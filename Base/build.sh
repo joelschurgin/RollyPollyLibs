@@ -14,6 +14,8 @@ $CC -c base.c -o base.o $BASE_CFLAGS
 ar rcs libbase.a base.o
 rm base.o
 
+echo -e "=> \033[32mBUILD COMPLETE: libbase.a\033[0m"
+
 echo "Building base_test..."
 $CC base_test.c -L. -lbase -o base_test $TEST_CFLAGS $LDFLAGS
 
@@ -23,4 +25,4 @@ mv libbase.a ../build/lib/libbase.a
 mkdir -p ../build/tests
 mv base_test ../build/tests/base_test
 
-echo "Build complete: build/base_test"
+echo -e "=> \033[32mBUILD COMPLETE: base_test\033[0m"

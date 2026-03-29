@@ -16,6 +16,8 @@ echo "Building misty library..."
 $CC -c misty.c -o misty.o $MISTY_CFLAGS
 ar rcs libmisty.a misty.o
 
+echo -e "=> \033[32mBUILD COMPLETE: libmisty.a\033[0m"
+
 echo "Building misty_test..."
 $CC misty_test.c -L. -lmisty -o misty_test $TEST_CFLAGS $LDFLAGS
 
@@ -26,4 +28,4 @@ mv libmisty.a ../build/lib/libmisty.a
 mkdir -p ../build/tests
 mv misty_test ../build/tests/misty_test
 
-echo "Build complete: build/misty_test"
+echo -e "=> \033[32mBUILD COMPLETE: misty_test\033[0m"

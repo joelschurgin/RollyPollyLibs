@@ -23,6 +23,8 @@ void barrier_init(Barrier *barrier, u64 thread_count);
 void barrier_release(Barrier *barrier);
 void barrier_sync(Barrier *barrier);
 
+#define ThreadExit(ret) pthread_exit((ret))
+
 typedef struct LaneCtx LaneCtx;
 struct LaneCtx {
     u64 lane_idx;

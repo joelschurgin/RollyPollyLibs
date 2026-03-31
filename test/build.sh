@@ -17,7 +17,6 @@ for arg in "$@"; do
         ./build.sh m64 dwarf3
         ./build.sh m64 dwarf4
         ./build.sh m64 dwarf5
-
         exit
         ;;
     m32)
@@ -54,9 +53,11 @@ fi
 if [[ "$DWARF_NAME" ]]; then
     EXEC_NAME+="_$DWARF_NAME"
 fi
+if [[ "$ENDIAN_NAME" ]]; then
+    EXEC_NAME+="_$ENDIAN_NAME"
+fi
 
 BUILD_DIR=../build/tests/dwarf_tests
 mkdir -p $BUILD_DIR
-gcc main.c -o $BUILD_DIR/$EXEC_NAME -g $ARCH $DWARF_VERSION
-
+gcc main.c -o $BUILD_DIR/$EXEC_NAME -g $ARCH $DWARF_VERSION 
 echo -e "=> \033[32mBUILD COMPLETE: $EXEC_NAME\033[0m"

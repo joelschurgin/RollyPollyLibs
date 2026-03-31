@@ -14,15 +14,19 @@ void* parallel_main(void* main_args) {
         ThreadExit(NULL);
     }
 
+    MistyMountain_SectionHeaderTableInfo section_header_table_info;
     if (LaneIdx() == 0) {
         Arena* arena = default_arena();
         String path = String(argv[1]);
         File* f = FilePtr(arena, path);
 
         MistyMountain* mountain = MistyMountain(arena);
-        misty_read_elf_header(mountain, f);
+        section_header_table_info = misty_read_elf_header(mountain, f);
     }
     LaneSync();
+    LaneSyncStruct(section_header_table_info, 0);
+
+    printf("Thread %d | offset: %lu\n", LaneIdx(), section_header_table_info);
 }
 
 String curr_dir(String path) {

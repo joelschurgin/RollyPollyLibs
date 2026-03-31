@@ -49,6 +49,10 @@ MistyMountain* misty_mountain_create(Arena* arena);
 
 #define misty_section(misty_mountain, section_name) (misty_mountain)->sections[(misty_mountain)->section_name]
 
-void misty_read_elf_header(MistyMountain* mountain, File* f);
+typedef struct {
+    u64 table_offset;
+    u64 entry_size;
+} MistyMountain_SectionHeaderTableInfo;
+MistyMountain_SectionHeaderTableInfo misty_read_elf_header(MistyMountain* mountain, File* f);
 
 #endif

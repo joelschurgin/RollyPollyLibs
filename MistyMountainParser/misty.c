@@ -7,7 +7,7 @@ MistyMountain* misty_mountain_create(Arena* arena) {
 }
 
 #define HeaderGet(header, field) (((header).type == ELF_32) ? (header).h.h32.field : (header).h.h64.field)
-void misty_read_elf_header(MistyMountain* mountain, File* f) {
+MistyMountain_SectionHeaderTableInfo misty_read_elf_header(MistyMountain* mountain, File* f) {
     ElfHeader header;
     file_read_bytes(f, 0, &header.h, sizeof(header.h));
 
@@ -28,5 +28,11 @@ void misty_read_elf_header(MistyMountain* mountain, File* f) {
 
     mountain->type     = type;
     mountain->endian   = endian;
-    mountain->shstrtab = HeaderGet(header, e_shstrndx);
+    mountain->shstrtab = 1 + HeaderGet(header, e_shstrndx);
+    mountain->sections = Array(mountain->arena, 1 + HeaderGet(header, e_shnum), MistyMountain_Section);
+
+    return (MistyMountain_SectionHeaderTableInfo) {
+        .table_offset = HeaderGet(header, e_shoff),
+        .entry_size = HeaderGet(header, e_shentsize),
+    };
 }

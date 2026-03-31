@@ -6,7 +6,7 @@ struct _Array {
 void* array_alloc(Arena* arena, u64 size, u64 element_size);
 #define Array(arena, size, type) (type *)array_alloc((arena), (size), sizeof(type))
 
-#define ArraySize(arr) (*(_Array*)((arr)-1))
+#define ArraySize(arr) (((_Array*)((arr)-1))->size)
 
 typedef u8*  u8Array;
 typedef u16* u16Array;

@@ -46,11 +46,11 @@ internal void thread_ctx_create(Arena* arena, u64 num_threads, ThreadCtx* ctx) {
     ctx->lanes = Array(arena, num_threads, LaneCtx);
     for (u64 lane_idx = 0; lane_idx < num_threads; lane_idx++) {
         ctx->lanes[lane_idx].lane_idx = lane_idx;
-        ctx->lanes[lane_idx].lane_count = num_threads;
     }
 
     ThreadKeyCreate(ctx->key);
     barrier_init(&ctx->barrier, num_threads);
+    ctx->shared_arena = arena;
 }
 
 internal void thread_ctx_delete(ThreadCtx ctx) {
@@ -73,6 +73,30 @@ internal void* setup_thread_locals(void* params) {
     SetupThreadLocals* setup = (SetupThreadLocals*)params;
     thread_ctx_assign(thread_ctx, setup->thread_idx);
     return setup->parallel_entry_point(setup->params);
+}
+
+void* lane_alloc(Arena* arena, u64 num_bytes, u64 src_lane_idx) {
+    void* data = 0L;
+    if (LaneIdx() == src_lane_idx) {
+        data = arena_push(arena, num_bytes * LaneCount(), 1, false);
+    }
+    LaneSync();
+
+    return data + (num_bytes * LaneIdx());
+}
+
+void lane_sync_data(Arena* arena, void* data, u64 num_bytes, u64 src_lane_idx) {
+    void* broadcasted = 0L; 
+    if (LaneIdx() == src_lane_idx) {
+        broadcasted = arena_push(arena, num_bytes, 1, false);
+        MemoryCopy(broadcasted, data, num_bytes);
+        arena_pop(arena, num_bytes);
+    }
+    LaneSync();
+    if (LaneIdx() != src_lane_idx) {
+        MemoryCopy(data, broadcasted, num_bytes);
+    }
+    LaneSync();
 }
 
 void create_parallel_entry_point(u64 num_threads, void* (*parallel_entry_point)(void*), void* params) {

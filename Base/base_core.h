@@ -143,4 +143,13 @@ b32 memory_is_zero(void* ptr, u64 size);
 // cool for loops
 #define DeferBlock(begin, end)        for(i32 _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 
+// arrays
+#define ArrayName(type) Glue(type, Array)
+
+#define Array(arena, num_elements, type) (ArrayName(type)){ .data = push_array((arena), type, (num_elements), true), .count = (num_elements), }
+#define DefineArray(type) typedef struct { \
+        type * data;                       \
+        u64 count;                         \
+    } ArrayName(type)
+
 #endif

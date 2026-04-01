@@ -25,13 +25,21 @@ typedef struct {
 } ElfHeader;
 
 typedef struct {
+    ElfType type;
+    union {
+        Elf32_Shdr h32;
+        Elf64_Shdr h64;
+    } h;
+} ElfSectionHeader;
+
+typedef struct {
     String name;
     u64 offset;
     u64 pos;
     void* data;
 } MistyMountain_Section;
 
-typedef MistyMountain_Section* MistyMountain_SectionArray;
+DefineArray(MistyMountain_Section);
 
 typedef struct {
     Arena* arena;
@@ -39,7 +47,6 @@ typedef struct {
     ElfEndian endian;
 
     u64 debug_abbrev_idx;
-    u64 shstrtab;
 
     MistyMountain_SectionArray sections;
 } MistyMountain;
@@ -52,7 +59,11 @@ MistyMountain* misty_mountain_create(Arena* arena);
 typedef struct {
     u64 table_offset;
     u64 entry_size;
+    u8* section_names;
 } MistyMountain_SectionHeaderTableInfo;
 MistyMountain_SectionHeaderTableInfo misty_read_elf_header(MistyMountain* mountain, File* f);
+u8* misty_read_shstrtab(MistyMountain* mountain, File* f, u64 offset);
+
+void misty_read_elf_section_headers(MistyMountain* mountain, File* f, MistyMountain_SectionHeaderTableInfo section_header_table_info);
 
 #endif

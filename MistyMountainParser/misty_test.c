@@ -14,16 +14,22 @@ void* parallel_main(void* main_args) {
         ThreadExit(NULL);
     }
 
+    File* f;
+    MistyMountain* mountain = 0L;
     MistyMountain_SectionHeaderTableInfo section_header_table_info;
     if (LaneIdx() == 0) {
         Arena* arena = default_arena();
         String path = String(argv[1]);
-        File* f = FilePtr(arena, path);
+        f = FilePtr(arena, path);
 
-        MistyMountain* mountain = MistyMountain(arena);
+        mountain = MistyMountain(arena);
         section_header_table_info = misty_read_elf_header(mountain, f);
     }
+    LaneSyncPtr(f, 0);
+    LaneSyncPtr(mountain, 0);
     LaneSyncStruct(section_header_table_info, 0);
+
+    misty_read_elf_section_headers(mountain, f, section_header_table_info);
 }
 
 String curr_dir(String path) {
@@ -67,8 +73,6 @@ i32 main(i32 argc, u8** argv) {
         create_parallel_entry_point(num_threads, parallel_main, &main_args);
         temp_arena_end(temp_arena);
     }
-
-
 
     return 0;
 }

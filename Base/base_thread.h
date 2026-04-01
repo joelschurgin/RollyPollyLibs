@@ -30,7 +30,7 @@ struct LaneCtx {
     u64 lane_idx;
 };
 
-typedef LaneCtx* LaneCtxArray;
+DefineArray(LaneCtx);
 
 typedef struct ThreadCtx ThreadCtx;
 struct ThreadCtx {
@@ -45,7 +45,7 @@ extern ThreadCtx thread_ctx;
 
 #define LaneCtx()   ((LaneCtx*)pthread_getspecific(thread_ctx.key))
 #define LaneIdx()   LaneCtx()->lane_idx
-#define LaneCount() ArraySize(thread_ctx.lanes)
+#define LaneCount() thread_ctx.lanes.count
 #define LaneSync()  barrier_sync(&thread_ctx.barrier)
 
 void* lane_alloc(Arena* arena, u64 num_bytes, u64 src_lane_idx);
@@ -53,11 +53,11 @@ void lane_sync_data(Arena* arena, void* data, u64 num_bytes, u64 src_lane_idx);
 
 #define LaneSyncData(data_ptr, num_bytes, src_lane_idx) lane_sync_data((thread_ctx.shared_arena), (data_ptr), (num_bytes), (src_lane_idx))
 #define LaneSyncStruct(data, src_lane_idx) LaneSyncData(&(data), sizeof(data), (src_lane_idx))
-#define LaneSyncArray(data_ptr, type, src_lane_idx) LaneSyncData((data_ptr), ArraySize(data)*sizeof(type), (src_lane_idx))
+#define LaneSyncPtr(ptr, src_lane_idx) LaneSyncStruct((ptr), (src_lane_idx))
 
 #define ThreadKeyCreate(key) pthread_key_create((pthread_key_t*)&(key), NULL)
 #define ThreadKeyDelete(key) pthread_key_delete((key))
 
 void create_parallel_entry_point(u64 num_threads, void* (*parallel_entry_point)(void*), void* params);
 
-
+#define ThreadArraySplit(array_size) thread_array_split(LaneCount(), (array_size), LaneIdx())

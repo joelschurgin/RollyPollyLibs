@@ -45,7 +45,7 @@ void barrier_sync(Barrier *barrier) {
 internal void thread_ctx_create(Arena* arena, u64 num_threads, ThreadCtx* ctx) {
     ctx->lanes = Array(arena, num_threads, LaneCtx);
     for (u64 lane_idx = 0; lane_idx < num_threads; lane_idx++) {
-        ctx->lanes[lane_idx].lane_idx = lane_idx;
+        ctx->lanes.data[lane_idx].lane_idx = lane_idx;
     }
 
     ThreadKeyCreate(ctx->key);
@@ -59,7 +59,7 @@ internal void thread_ctx_delete(ThreadCtx ctx) {
 }
 
 internal void thread_ctx_assign(ThreadCtx ctx, u64 thread_idx) {
-    pthread_setspecific(ctx.key, &ctx.lanes[thread_idx]);
+    pthread_setspecific(ctx.key, &ctx.lanes.data[thread_idx]);
 }
 
 typedef struct SetupThreadLocals SetupThreadLocals;

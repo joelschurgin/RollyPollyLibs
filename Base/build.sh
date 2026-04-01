@@ -5,8 +5,8 @@ SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 cd $SCRIPT_DIR
 
 CC="gcc"
-BASE_CFLAGS="-std=c99 -D_POSIX_C_SOURCE=200112L -Wextra -Werror -Wimplicit-function-declaration -nostdlib -nostartfiles -g -DBUILD_DEBUG"
-TEST_CFLAGS="-std=c99 -D_POSIX_C_SOURCE=200112L -nostartfiles -g"
+BASE_CFLAGS="-std=c99 -D_POSIX_C_SOURCE=200112L -Wextra -Werror -Wimplicit-function-declaration -nostdlib -nostartfiles -g3 -DBUILD_DEBUG"
+TEST_CFLAGS="-std=c99 -D_POSIX_C_SOURCE=200112L -nostartfiles -g3"
 LDFLAGS="-Wl,-e,entry_point -lpthread"
 
 echo "Building base library..."

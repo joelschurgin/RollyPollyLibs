@@ -38,7 +38,7 @@ struct ThreadCtx {
     LaneCtxArray lanes;
     u64 key;
     Barrier barrier;
-    u64 broadcast_value;
+    void* broadcast_memory;
 };
 
 extern ThreadCtx thread_ctx;

@@ -59,5 +59,5 @@ fi
 
 BUILD_DIR=../build/tests/dwarf_tests
 mkdir -p $BUILD_DIR
-gcc main.c -o $BUILD_DIR/$EXEC_NAME -g $ARCH $DWARF_VERSION 
+gcc main.c -o $BUILD_DIR/$EXEC_NAME -g3 $ARCH $DWARF_VERSION 
 echo -e "=> \033[32mBUILD COMPLETE: $EXEC_NAME\033[0m"

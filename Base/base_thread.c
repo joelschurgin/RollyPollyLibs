@@ -86,15 +86,14 @@ void* lane_alloc(Arena* arena, u64 num_bytes, u64 src_lane_idx) {
 }
 
 void lane_sync_data(Arena* arena, void* data, u64 num_bytes, u64 src_lane_idx) {
-    void* broadcasted = 0L; 
     if (LaneIdx() == src_lane_idx) {
-        broadcasted = arena_push(arena, num_bytes, 1, false);
-        MemoryCopy(broadcasted, data, num_bytes);
+        thread_ctx.broadcast_memory = arena_push(arena, num_bytes, 1, true);
+        MemoryCopy(thread_ctx.broadcast_memory, data, num_bytes);
         arena_pop(arena, num_bytes);
     }
     LaneSync();
     if (LaneIdx() != src_lane_idx) {
-        MemoryCopy(data, broadcasted, num_bytes);
+        MemoryCopy(data, thread_ctx.broadcast_memory, num_bytes);
     }
     LaneSync();
 }

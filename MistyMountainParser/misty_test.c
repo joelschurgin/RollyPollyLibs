@@ -23,10 +23,7 @@ void* parallel_main(void* main_args) {
         MistyMountain* mountain = MistyMountain(arena);
         section_header_table_info = misty_read_elf_header(mountain, f);
     }
-    LaneSync();
     LaneSyncStruct(section_header_table_info, 0);
-
-    printf("Thread %d | offset: %lu\n", LaneIdx(), section_header_table_info);
 }
 
 String curr_dir(String path) {

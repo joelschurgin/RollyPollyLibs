@@ -63,3 +63,10 @@ void file_read_bytes(File* f, u64 file_pos, void* buf, u64 num_bytes_to_read) {
     if (!file_is_open(f)) file_open(f, FILE_READ_ONLY);
     MemoryCopy(buf, f->data + file_pos, num_bytes_to_read);
 }
+
+String file_read_cstring(Arena* arena, File* f, u64 file_pos, u64* num_bytes_read) {
+    if (!file_is_open(f)) file_open(f, FILE_READ_ONLY);
+    String s = string_copy(arena, String(f->data + file_pos));
+    *num_bytes_read = s.size+1;
+    return s;
+}

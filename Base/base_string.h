@@ -36,6 +36,8 @@ String string_skip(String s, u64 amt);
 #define Postfix(str, size) string_postfix((str), (size))
 
 b32 string_compare(String a, String b);
+//String string_keep_before_perfect_match(String s, String str_match);
+String string_keep_after_perfect_match(String s, String str_match);
 
 String string_concat(Arena* arena, String s1, String s2);
 String string_copy(Arena* arena, String s);

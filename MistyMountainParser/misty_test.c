@@ -30,6 +30,11 @@ void* parallel_main(void* main_args) {
     LaneSyncStruct(section_header_table_info, 0);
 
     misty_read_elf_section_headers(mountain, f, section_header_table_info);
+
+    LaneSync();
+    if (LaneIdx() == 0) {
+        misty_macros(mountain, f);
+    }
 }
 
 String curr_dir(String path) {
@@ -40,7 +45,7 @@ String curr_dir(String path) {
 }
 
 i32 main(i32 argc, u8** argv) {
-    u64 num_threads = 4;
+    u64 num_threads = 1;
  
     Arena* arena = arena_alloc(1024, 1024);
     String dir = curr_dir(String(argv[0]));

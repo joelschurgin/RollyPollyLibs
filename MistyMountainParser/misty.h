@@ -34,9 +34,9 @@ typedef struct {
 
 typedef struct {
     String name;
+    u64 size;
     u64 offset;
     u64 pos;
-    void* data;
 } MistyMountain_Section;
 
 DefineArray(MistyMountain_Section);
@@ -46,7 +46,9 @@ typedef struct {
     ElfType type;
     ElfEndian endian;
 
-    u64 debug_abbrev_idx;
+    u64 debug_macro;
+    u64 debug_str;
+    u64 debug_str_offsets;
 
     MistyMountain_SectionArray sections;
 } MistyMountain;
@@ -54,7 +56,7 @@ typedef struct {
 MistyMountain* misty_mountain_create(Arena* arena);
 #define MistyMountain(arena) misty_mountain_create((arena))
 
-#define misty_section(misty_mountain, section_name) (misty_mountain)->sections[(misty_mountain)->section_name]
+#define misty_section(misty_mountain, section_name) &((misty_mountain)->sections.data[(misty_mountain)->section_name])
 
 typedef struct {
     u64 table_offset;
@@ -65,5 +67,20 @@ MistyMountain_SectionHeaderTableInfo misty_read_elf_header(MistyMountain* mounta
 u8* misty_read_shstrtab(MistyMountain* mountain, File* f, u64 offset);
 
 void misty_read_elf_section_headers(MistyMountain* mountain, File* f, MistyMountain_SectionHeaderTableInfo section_header_table_info);
+
+// sbyte = i8
+// ubyte = u8
+// uhalf = u16
+// uword = u32
+
+typedef struct {
+    u16 version;
+    u8 flags;
+    u64 debug_line_offset;
+
+    u8 address_size_bytes;
+} MistyMountain_MacroHeader;
+
+void misty_macros(MistyMountain* mountain, File* f);
 
 #endif

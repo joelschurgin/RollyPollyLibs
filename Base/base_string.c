@@ -91,6 +91,32 @@ b32 string_compare(String a, String b) {
     return true;
 }
 
+/*
+String string_keep_before_perfect_match(String s, String str_match) {
+    u8* c = s.str;
+    u8* c_match = str_match.str;
+    u64 i = 0;
+    for (; i < s.size && *c != *c_match; i++, c++);
+
+    u64 j = i;
+    for (; j < s.size && *c == *c_match; j++, c++, *c_match++);
+
+    return string_chop(s, (j-i == str_match.size) * i);
+}
+*/
+
+String string_keep_after_perfect_match(String s, String str_match) {
+    u8* c = s.str;
+    u8* c_match = str_match.str;
+    u64 i = 0;
+    for (; i < s.size && *c != *c_match; i++, c++);
+
+    u64 j = i;
+    for (; j < s.size && *c == *c_match; j++, c++, *c_match++);
+
+    return string_skip(s, (j-i == str_match.size) ? j : i);
+}
+
 String string_concat(Arena* arena, String s1, String s2) {
     String output = EmptyString(arena, s1.size + s2.size);
     MemoryCopy(output.str, s1.str, s1.size);

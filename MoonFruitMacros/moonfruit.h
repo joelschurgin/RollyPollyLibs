@@ -21,9 +21,10 @@ typedef struct {
     Mutex* mutex;
 } MoonFruit_ChunkQueue;
 
-MoonFruit_ChunkQueue* moonfruit_chunk_queue_create(Arena* arena, u64 capacity, u64 mutex_idx);
+MoonFruit_ChunkQueue* moonfruit_chunk_queue_create(Arena* arena, u64 capacity);
 u64 moonfruit_chunk_queue_size(MoonFruit_ChunkQueue* Q);
 void moonfruit_chunk_queue_push(MoonFruit_ChunkQueue* Q, MoonFruit_Chunk chunk);
+MoonFruit_Chunk moonfruit_chunk_queue_pop(MoonFruit_ChunkQueue* Q);
 
 /*
 void moonfruit_process_chunk(MoonFruit_Chunk* chunk) {

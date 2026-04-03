@@ -23,8 +23,9 @@ void* parallel_main(void* main_args) {
         File* f = FilePtr(arena, path);
         file_open(f, FILE_READ_ONLY);
 
-        Q = moonfruit_chunk_queue_create(arena, LaneCount() * 2, 0);
-        for (u64 i = 0; i < Q->capacity; i++) {
+        Q = moonfruit_chunk_queue_create(arena, LaneCount() * 2);
+        mutex_assign(&Q->mutex, 0);
+        for (u64 i = 0; i < 1; i++) {
             moonfruit_chunk_queue_push(Q, (MoonFruit_Chunk){
                 .file = f,
                 .size = MOONFRUIT_CHUNK_SIZE,
@@ -32,6 +33,10 @@ void* parallel_main(void* main_args) {
                 .data = 0,
             });
         }
+        for (u64 i = 0; i < Q->capacity; i++) {
+            MoonFruit_Chunk chunk = moonfruit_chunk_queue_pop(Q);
+        }
+
     }
     LaneSyncPtr(Q, 0);
 }

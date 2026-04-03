@@ -1,10 +1,9 @@
 #include "moonfruit.h"
 
-MoonFruit_ChunkQueue* moonfruit_chunk_queue_create(Arena* arena, u64 capacity, u64 mutex_idx) {
+MoonFruit_ChunkQueue* moonfruit_chunk_queue_create(Arena* arena, u64 capacity) {
     MoonFruit_ChunkQueue* Q = push_struct(arena, MoonFruit_ChunkQueue);
     Q->chunks = push_array(arena, MoonFruit_Chunk, capacity, true);
     Q->capacity = capacity;
-    Q->mutex = &thread_ctx.mutexes.data[mutex_idx];
     return Q;
 }
 
@@ -16,16 +15,29 @@ u64 moonfruit_chunk_queue_size(MoonFruit_ChunkQueue* Q) {
 }
 
 void moonfruit_chunk_queue_push(MoonFruit_ChunkQueue* Q, MoonFruit_Chunk chunk) {
-    mutex_lock(Q->mutex);
-    u64 size = moonfruit_chunk_queue_size(Q);
-    u64 capacity = atomic_load(&Q->capacity);
-    if (size >= capacity) {
-        Assert(!"Not enough space in the chunk queue");
+    DeferBlock(mutex_lock(Q->mutex), mutex_unlock(Q->mutex)) {
+        u64 size = moonfruit_chunk_queue_size(Q);
+        u64 capacity = atomic_load(&Q->capacity);
+        if (size+1 >= capacity) {
+            Assert(!"Not enough space in the chunk queue");
+        }
+
+        Q->chunks[Q->last_idx] = chunk;
+        atomic_add(&Q->last_idx, 1);
+        atomic_compare_exchange(&Q->last_idx, &capacity, 0);
     }
+}
 
-    atomic_add(&Q->last_idx, 1);
-    atomic_compare_exchange(&Q->last_idx, &capacity, 0);
-
-    Q->chunks[Q->last_idx] = chunk;
-    mutex_unlock(Q->mutex);
+MoonFruit_Chunk moonfruit_chunk_queue_pop(MoonFruit_ChunkQueue* Q) {
+    MoonFruit_Chunk chunk = (MoonFruit_Chunk){0};
+    DeferBlock(mutex_lock(Q->mutex), mutex_unlock(Q->mutex)) {
+        u64 size = moonfruit_chunk_queue_size(Q);
+        if (size != 0) {
+            u64 capacity = atomic_load(&Q->capacity);
+            chunk = Q->chunks[Q->first_idx];
+            atomic_add(&Q->first_idx, 1);
+            atomic_compare_exchange(&Q->first_idx, &capacity, 0);
+        }
+    }
+    return chunk;
 }

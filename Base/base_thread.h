@@ -29,6 +29,7 @@ typedef struct {
 
 DefineArray(Mutex);
 
+void mutex_assign(Mutex** mutex, u64 idx);
 void mutex_init(Mutex* mutex);
 void mutex_release(Mutex* mutex);
 void mutex_lock(Mutex* mutex);

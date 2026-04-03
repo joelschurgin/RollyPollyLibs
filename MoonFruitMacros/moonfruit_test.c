@@ -20,25 +20,26 @@ void* parallel_main(void* main_args) {
     if (LaneIdx() == 0) {
         Arena* arena = default_arena();
         String path = String(argv[1]);
-        File* f = FilePtr(arena, path);
-        file_open(f, FILE_READ_ONLY);
+        MoonFruit_File* f = moonfruit_file_create(arena, path);
+        moonfruit_file_open(f);
 
         Q = moonfruit_chunk_queue_create(arena, LaneCount() * 2);
         mutex_assign(&Q->mutex, 0);
-        for (u64 i = 0; i < 1; i++) {
-            moonfruit_chunk_queue_push(Q, (MoonFruit_Chunk){
-                .file = f,
-                .size = MOONFRUIT_CHUNK_SIZE,
-                .pos = 0,
-                .data = 0,
-            });
+        for (u64 i = 0; i < LaneCount(); i++) {
+            moonfruit_file_push_next_chunk(f, Q);
         }
-        for (u64 i = 0; i < Q->capacity; i++) {
-            MoonFruit_Chunk chunk = moonfruit_chunk_queue_pop(Q);
-        }
-
     }
     LaneSyncPtr(Q, 0);
+
+    for (; moonfruit_chunk_queue_size(Q) > 0 ; ) {
+        MoonFruit_Chunk chunk = moonfruit_chunk_queue_pop(Q);
+        if (!moonfruit_chunk_empty(chunk)) {
+            printf("===================CHUNK===================\n"
+                   "LAST CHUNK => %d\n"
+                   "%.*s\n", chunk.last_chunk_in_file, chunk.text.size, chunk.text.str);
+            moonfruit_file_push_next_chunk(chunk.file, Q);
+        }
+    }
 }
 
 String parent_dir(String path, u32 num_dirs) {

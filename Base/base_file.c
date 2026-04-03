@@ -57,6 +57,7 @@ void file_close(File* f) {
 
     close(f->fd);
     f->fd = -1;
+    f->data = NULL;
 }
 
 void file_read_bytes(File* f, u64 file_pos, void* buf, u64 num_bytes_to_read) {

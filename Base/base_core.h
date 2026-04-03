@@ -159,6 +159,7 @@ b32 memory_is_zero(void* ptr, u64 size);
 // atomic_load:
 // return *ptr;
 #define atomic_load(ptr)                                    __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
+#define atomic_load_ptr(ptr)                                __atomic_load_n(&ptr, __ATOMIC_SEQ_CST)
 
 // atomic_store:
 // *ptr = val;

@@ -8,12 +8,17 @@
 typedef struct {
     File file;
     u64 pos;
+    u64 chunk_count;
+    u64Array per_chunk_line_nums;
 } MoonFruit_File;
 
 typedef struct {
     MoonFruit_File* file;
     String text;
     u64 pos;
+    u64 per_file_chunk_idx;
+
+    b8 first_chunk_in_file;
     b8 last_chunk_in_file;
 } MoonFruit_Chunk;
 
@@ -32,8 +37,9 @@ void moonfruit_chunk_queue_push(MoonFruit_ChunkQueue* Q, MoonFruit_Chunk chunk);
 MoonFruit_Chunk moonfruit_chunk_queue_pop(MoonFruit_ChunkQueue* Q);
 
 #define moonfruit_chunk_empty(chunk) (chunk.text.size == 0)
+void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue* Q);
 
-MoonFruit_File* moonfruit_file_create(Arena* arena, String path);
+MoonFruit_File* moonfruit_file_create_and_open(Arena* arena, String path);
 void moonfruit_file_open(MoonFruit_File* f);
 void moonfruit_file_close(MoonFruit_File* f);
 

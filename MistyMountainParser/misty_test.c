@@ -75,7 +75,7 @@ i32 main(i32 argc, u8** argv) {
             .argv = argv_test,
         };
 
-        create_parallel_entry_point(num_threads, parallel_main, &main_args);
+        create_parallel_entry_point(num_threads, 0, parallel_main, &main_args);
         temp_arena_end(temp_arena);
     }
 

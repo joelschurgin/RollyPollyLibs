@@ -1,3 +1,4 @@
+#define BASE_ENTRY_POINT
 #include "base.h"
 
 #include <stdio.h>
@@ -17,7 +18,7 @@ void* parallel_main(void*) {
 
 i32 main(i32 argc, u8** argv) {
     u64 num_threads = 8;
-    create_parallel_entry_point(num_threads, parallel_main, NULL);
+    create_parallel_entry_point(num_threads, 0, parallel_main, NULL);
 
     return 0;
 }

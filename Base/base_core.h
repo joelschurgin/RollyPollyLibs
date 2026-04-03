@@ -152,4 +152,42 @@ b32 memory_is_zero(void* ptr, u64 size);
         u64 count;                         \
     } ArrayName(type)
 
+// atomics
+#define ATOMIC_MEMORDER __ATOMIC_SEQ_CST
+#if COMPILER_CLANG || COMPILER_GCC
+
+// atomic_load:
+// return *ptr;
+#define atomic_load(ptr)                                    __atomic_load_n(ptr, __ATOMIC_SEQ_CST)
+
+// atomic_store:
+// *ptr = val;
+#define atomic_store(ptr, val)                              __atomic_store_n(ptr, val, __ATOMIC_SEQ_CST)
+
+// atomic_exchange
+// return *ptr;
+// *ptr = val;
+#define atomic_exchange(ptr, val)                           __atomic_exchange_n(ptr, val, __ATOMIC_SEQ_CST)
+
+// atomic_compare_exchange:
+// if (*ptr == *expect) {
+//      *ptr = val_if_true;
+//      return true;
+// } else {
+//      return false;
+// }
+#define atomic_compare_exchange(ptr, expected, val_if_true) __atomic_compare_exchange_n(ptr, expected, val_if_true, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
+
+// atomic_<op>:
+// *ptr += val; *ptr -= val; *ptr &= val; etc..
+#define atomic_add(ptr, val)                                __atomic_fetch_add(ptr, val, __ATOMIC_SEQ_CST)
+#define atomic_sub(ptr, val)                                __atomic_fetch_sub(ptr, val, __ATOMIC_SEQ_CST)
+#define atomic_and(ptr, val)                                __atomic_fetch_and(ptr, val, __ATOMIC_SEQ_CST)
+#define atomic_xor(ptr, val)                                __atomic_fetch_xor(ptr, val, __ATOMIC_SEQ_CST)
+#define atomic_or(ptr, val)                                 __atomic_fetch_or(ptr, val, __ATOMIC_SEQ_CST)
+#define atomic_nand(ptr, val)                               __atomic_fetch_nand(ptr, val, __ATOMIC_SEQ_CST)
+#else
+#  error Atomic intrinsics not defined for this compiler / architecture.
+#endif
+
 #endif

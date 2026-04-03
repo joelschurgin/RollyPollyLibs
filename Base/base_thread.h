@@ -23,6 +23,17 @@ void barrier_init(Barrier *barrier, u64 thread_count);
 void barrier_release(Barrier *barrier);
 void barrier_sync(Barrier *barrier);
 
+typedef struct {
+    pthread_mutex_t id;
+} Mutex;
+
+DefineArray(Mutex);
+
+void mutex_init(Mutex* mutex);
+void mutex_release(Mutex* mutex);
+void mutex_lock(Mutex* mutex);
+void mutex_unlock(Mutex* mutex);
+
 #define ThreadExit(ret) pthread_exit((ret))
 
 typedef struct LaneCtx LaneCtx;
@@ -39,6 +50,7 @@ struct ThreadCtx {
     u64 key;
     Barrier barrier;
     void* broadcast_memory;
+    MutexArray mutexes;
 };
 
 extern ThreadCtx thread_ctx;
@@ -58,6 +70,6 @@ void lane_sync_data(Arena* arena, void* data, u64 num_bytes, u64 src_lane_idx);
 #define ThreadKeyCreate(key) pthread_key_create((pthread_key_t*)&(key), NULL)
 #define ThreadKeyDelete(key) pthread_key_delete((key))
 
-void create_parallel_entry_point(u64 num_threads, void* (*parallel_entry_point)(void*), void* params);
+void create_parallel_entry_point(u64 num_threads, u64 num_mutexes, void* (*parallel_entry_point)(void*), void* params);
 
 #define ThreadArraySplit(array_size) thread_array_split(LaneCount(), (array_size), LaneIdx())

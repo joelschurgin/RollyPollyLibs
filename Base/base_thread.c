@@ -42,7 +42,23 @@ void barrier_sync(Barrier *barrier) {
     pthread_barrier_wait(&barrier->barrier_id);
 }
 
-internal void thread_ctx_create(Arena* arena, u64 num_threads, ThreadCtx* ctx) {
+void mutex_init(Mutex* mutex) {
+    pthread_mutex_init(&mutex->id, NULL);
+}
+
+void mutex_release(Mutex* mutex) {
+    pthread_mutex_destroy(&mutex->id);
+}
+
+void mutex_lock(Mutex* mutex) {
+    pthread_mutex_lock(&mutex->id);
+}
+
+void mutex_unlock(Mutex* mutex) {
+    pthread_mutex_unlock(&mutex->id);
+}
+
+internal void thread_ctx_create(Arena* arena, u64 num_threads, u64 num_mutexes, ThreadCtx* ctx) {
     ctx->lanes = Array(arena, num_threads, LaneCtx);
     for (u64 lane_idx = 0; lane_idx < num_threads; lane_idx++) {
         ctx->lanes.data[lane_idx].lane_idx = lane_idx;
@@ -51,11 +67,20 @@ internal void thread_ctx_create(Arena* arena, u64 num_threads, ThreadCtx* ctx) {
     ThreadKeyCreate(ctx->key);
     barrier_init(&ctx->barrier, num_threads);
     ctx->shared_arena = arena;
+
+    ctx->mutexes.data = push_array(arena, Mutex, num_mutexes, false);
+    ctx->mutexes.count = num_mutexes;
+    for (u64 mutex_idx = 0; mutex_idx < num_mutexes; mutex_idx++) {
+        mutex_init(&ctx->mutexes.data[mutex_idx]);
+    }
 }
 
 internal void thread_ctx_delete(ThreadCtx ctx) {
     ThreadKeyDelete(ctx.key);
     barrier_release(&ctx.barrier);
+    for (u64 mutex_idx = 0; mutex_idx < ctx.mutexes.count; mutex_idx++) {
+        mutex_release(&ctx.mutexes.data[mutex_idx]);
+    }
 }
 
 internal void thread_ctx_assign(ThreadCtx ctx, u64 thread_idx) {
@@ -98,11 +123,11 @@ void lane_sync_data(Arena* arena, void* data, u64 num_bytes, u64 src_lane_idx) {
     LaneSync();
 }
 
-void create_parallel_entry_point(u64 num_threads, void* (*parallel_entry_point)(void*), void* params) {
+void create_parallel_entry_point(u64 num_threads, u64 num_mutexes, void* (*parallel_entry_point)(void*), void* params) {
     Arena* arena = default_arena();
 
     DeferBlock({
-        thread_ctx_create(arena, num_threads, &thread_ctx);
+        thread_ctx_create(arena, num_threads, num_mutexes, &thread_ctx);
     }, {
         thread_ctx_delete(thread_ctx);
     }) {

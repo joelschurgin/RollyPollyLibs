@@ -1,5 +1,7 @@
-#include "base.h"
 #include "moonfruit.h"
+
+#define BASE_ENTRY_POINT
+#include "base.h"
 
 typedef struct {
     i32 argc;
@@ -14,23 +16,24 @@ void* parallel_main(void* main_args) {
         ThreadExit(NULL);
     }
 
-    File* f;
-    DeferBlock({
-        if (LaneIdx() == 0) {
-            Arena* arena = default_arena();
-            String path = String(argv[1]);
-            f = FilePtr(arena, path);
-            file_open(f, FILE_READ_ONLY);
+    MoonFruit_ChunkQueue* Q;
+    if (LaneIdx() == 0) {
+        Arena* arena = default_arena();
+        String path = String(argv[1]);
+        File* f = FilePtr(arena, path);
+        file_open(f, FILE_READ_ONLY);
+
+        Q = moonfruit_chunk_queue_create(arena, LaneCount() * 2, 0);
+        for (u64 i = 0; i < Q->capacity; i++) {
+            moonfruit_chunk_queue_push(Q, (MoonFruit_Chunk){
+                .file = f,
+                .size = MOONFRUIT_CHUNK_SIZE,
+                .pos = 0,
+                .data = 0,
+            });
         }
-        LaneSyncPtr(f, 0);
-    }, {
-        LaneSync();
-        if (LaneIdx() == 0) {
-            file_close(f);
-        }
-    }) {
-        // read file here
     }
+    LaneSyncPtr(Q, 0);
 }
 
 String parent_dir(String path, u32 num_dirs) {
@@ -42,7 +45,7 @@ String parent_dir(String path, u32 num_dirs) {
 }
 
 i32 main(i32 argc, u8** argv) {
-    u64 num_threads = 4;
+    u64 num_threads = 1;
  
     Arena* arena = arena_alloc(1024, 1024);
     String dir = parent_dir(String(argv[0]), 3);
@@ -65,7 +68,7 @@ i32 main(i32 argc, u8** argv) {
             .argv = argv_test,
         };
 
-        create_parallel_entry_point(num_threads, parallel_main, &main_args);
+        create_parallel_entry_point(num_threads, 1, parallel_main, &main_args);
         temp_arena_end(temp_arena);
     }
 

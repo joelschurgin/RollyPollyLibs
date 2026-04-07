@@ -4,6 +4,8 @@ struct String {
     u64 size;
 };
 
+DefineArray(String);
+
 internal b32 char_is_whitespace(u8 c);
 internal b32 char_is_upper(u8 c);
 internal b32 char_is_lower(u8 c);

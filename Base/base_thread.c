@@ -71,7 +71,7 @@ void mutex_unlock(Mutex* mutex) {
 }
 
 internal void thread_ctx_create(Arena* arena, u64 num_threads, u64 num_mutexes, ThreadCtx* ctx) {
-    ctx->lanes = Array(arena, num_threads, LaneCtx);
+    ctx->lanes = Array(arena, LaneCtx, num_threads);
     for (u64 lane_idx = 0; lane_idx < num_threads; lane_idx++) {
         ctx->lanes.data[lane_idx].lane_idx = lane_idx;
     }

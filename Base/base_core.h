@@ -147,7 +147,7 @@ b32 memory_is_zero(void* ptr, u64 size);
 // arrays
 #define ArrayName(type) Glue(type, Array)
 
-#define Array(arena, num_elements, type) (ArrayName(type)){ .data = push_array((arena), type, (num_elements), true), .count = (num_elements), }
+#define Array(arena, type, num_elements) (ArrayName(type)){ .data = push_array((arena), type, (num_elements), true), .count = (num_elements), }
 #define DefineArray(type) typedef struct { \
         type * data;                       \
         u64 count;                         \

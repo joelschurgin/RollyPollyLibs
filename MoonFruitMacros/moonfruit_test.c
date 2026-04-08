@@ -59,7 +59,7 @@ String parent_dir(String path, u32 num_dirs) {
 }
 
 i32 main(i32 argc, u8 **argv) {
-    u64 num_threads = 2;
+    u64 num_threads = 1;
 
     Arena *arena = arena_alloc(1024, 1024);
     String dir   = parent_dir(String(argv[0]), 3);

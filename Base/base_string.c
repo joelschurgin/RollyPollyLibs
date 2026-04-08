@@ -81,8 +81,28 @@ String string_skip(String s, u64 amt) {
     return s;
 }
 
+String string_chop_whitespace(String s) {
+    u64 amt = 0;
+    for (i64 i = s.size-1; i >= 0 && char_is_whitespace(s.str[i]); i--,amt++);
+    return string_chop(s, amt);
+}
+
+String string_skip_whitespace(String s) {
+    u64 amt = 0;
+    for (; amt < s.size && char_is_whitespace(s.str[amt]); amt++);
+    return string_skip(s, amt);
+}
+
+String string_chop_before_whitespace(String s) {
+    u64 amt = 0;
+    for (; amt < s.size && !char_is_whitespace(s.str[amt]); amt++);
+    return string_prefix(s, amt);
+}
+
 b32 string_compare(String a, String b) {
     if (a.size != b.size) return false;
+
+    // could make this faster by comparing u64's or even use simd then compare the remaining chars
 
     for (u64 i = 0; i < a.size; i++) {
         if (a.str[i] != b.str[i]) return false;

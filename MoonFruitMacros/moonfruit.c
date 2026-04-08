@@ -1,5 +1,60 @@
 #include "moonfruit.h"
 
+MoonFruit_File *moonfruit_file_create_and_open(Arena *arena, String path) {
+    MoonFruit_File *f = push_struct(arena, MoonFruit_File);
+    f->file           = File(arena, path);
+    f->pos            = 0;
+
+    moonfruit_file_open(f);
+
+    u64 num_chunks          = CeilIntDiv(f->file.size, MOONFRUIT_CHUNK_SIZE);
+    u64 num_chunks_plus_one = 1 + num_chunks;
+    f->per_chunk_line_nums  = Array(arena, u64, num_chunks_plus_one);
+    for (u64 i = 0; i < num_chunks_plus_one; i++) {
+        f->per_chunk_line_nums.data[i] = 1;
+    }
+
+    f->per_chunk_info = Array(arena, MoonFruit_PerChunkInfo, num_chunks);
+    for (u64 i = 0; i < num_chunks; i++) {
+        f->per_chunk_info.data[i] = (MoonFruit_PerChunkInfo){
+            .start_line = 1,
+        };
+    }
+    return f;
+}
+
+void moonfruit_file_open(MoonFruit_File *f) {
+    file_open(&f->file, FILE_READ_ONLY);
+}
+
+void moonfruit_file_close(MoonFruit_File *f) { file_close(&f->file); }
+
+void moonfruit_file_push_next_chunk(MoonFruit_File       *f,
+                                    MoonFruit_ChunkQueue *Q) {
+    u64 file_pos  = atomic_load(&f->pos);
+    u64 file_size = atomic_load(&f->file.size);
+
+    if (file_pos < file_size) {
+        u64 new_size        = Min(file_size - file_pos, MOONFRUIT_CHUNK_SIZE);
+        u64 old_chunk_count = atomic_fetch_add(&f->chunk_count, 1);
+        MoonFruit_Chunk next_chunk = (MoonFruit_Chunk){
+            .file = f,
+            .text =
+                (String){
+                    .str  = f->file.data + file_pos,
+                    .size = new_size,
+                },
+            .pos                 = 0,
+            .per_file_chunk_idx  = old_chunk_count,
+            .first_chunk_in_file = (file_pos == 0),
+            .last_chunk_in_file  = (file_pos + new_size >= file_size),
+        };
+        atomic_fetch_add(&f->pos, new_size);
+        moonfruit_chunk_queue_push(Q, next_chunk);
+        return;
+    }
+}
+
 MoonFruit_ChunkQueue *moonfruit_chunk_queue_create(Arena *arena, u64 capacity) {
     MoonFruit_ChunkQueue *Q = push_struct(arena, MoonFruit_ChunkQueue);
     Q->chunks   = push_array(arena, MoonFruit_Chunk, capacity, true);
@@ -120,12 +175,12 @@ void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_Chun
                 if ((byte & 1) == 1) {
                     u8* c_end = c_start;
                     for (; *c_end != '\n'; c_end++);
-                    String full_macro_string = (String){
+                    String raw_macro  = (String){
                         .str = c_start,
                         .size = (u64)(c_end - c_start),
                     };
-                    printf("MACRO FOUND: %.*s\n", full_macro_string.size, full_macro_string.str);
-                    // TODO: parse macro and store in chunk_info->macros
+                    //printf("MACRO FOUND: %.*s\n", full_macro_string.size, full_macro_string.str);
+                    MoonFruit_Macro parsed_macro = moonfruit_macro_parse(raw_macro);
                 }
                 c_start++;
                 byte >>= 1;
@@ -164,57 +219,65 @@ void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_Chun
     */
 }
 
-MoonFruit_File *moonfruit_file_create_and_open(Arena *arena, String path) {
-    MoonFruit_File *f = push_struct(arena, MoonFruit_File);
-    f->file           = File(arena, path);
-    f->pos            = 0;
+#define MF_LETTERS_TO_U64(a, b, c, d, e, f, g, h)  (((u64)(a) << (8*0)) + \
+                                                    ((u64)(b) << (8*1)) + \
+                                                    ((u64)(c) << (8*2)) + \
+                                                    ((u64)(d) << (8*3)) + \
+                                                    ((u64)(e) << (8*4)) + \
+                                                    ((u64)(f) << (8*5)) + \
+                                                    ((u64)(g) << (8*6)) + \
+                                                    ((u64)(h) << (8*7)))
+#define MF_LETTERS_INCLUDE MF_LETTERS_TO_U64('i', 'n', 'c', 'l', 'u', 'd', 'e', 0)
+#define MF_LETTERS_DEFINE  MF_LETTERS_TO_U64('d', 'e', 'f', 'i', 'n', 'e',  0,  0)
+#define MF_LETTERS_UNDEF   MF_LETTERS_TO_U64('u', 'n', 'd', 'e', 'f',  0,   0,  0)
+#define MF_LETTERS_IF      MF_LETTERS_TO_U64('i', 'f',  0,   0,   0,   0,   0,  0)
+#define MF_LETTERS_IFDEF   MF_LETTERS_TO_U64('i', 'f', 'd', 'e', 'f',  0,   0,  0)
+#define MF_LETTERS_IFNDEF  MF_LETTERS_TO_U64('i', 'f', 'n', 'd', 'e', 'f',  0,  0)
+#define MF_LETTERS_ELSE    MF_LETTERS_TO_U64('e', 'l', 's', 'e',  0,   0,   0,  0)
+#define MF_LETTERS_ENDIF   MF_LETTERS_TO_U64('e', 'n', 'd', 'i', 'f',  0,  0,   0)
 
-    moonfruit_file_open(f);
+MoonFruit_Macro moonfruit_macro_parse(String raw_macro) {
+    Assert(raw_macro.size > 0);
+    Assert(raw_macro.str[0] == '#');
 
-    u64 num_chunks          = CeilIntDiv(f->file.size, MOONFRUIT_CHUNK_SIZE);
-    u64 num_chunks_plus_one = 1 + num_chunks;
-    f->per_chunk_line_nums  = Array(arena, u64, num_chunks_plus_one);
-    for (u64 i = 0; i < num_chunks_plus_one; i++) {
-        f->per_chunk_line_nums.data[i] = 1;
+    MoonFruit_Macro parsed_macro = (MoonFruit_Macro){0};
+
+    raw_macro = string_skip(raw_macro, 1); // remove #
+    raw_macro = string_skip_whitespace(raw_macro);
+
+    String macro_type = string_chop_before_whitespace(raw_macro);
+
+    u64 first_8_letters = 0;
+    MemoryCopy(&first_8_letters, macro_type.str, Min(sizeof(u64), macro_type.size));
+
+    switch (first_8_letters) {
+        case MF_LETTERS_INCLUDE:
+            printf("include\n");
+        break;
+        case MF_LETTERS_DEFINE:
+            printf("define\n");
+        break;
+        case MF_LETTERS_UNDEF:
+            printf("undef\n");
+        break;
+        case MF_LETTERS_IF:
+            printf("if\n");
+        break;
+        case MF_LETTERS_IFDEF:
+            printf("ifdef\n");
+        break;
+        case MF_LETTERS_IFNDEF:
+            printf("ifndef\n");
+        break;
+        case MF_LETTERS_ELSE:
+            printf("else\n");
+        break;
+        case MF_LETTERS_ENDIF:
+            printf("endif\n");
+        break;
+        default:
+            Assert(!"Not a valid macro!!");
     }
 
-    f->per_chunk_info = Array(arena, MoonFruit_PerChunkInfo, num_chunks);
-    for (u64 i = 0; i < num_chunks; i++) {
-        f->per_chunk_info.data[i] = (MoonFruit_PerChunkInfo){
-            .start_line = 1,
-        };
-    }
-    return f;
-}
-
-void moonfruit_file_open(MoonFruit_File *f) {
-    file_open(&f->file, FILE_READ_ONLY);
-}
-
-void moonfruit_file_close(MoonFruit_File *f) { file_close(&f->file); }
-
-void moonfruit_file_push_next_chunk(MoonFruit_File       *f,
-                                    MoonFruit_ChunkQueue *Q) {
-    u64 file_pos  = atomic_load(&f->pos);
-    u64 file_size = atomic_load(&f->file.size);
-
-    if (file_pos < file_size) {
-        u64 new_size        = Min(file_size - file_pos, MOONFRUIT_CHUNK_SIZE);
-        u64 old_chunk_count = atomic_fetch_add(&f->chunk_count, 1);
-        MoonFruit_Chunk next_chunk = (MoonFruit_Chunk){
-            .file = f,
-            .text =
-                (String){
-                    .str  = f->file.data + file_pos,
-                    .size = new_size,
-                },
-            .pos                 = 0,
-            .per_file_chunk_idx  = old_chunk_count,
-            .first_chunk_in_file = (file_pos == 0),
-            .last_chunk_in_file  = (file_pos + new_size >= file_size),
-        };
-        atomic_fetch_add(&f->pos, new_size);
-        moonfruit_chunk_queue_push(Q, next_chunk);
-        return;
-    }
+    return parsed_macro;
 }

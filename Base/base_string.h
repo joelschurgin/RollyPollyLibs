@@ -31,6 +31,11 @@ String string_postfix(String s, u64 size);
 String string_chop(String s, u64 amt);
 String string_skip(String s, u64 amt);
 
+String string_chop_whitespace(String s);
+String string_skip_whitespace(String s);
+
+String string_chop_before_whitespace(String s);
+
 #define String(s) (String){ .str = s, .size = cstring_size(s) }
 #define EmptyString(arena, string_size) (String){ .str = push_array((arena), u8, (string_size), true), .size = (string_size), }
 #define SubString(str, first_idx, last_idx) string_substr((str), (first_idx), (last_idx))

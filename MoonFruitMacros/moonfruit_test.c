@@ -3,6 +3,10 @@
 #define BASE_ENTRY_POINT
 #include "base.h"
 
+#define func(y) y
+#undef func
+
+
 // #define skip_this
 
 /*
@@ -11,6 +15,10 @@
  * #define also_skip_this
 #define and_this too
  */
+
+#define MULTIPLE_LINES 0, \
+                       1, \
+                       2
 
 const u8 test[] = "#define skipping this too";
 
@@ -28,11 +36,11 @@ void *parallel_main(void *main_args) {
     }
 
     MoonFruit_ChunkQueue *Q;
-    Arena                *arena;
+    Arena *arena;
     if (LaneIdx() == 0) {
-        arena                = default_arena();
-        String          path = String(argv[1]);
-        MoonFruit_File *f    = moonfruit_file_create_and_open(arena, path);
+        arena = default_arena();
+        String path = String(argv[1]);
+        MoonFruit_File *f = moonfruit_file_create_and_open(arena, path);
 
         Q = moonfruit_chunk_queue_create(arena, LaneCount() * 2);
         mutex_assign(&Q->mutex, 0);
@@ -75,7 +83,7 @@ i32 main(i32 argc, u8 **argv) {
                                          dir.str, test_file_name);
         printf("test path: %.*s\n", test_path.size, test_path.str);
 
-        u8      *argv_test[] = {(u8 *)argv[0], test_path.str};
+        u8 *argv_test[] = {(u8 *)argv[0], test_path.str};
         MainArgs main_args   = (MainArgs){
             .argc = sizeof(argv_test) / sizeof(*argv_test),
             .argv = argv_test,

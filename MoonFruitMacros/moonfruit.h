@@ -20,7 +20,33 @@ typedef enum {
 
 typedef struct {
     MoonFruit_MacroType type;
-    StringArray operands;
+    union {
+        struct {
+            String file_name;
+        } Include;
+        struct {
+            String name;
+            String body;
+            StringArray args;
+        } Define;
+        struct {
+            String name;
+        } Undef;
+        struct {
+            String condition;
+        } If;
+        struct {
+            String name;
+        } Ifdef;
+        struct {
+            String name;
+        } Ifndef;
+        struct {
+            String condition;
+        } Elif;
+        //struct {} Else;
+        //struct {} Endif;
+    } expr;
 } MoonFruit_Macro;
 
 DefineArray(MoonFruit_Macro);
@@ -71,9 +97,9 @@ void moonfruit_chunk_queue_push(MoonFruit_ChunkQueue *Q, MoonFruit_Chunk chunk);
 MoonFruit_Chunk moonfruit_chunk_queue_pop(MoonFruit_ChunkQueue *Q);
 
 #define moonfruit_chunk_empty(chunk) (chunk.text.size == 0)
-void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk,
-                             MoonFruit_ChunkQueue *Q);
+void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *Q);
 
-MoonFruit_Macro moonfruit_macro_parse(String raw_macro);
+String moonfruit_macro_extract_string(u8* macro_start);
+MoonFruit_Macro moonfruit_macro_init(String raw_macro);
 
 #endif

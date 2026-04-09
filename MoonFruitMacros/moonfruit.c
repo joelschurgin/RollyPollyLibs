@@ -173,14 +173,9 @@ void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_Chun
             u8 byte = macro_starts[byte_idx];
             while (byte > 0) {
                 if ((byte & 1) == 1) {
-                    u8* c_end = c_start;
-                    for (; *c_end != '\n'; c_end++);
-                    String raw_macro  = (String){
-                        .str = c_start,
-                        .size = (u64)(c_end - c_start),
-                    };
+                    String raw_macro = moonfruit_macro_extract_string(c_start);
                     //printf("MACRO FOUND: %.*s\n", full_macro_string.size, full_macro_string.str);
-                    MoonFruit_Macro parsed_macro = moonfruit_macro_parse(raw_macro);
+                    MoonFruit_Macro parsed_macro = moonfruit_macro_init(raw_macro);
                 }
                 c_start++;
                 byte >>= 1;
@@ -219,6 +214,16 @@ void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_Chun
     */
 }
 
+String moonfruit_macro_extract_string(u8* macro_start) {
+    u8* c = macro_start;
+    for (; c[1] != '\n' || (c[0] == '\\' && c[1] ==  '\n'); c++);
+    String raw_macro  = (String) {
+        .str = macro_start,
+        .size = (u64)(c+1 - macro_start),
+    };
+    return raw_macro;
+}
+
 #define MF_LETTERS_TO_U64(a, b, c, d, e, f, g, h)  (((u64)(a) << (8*0)) + \
                                                     ((u64)(b) << (8*1)) + \
                                                     ((u64)(c) << (8*2)) + \
@@ -227,16 +232,20 @@ void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_Chun
                                                     ((u64)(f) << (8*5)) + \
                                                     ((u64)(g) << (8*6)) + \
                                                     ((u64)(h) << (8*7)))
-#define MF_LETTERS_INCLUDE MF_LETTERS_TO_U64('i', 'n', 'c', 'l', 'u', 'd', 'e', 0)
-#define MF_LETTERS_DEFINE  MF_LETTERS_TO_U64('d', 'e', 'f', 'i', 'n', 'e',  0,  0)
-#define MF_LETTERS_UNDEF   MF_LETTERS_TO_U64('u', 'n', 'd', 'e', 'f',  0,   0,  0)
-#define MF_LETTERS_IF      MF_LETTERS_TO_U64('i', 'f',  0,   0,   0,   0,   0,  0)
-#define MF_LETTERS_IFDEF   MF_LETTERS_TO_U64('i', 'f', 'd', 'e', 'f',  0,   0,  0)
-#define MF_LETTERS_IFNDEF  MF_LETTERS_TO_U64('i', 'f', 'n', 'd', 'e', 'f',  0,  0)
-#define MF_LETTERS_ELSE    MF_LETTERS_TO_U64('e', 'l', 's', 'e',  0,   0,   0,  0)
-#define MF_LETTERS_ENDIF   MF_LETTERS_TO_U64('e', 'n', 'd', 'i', 'f',  0,  0,   0)
+typedef enum {
+    MF_LETTERS_INCLUDE = MF_LETTERS_TO_U64('i', 'n', 'c', 'l', 'u', 'd', 'e', 0),
+    MF_LETTERS_DEFINE  = MF_LETTERS_TO_U64('d', 'e', 'f', 'i', 'n', 'e',  0,  0),
+    MF_LETTERS_UNDEF   = MF_LETTERS_TO_U64('u', 'n', 'd', 'e', 'f',  0,   0,  0),
+    MF_LETTERS_IF      = MF_LETTERS_TO_U64('i', 'f',  0,   0,   0,   0,   0,  0),
+    MF_LETTERS_IFDEF   = MF_LETTERS_TO_U64('i', 'f', 'd', 'e', 'f',  0,   0,  0),
+    MF_LETTERS_IFNDEF  = MF_LETTERS_TO_U64('i', 'f', 'n', 'd', 'e', 'f',  0,  0),
+    MF_LETTERS_ELIF    = MF_LETTERS_TO_U64('e', 'l', 'i', 'f',  0,   0,   0,  0),
+    MF_LETTERS_ELSE    = MF_LETTERS_TO_U64('e', 'l', 's', 'e',  0,   0,   0,  0),
+    MF_LETTERS_ENDIF   = MF_LETTERS_TO_U64('e', 'n', 'd', 'i', 'f',  0,   0,  0),
+    MF_LETTERS_ERROR   = MF_LETTERS_TO_U64('e', 'r', 'r', 'o', 'r',  0,   0,  0),
+} MF_Letters;
 
-MoonFruit_Macro moonfruit_macro_parse(String raw_macro) {
+MoonFruit_Macro moonfruit_macro_init(String raw_macro) {
     Assert(raw_macro.size > 0);
     Assert(raw_macro.str[0] == '#');
 
@@ -244,39 +253,78 @@ MoonFruit_Macro moonfruit_macro_parse(String raw_macro) {
 
     raw_macro = string_skip(raw_macro, 1); // remove #
     raw_macro = string_skip_whitespace(raw_macro);
+    raw_macro = string_chop_whitespace(raw_macro);
 
     String macro_type = string_chop_before_whitespace(raw_macro);
+
+    String raw_expression = string_skip_whitespace((String){
+        .str = raw_macro.str + macro_type.size,
+        .size = raw_macro.size - macro_type.size,
+    });
 
     u64 first_8_letters = 0;
     MemoryCopy(&first_8_letters, macro_type.str, Min(sizeof(u64), macro_type.size));
 
     switch (first_8_letters) {
         case MF_LETTERS_INCLUDE:
-            printf("include\n");
+        {
+            parsed_macro.type = MF_INCLUDE;
+            if (!((raw_expression.str[0] == '"' && raw_expression.str[raw_expression.size-1] == '"') ||
+                  (raw_expression.str[0] == '<' && raw_expression.str[raw_expression.size-1] == '>'))) {
+                Assert(!"Invalid include");
+            }
+
+            String file_name;
+            file_name = string_skip(raw_expression, 1);
+            file_name = string_chop(file_name, 1);
+            parsed_macro.expr.Include.file_name = file_name;
+        }
         break;
         case MF_LETTERS_DEFINE:
-            printf("define\n");
+        {
+            parsed_macro.type = MF_DEFINE;
+            // TODO:
+        }
         break;
         case MF_LETTERS_UNDEF:
-            printf("undef\n");
+        {
+            parsed_macro.type = MF_UNDEF;
+            parsed_macro.expr.Undef.name = raw_expression;
+        }
         break;
         case MF_LETTERS_IF:
-            printf("if\n");
+
+        {
+            parsed_macro.type = MF_IF;
+            parsed_macro.expr.If.condition = raw_expression;
+        }
         break;
         case MF_LETTERS_IFDEF:
-            printf("ifdef\n");
+        {
+            parsed_macro.type = MF_IFDEF;
+            parsed_macro.expr.Ifdef.name = raw_expression;
+        }
         break;
         case MF_LETTERS_IFNDEF:
-            printf("ifndef\n");
+        {
+            parsed_macro.type = MF_IFNDEF;
+            parsed_macro.expr.Ifndef.name = raw_expression;
+        }
+        break;
+        case MF_LETTERS_ELIF:
+        {
+            parsed_macro.type = MF_ELIF;
+            parsed_macro.expr.Elif.condition = raw_expression;
+        }
         break;
         case MF_LETTERS_ELSE:
-            printf("else\n");
+            parsed_macro.type = MF_ELSE;
         break;
         case MF_LETTERS_ENDIF:
-            printf("endif\n");
+            parsed_macro.type = MF_ENDIF;
         break;
         default:
-            Assert(!"Not a valid macro!!");
+            Assert(!"Unhandled preprocessor directive!!");
     }
 
     return parsed_macro;

@@ -175,7 +175,7 @@ void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_Chun
                 if ((byte & 1) == 1) {
                     String raw_macro = moonfruit_macro_extract_string(c_start);
                     //printf("MACRO FOUND: %.*s\n", full_macro_string.size, full_macro_string.str);
-                    MoonFruit_Macro parsed_macro = moonfruit_macro_init(raw_macro);
+                    MoonFruit_Macro parsed_macro = moonfruit_macro_init(arena, Q->mutex, raw_macro);
                 }
                 c_start++;
                 byte >>= 1;
@@ -248,7 +248,7 @@ typedef enum {
     MF_LETTERS_ERROR   = MF_LETTERS_TO_U64('e', 'r', 'r', 'o', 'r',  0,   0,  0),
 } MF_Letters;
 
-MoonFruit_Macro moonfruit_macro_init(String raw_macro) {
+MoonFruit_Macro moonfruit_macro_init(Arena* arena, Mutex* mutex, String raw_macro) {
     Assert(raw_macro.size > 0);
     Assert(raw_macro.str[0] == '#');
 
@@ -288,43 +288,43 @@ MoonFruit_Macro moonfruit_macro_init(String raw_macro) {
             parsed_macro.type = MF_DEFINE;
             u8* c = raw_expression.str;
             for (; !char_is_whitespace(*c) && (*c) != '('; c++);
-            String name = (String) {
+            parsed_macro.expr.Define.name = (String) {
                 .str = raw_expression.str,
                 .size = (u64)(c - raw_expression.str),
             };
 
-            if (c[0] == '(' && c[1] == ')') {
-                name.size += 2;
-                c += 2;
-            } else if (*c == '(') {
-                String arg;
+            if (c[0] == '(' && c[1] != ')') {
+                u64 num_args = 1;
+                for (u8* _c = c; (*_c) != ')'; _c++) {
+                    num_args += (u64)((*_c) == ',');
+                }
+
+                MutexBlock(mutex) {
+                    parsed_macro.expr.Define.args = Array(arena, String, num_args);
+                }
+
                 u8* arg_start = ++c;
+                u64 num_args_parsed = 0;
                 for (; (*c) != ')'; c++) {
                     if (*c == ',') {
-                        arg = string_skip_whitespace((String){
+                        parsed_macro.expr.Define.args.data[num_args_parsed++] = string_skip_whitespace((String){
                             .str = arg_start,
                             .size = (u64)(c - arg_start),
                         });
                         arg_start = c+1;
-                        printf("arg: %.*s\n", arg.size, arg.str);
                     }
                 }
-                arg = string_skip_whitespace((String){
+                parsed_macro.expr.Define.args.data[num_args_parsed++] = string_skip_whitespace((String){
                     .str = arg_start,
                     .size = (u64)(c - arg_start),
                 });
                 c++;
-
-                printf("arg: %.*s\n", arg.size, arg.str);
             }
  
-            printf("name: %.*s\n", name.size, name.str);
-
-            String body = string_skip_whitespace((String){
+            parsed_macro.expr.Define.body = string_skip_whitespace((String) {
                 .str = c,
                 .size = raw_expression.size - (u64)(c - raw_expression.str),
             });
-            printf("body: %.*s\n", body.size, body.str);
         }
         break;
         case MF_LETTERS_UNDEF:
@@ -334,7 +334,6 @@ MoonFruit_Macro moonfruit_macro_init(String raw_macro) {
         }
         break;
         case MF_LETTERS_IF:
-
         {
             parsed_macro.type = MF_IF;
             parsed_macro.expr.If.condition = raw_expression;

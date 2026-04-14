@@ -100,6 +100,6 @@ MoonFruit_Chunk moonfruit_chunk_queue_pop(MoonFruit_ChunkQueue *Q);
 void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *Q);
 
 String moonfruit_macro_extract_string(u8* macro_start);
-MoonFruit_Macro moonfruit_macro_init(String raw_macro);
+MoonFruit_Macro moonfruit_macro_init(Arena* arena, Mutex* mutex, String raw_macro);
 
 #endif

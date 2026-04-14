@@ -8,7 +8,7 @@
 #define no_params()
 
 #define func(y) y
-#undef func
+#define func2(x) (6 * func(2*(x)))
 
 
 // #define skip_this

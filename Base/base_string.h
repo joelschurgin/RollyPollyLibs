@@ -6,15 +6,15 @@ struct String {
 
 DefineArray(String);
 
-internal b32 char_is_whitespace(u8 c);
-internal b32 char_is_upper(u8 c);
-internal b32 char_is_lower(u8 c);
-internal b32 char_is_alpha(u8 c);
-internal b32 char_is_slash(u8 c);
-internal b32 char_is_digit(u8 c, u32 base);
-internal u8 char_to_lower(u8 c);
-internal u8 char_to_upper(u8 c);
-internal u8 char_correct_slash(u8 c);
+b32 char_is_whitespace(u8 c);
+b32 char_is_upper(u8 c);
+b32 char_is_lower(u8 c);
+b32 char_is_alpha(u8 c);
+b32 char_is_slash(u8 c);
+b32 char_is_digit(u8 c, u32 base);
+u8 char_to_lower(u8 c);
+u8 char_to_upper(u8 c);
+u8 char_correct_slash(u8 c);
 
 u64 cstring_size_(u8* s);
 

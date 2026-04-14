@@ -3,6 +3,10 @@
 #define BASE_ENTRY_POINT
 #include "base.h"
 
+#define should_not_have_params (u64)param
+#define with_params(a, b,c) (a+b+c)
+#define no_params()
+
 #define func(y) y
 #undef func
 

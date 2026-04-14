@@ -1,24 +1,24 @@
-internal b32 char_is_whitespace(u8 c) {
+b32 char_is_whitespace(u8 c) {
     return (c == ' ' || c == '\n' || c == '\t' || c == '\r' || c == '\f' || c == '\v');
 }
 
-internal b32 char_is_upper(u8 c) {
+b32 char_is_upper(u8 c) {
     return ('A' <= c && c <= 'Z');
 }
 
-internal b32 char_is_lower(u8 c) {
+b32 char_is_lower(u8 c) {
     return ('a' <= c && c <= 'z');
 }
 
-internal b32 char_is_alpha(u8 c) {
+b32 char_is_alpha(u8 c) {
     return (char_is_upper(c) || char_is_lower(c));
 }
 
-internal b32 char_is_slash(u8 c) {
+b32 char_is_slash(u8 c) {
     return c == '/' || c == '\\';
 }
 
-internal b32 char_is_digit(u8 c, u32 base) {
+b32 char_is_digit(u8 c, u32 base) {
     Assert(base > 0 && base <= 16);
     if (base > 10) {
         c = char_to_lower(c);
@@ -27,17 +27,17 @@ internal b32 char_is_digit(u8 c, u32 base) {
     return (c >= '0' && c < '0' + base);
 }
 
-internal u8 char_to_lower(u8 c) {
+u8 char_to_lower(u8 c) {
     if (char_is_upper(c)) c += ('a' - 'A');
     return c;
 }
 
-internal u8 char_to_upper(u8 c) {
+u8 char_to_upper(u8 c) {
     if (char_is_lower(c)) c += ('A' - 'a');
     return c;
 }
 
-internal u8 char_correct_slash(u8 c) {
+u8 char_correct_slash(u8 c) {
     if (char_is_slash(c))  c = '/';
     return c;
 }

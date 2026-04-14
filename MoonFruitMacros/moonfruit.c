@@ -166,7 +166,7 @@ void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_Chun
 
     // loop through macros and add information
     {
-        printf("==================MACROS==================\n");
+        //printf("==================MACROS==================\n");
         u8* c_start = chunk.text.str;
         for (u64 byte_idx = 0; byte_idx < (sizeof(macro_starts)/sizeof(*macro_starts)); byte_idx++) {
             c_start = chunk.text.str + (byte_idx * 8);
@@ -188,14 +188,17 @@ void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_Chun
         atomic_fetch_add(&chunk.file->per_chunk_info.data[idx].start_line, num_lines);
     }
 
+    /*
     printf("==================CHUNK===================\n"
            "Chunk Idx  => %d\n"
            "num_lines  => %d\n"
            "num_macros => %d\n"
            "------------------------------------------\n"
            "%.*s\n",
-           chunk.per_file_chunk_idx, num_lines, num_macros, chunk.text.size,
+           chunk.per_file_chunk_idx, num_lines, num_macros,
+           chunk.text.size,
            chunk.text.str);
+    */
 
     if (!chunk.last_chunk_in_file) {
         moonfruit_file_push_next_chunk(chunk.file, Q);
@@ -283,7 +286,45 @@ MoonFruit_Macro moonfruit_macro_init(String raw_macro) {
         case MF_LETTERS_DEFINE:
         {
             parsed_macro.type = MF_DEFINE;
-            // TODO:
+            u8* c = raw_expression.str;
+            for (; !char_is_whitespace(*c) && (*c) != '('; c++);
+            String name = (String) {
+                .str = raw_expression.str,
+                .size = (u64)(c - raw_expression.str),
+            };
+
+            if (c[0] == '(' && c[1] == ')') {
+                name.size += 2;
+                c += 2;
+            } else if (*c == '(') {
+                String arg;
+                u8* arg_start = ++c;
+                for (; (*c) != ')'; c++) {
+                    if (*c == ',') {
+                        arg = string_skip_whitespace((String){
+                            .str = arg_start,
+                            .size = (u64)(c - arg_start),
+                        });
+                        arg_start = c+1;
+                        printf("arg: %.*s\n", arg.size, arg.str);
+                    }
+                }
+                arg = string_skip_whitespace((String){
+                    .str = arg_start,
+                    .size = (u64)(c - arg_start),
+                });
+                c++;
+
+                printf("arg: %.*s\n", arg.size, arg.str);
+            }
+ 
+            printf("name: %.*s\n", name.size, name.str);
+
+            String body = string_skip_whitespace((String){
+                .str = c,
+                .size = raw_expression.size - (u64)(c - raw_expression.str),
+            });
+            printf("body: %.*s\n", body.size, body.str);
         }
         break;
         case MF_LETTERS_UNDEF:

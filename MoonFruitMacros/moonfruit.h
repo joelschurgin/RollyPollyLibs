@@ -51,8 +51,28 @@ typedef struct {
 
 DefineArray(MoonFruit_Macro);
 
+typedef enum {
+    MF_TOKEN_IDENTIFIER,     // any sequence of letters, digits, or underscores, which begins with a letter or underscore
+    MF_TOKEN_NUMBER,         // begins with optional period, a required decimal digit, and then continue with any sequence of letters, digits, underscores, periods, and exponents
+    MF_TOKEN_STRING_LITERAL, // string constants, char constants, and header names (in between <>)
+    MF_TOKEN_PUNCTUATOR,     // All but three of the punctuation characters in ASCII are C punctuators. The exceptions are ‘@’, ‘$’, and ‘`’. => !"#%&'()*+,-./:;<=>?[]\`{}|~
+    MF_TOKEN_OTHER,          // any other single byte
+} MoonFruit_TokenType;
+
+typedef struct {
+    MoonFruit_TokenType type;
+    String data;
+} MoonFruit_Token;
+
+typedef struct MoonFruit_TokenNode MoonFruit_TokenNode;
+struct MoonFruit_TokenNode {
+    MoonFruit_Token token;
+    MoonFruit_TokenNode* next;
+};
+
 typedef struct {
     u64 start_line;
+    MoonFruit_TokenNode* token_list;
     MoonFruit_MacroArray macros;
 } MoonFruit_PerChunkInfo;
 

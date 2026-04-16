@@ -125,6 +125,35 @@ void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_Chun
         }
     }
 
+    // read tokens
+    {
+        // MF_TOKEN_IDENTIFIER,     // any sequence of letters, digits, or underscores, which begins with a letter or underscore
+        // MF_TOKEN_NUMBER,         // begins with optional period, a required decimal digit, and then continue with any sequence of letters, digits, underscores, periods, and exponents
+        // MF_TOKEN_STRING_LITERAL, // string constants, char constants, and header names (in between <>)
+        // MF_TOKEN_PUNCTUATOR,     // All but three of the punctuation characters in ASCII are C punctuators. The exceptions are ‘@’, ‘$’, and ‘`’. => !"#%&'()*+,-./:;<=>?[]\`{}|~
+        // MF_TOKEN_OTHER,          // any other single byte
+        u8 *c = &chunk.text.str[0];
+        MoonFruit_Token token = (MoonFruit_Token){0};
+        for (u64 idx = 0; idx < chunk.text.size-1; idx++, c++) {
+            if (char_is_alpha(*c) || c[0] == '_') {
+                token.type = MF_TOKEN_IDENTIFIER;
+                token.data.str = c;
+                for ( ; (char_is_alpha(*c) || char_is_digit(*c, 10) || c[0] == '_') && idx < chunk.text.size-1; idx++, c++);
+                token.data.size = (u64)(c - token.data.str);
+                printf("%.*s\n", token.data.size, token.data.str);
+            } else if (char_is_digit(*c, 10) || *c == '.') {
+                token.type = MF_TOKEN_NUMBER;
+                token.data.str = c;
+                for ( ; (char_is_alpha(*c) || char_is_digit(*c, 10) || c[0] == '_') && idx < chunk.text.size-1; idx++, c++);
+                token.data.size = (u64)(c - token.data.str);
+                printf("%.*s\n", token.data.size, token.data.str);
+
+            }
+        }
+    }
+
+    ////////////////////////////////////// old code //////////////////////////////////////
+    /*
     u8 macro_starts[MOONFRUIT_CHUNK_SIZE / 8] = {0};
 
     u64 num_lines  = 0;
@@ -188,22 +217,11 @@ void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_Chun
         atomic_fetch_add(&chunk.file->per_chunk_info.data[idx].start_line, num_lines);
     }
 
-    /*
-    printf("==================CHUNK===================\n"
-           "Chunk Idx  => %d\n"
-           "num_lines  => %d\n"
-           "num_macros => %d\n"
-           "------------------------------------------\n"
-           "%.*s\n",
-           chunk.per_file_chunk_idx, num_lines, num_macros,
-           chunk.text.size,
-           chunk.text.str);
-    */
-
     if (!chunk.last_chunk_in_file) {
         moonfruit_file_push_next_chunk(chunk.file, Q);
         return;
     }
+    */
 
     // still not the right place because this chunk could get processed before
     // the rest of the chunks
@@ -215,6 +233,7 @@ void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_Chun
         }
     }
     */
+
 }
 
 String moonfruit_macro_extract_string(u8* macro_start) {

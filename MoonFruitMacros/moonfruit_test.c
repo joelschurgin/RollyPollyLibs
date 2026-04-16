@@ -10,6 +10,9 @@
 #define func(y) y
 #define func2(x) (6 * func(2*(x)))
 
+#define my_exponent 4e+3
+#define bad_exponent 3tone3 // tokenizer doesn't throw an error while using gcc
+
 
 // #define skip_this
 

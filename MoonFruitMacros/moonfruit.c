@@ -98,6 +98,90 @@ MoonFruit_Chunk moonfruit_chunk_queue_pop(MoonFruit_ChunkQueue *Q) {
     return chunk;
 }
 
+internal b32 moonfruit_skip_comment(u8** c_iter, String str) {
+    Assert(c_iter != NULL);
+    Assert(*c_iter != NULL);
+
+    b32 skip_comment = false;
+
+    u8* c;
+    DeferBlock(c = *c_iter, *c_iter = c) {
+        if (*c == '/'){
+            if (*(c+1) == '/') {
+                c += 2;
+                for EachCharContinueUntil(c, str, (*c == '\n'));
+                c++;
+                skip_comment = true;
+            } else if (*(c+1) == '*') {
+                c += 2;
+                for EachCharContinueUntil(c, str, (*c == '*' && *(c+1) == '/'));
+                c += 2;
+                skip_comment = true;
+            }
+        }
+    }
+
+    return skip_comment;
+}
+
+internal void moonfruit_token_identifier(u8** c_iter, String str, MoonFruit_Token* token) {
+    // any sequence of letters, digits, or underscores, which begins with a letter or underscore
+
+    Assert(token != NULL);
+    Assert(c_iter != NULL);
+    Assert(*c_iter != NULL);
+
+    u8* c;
+    DeferBlock(c = *c_iter, *c_iter = c) {
+        token->type = MF_TOKEN_IDENTIFIER;
+        token->data.str = c++;
+        for EachCharContinueUntil(c, str, !(char_is_alpha(*c) || char_is_digit(*c, 10) || *c == '_'));
+        token->data.size = (u64)(c - token->data.str);
+        c--;
+    }
+}
+
+internal void moonfruit_token_number(u8** c_iter, String str, MoonFruit_Token* token) {
+    // begins with optional period, a required decimal digit, and then continue with any sequence of letters, digits, underscores, periods, and exponents
+
+    Assert(token != NULL);
+    Assert(c_iter != NULL);
+    Assert(*c_iter != NULL);
+
+    u8* c;
+    DeferBlock(c = *c_iter, *c_iter = c) {
+        token->type = MF_TOKEN_NUMBER;
+        token->data.str = c++;
+        for EachCharContinueUntil(c, str, !(char_is_alpha(*c) || char_is_digit(*c, 10) || *c == '_' || *c == '.')) {
+            if ((*c == 'e' || *c == 'E' || *c == 'p' || *c == 'P') &&
+                (*(c+1) == '+' || *(c+1)  == '-')) {
+                c++;
+            }
+        }
+        token->data.size = (u64)(c - token->data.str);
+        c--;
+    }
+}
+
+internal void moonfruit_token_string_literal(u8** c_iter, String str, MoonFruit_Token* token) {
+    // string constants, char constants, and header names (in between <>)
+
+    Assert(token != NULL);
+    Assert(c_iter != NULL);
+    Assert(*c_iter != NULL);
+
+    u8* c;
+    DeferBlock(c = *c_iter, *c_iter = c) {
+        u8 start_char = *c;
+        token->type = MF_TOKEN_NUMBER;
+        token->data.str = ++c;
+        for EachCharContinueUntil(c, str, *c == start_char);
+        token->data.size = (u64)(c - token->data.str);
+    }
+}
+
+
+
 void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *Q) {
     if (moonfruit_chunk_empty(chunk))
         return;
@@ -127,29 +211,97 @@ void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_Chun
 
     // read tokens
     {
-        // MF_TOKEN_IDENTIFIER,     // any sequence of letters, digits, or underscores, which begins with a letter or underscore
-        // MF_TOKEN_NUMBER,         // begins with optional period, a required decimal digit, and then continue with any sequence of letters, digits, underscores, periods, and exponents
-        // MF_TOKEN_STRING_LITERAL, // string constants, char constants, and header names (in between <>)
-        // MF_TOKEN_PUNCTUATOR,     // All but three of the punctuation characters in ASCII are C punctuators. The exceptions are ‘@’, ‘$’, and ‘`’. => !"#%&'()*+,-./:;<=>?[]\`{}|~
-        // MF_TOKEN_OTHER,          // any other single byte
-        u8 *c = &chunk.text.str[0];
         MoonFruit_Token token = (MoonFruit_Token){0};
-        for (u64 idx = 0; idx < chunk.text.size-1; idx++, c++) {
-            if (char_is_alpha(*c) || c[0] == '_') {
-                token.type = MF_TOKEN_IDENTIFIER;
-                token.data.str = c;
-                for ( ; (char_is_alpha(*c) || char_is_digit(*c, 10) || c[0] == '_') && idx < chunk.text.size-1; idx++, c++);
-                token.data.size = (u64)(c - token.data.str);
-                printf("%.*s\n", token.data.size, token.data.str);
-            } else if (char_is_digit(*c, 10) || *c == '.') {
-                token.type = MF_TOKEN_NUMBER;
-                token.data.str = c;
-                for ( ; (char_is_alpha(*c) || char_is_digit(*c, 10) || c[0] == '_') && idx < chunk.text.size-1; idx++, c++);
-                token.data.size = (u64)(c - token.data.str);
-                printf("%.*s\n", token.data.size, token.data.str);
+        for EachChar(c, chunk.text) {
+            if (char_is_whitespace(*c)) continue;
+            if (moonfruit_skip_comment(&c, chunk.text)) continue;
 
+            // must be the start of a token
+            if (char_is_alpha(*c) || *c == '_') {
+                moonfruit_token_identifier(&c, chunk.text, &token);
+                printf("%.*s\n", token.data.size, token.data.str);
+            } else if (char_is_digit(*c, 10)) {
+                moonfruit_token_number(&c, chunk.text, &token);
+                printf("%.*s\n", token.data.size, token.data.str);
+            } else if (*c == '"' || *c == '\'') {
+                moonfruit_token_string_literal(&c, chunk.text, &token);
+                printf("%.*s\n", token.data.size, token.data.str);
+            } else {
+                #define MoonFruit_TokenFromPtr(token_type, ptr, num_bytes) (MoonFruit_Token){ .type=(token_type), .data = (String) { .str=(ptr), .size=(num_bytes)} }
+                switch (*c) {
+                    case '{':
+                    case '}':
+                    case '[':
+                    case ']':
+                    case ',':
+                    case '(':
+                    case ')':
+                    case ';':
+                    case '~':
+                    case '?':
+                        token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1);
+                    break;
+                    case '!':
+                    case '*':
+                    case '/':
+                    case '%':
+                    case '^':
+                    case '=':
+                        token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == '='));
+                    break;
+                    case '#':
+                    case ':':
+                        token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == *c));
+                    break;
+                    case '+':
+                    case '&':
+                    case '|':
+                        token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == '=' || *(c+1) == *c));
+                    break;
+                    case '-':
+                        token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == '=' || *(c+1) == '-' || *(c+1) == '>'));
+                    break;
+                    case '<':
+                    case '>':
+                        token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == '=' || *(c+1) == *c) + (*(c+1) == *c && *(c+2) == '='));
+                    break;
+                    case '.':
+                        if (char_is_digit(*(c+1), 10)) {
+                            c++;
+                            moonfruit_token_number(&c, chunk.text, &token);
+                            token.data.str--;
+                            token.data.size++;
+                        } else if (*(c+1) == '.' && *(c+2) == '.') {
+                            token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 3);
+                            c += 2;
+                        } else if (*(c+1) == '.' ){
+                            AssertAlways(!"Invalid token that starts with .. ");
+                        } else {
+                            token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1);
+                        }
+                    break;
+                    default:
+                        token = MoonFruit_TokenFromPtr(MF_TOKEN_OTHER, c, 1); // any other single byte
+                    break;
+                }
+                if (token.type == MF_TOKEN_PUNCTUATOR) printf("%.*s\n", token.data.size, token.data.str);
+                #undef MoonFruit_TokenFromPtr
             }
+            // TODO: header names for string literals // MF_TOKEN_STRING_LITERAL, // string constants, char constants, and header names (in between <>)
+
+            // MF_TOKEN_PUNCTUATOR,     // All but three of the punctuation characters in ASCII are C punctuators. The exceptions are ‘@’, ‘$’, and ‘`’. => !"#%&'()*+,-./:;<=>?[]\`{}|~
         }
+
+        /*
+        printf("|=======|\n"
+               "| CHUNK |\n"
+               "|=======|\n\n%.*s\n", chunk.text.size, chunk.text.str);
+        */
+    }
+
+    if (!chunk.last_chunk_in_file) {
+        moonfruit_file_push_next_chunk(chunk.file, Q);
+        return;
     }
 
     ////////////////////////////////////// old code //////////////////////////////////////

@@ -11,9 +11,15 @@
 #define func2(x) (6 * func(2*(x)))
 
 #define my_exponent 4e+3
+#define my_exponent2 4e3
+#define my_exponent3 4p-3
+#define num .4e-3
 #define bad_exponent 3tone3 // tokenizer doesn't throw an error while using gcc
 
-
+/* 1234
+ *
+ *
+ * */
 // #define skip_this
 
 /*
@@ -27,12 +33,16 @@
                        1, \
                        2
 
-const u8 test[] = "#define skipping this too";
+const u8 test[] = "#define skipping this string literal too";
 
 typedef struct {
     i32  argc;
     u8 **argv;
 } MainArgs;
+
+void func_w_va_args(...) {
+
+}
 
 void *parallel_main(void *main_args) {
     i32  argc = ((MainArgs *)main_args)->argc;

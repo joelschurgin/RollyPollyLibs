@@ -200,6 +200,10 @@ b32 memory_is_zero(void* ptr, u64 size);
 
 // cool for loops
 #define DeferBlock(begin, end)        for(i32 _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
+#define EachCharUntil(iter, string, cond) (u8* iter = (string).str; (u64)(iter - (string).str) < (string).size && !(cond); iter++)
+#define EachChar(iter, string) EachCharUntil(iter, string, false)
+#define EachCharContinueUntil(iter, string, cond) (; (u64)(iter - (string).str) < (string).size && !(cond); iter++)
+#define EachCharContinue(iter, string) EachCharContinueUntil(iter, string, false)
 
 // arrays
 #define ArrayName(type) Glue(type, Array)

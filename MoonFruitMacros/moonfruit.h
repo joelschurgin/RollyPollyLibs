@@ -112,17 +112,15 @@ u64                   moonfruit_chunk_queue_size(MoonFruit_ChunkQueue *Q);
 void                  moonfruit_chunk_queue_push(MoonFruit_ChunkQueue *Q, MoonFruit_Chunk chunk);
 MoonFruit_Chunk       moonfruit_chunk_queue_pop(MoonFruit_ChunkQueue *Q);
 
-internal b32  moonfruit_skip_comment(u8** c_iter, String str);
-internal void moonfruit_token_identifier(u8** c_iter, String str, MoonFruit_Token* token);
-internal void moonfruit_token_number(u8** c_iter, String str, MoonFruit_Token* token);
-internal void moonfruit_token_string_literal(u8** c_iter, u8 end_char, String str, MoonFruit_Token* token);
+void moonfruit_chunk_align_to_line(MoonFruit_Chunk* chunk);
 
+internal b32  moonfruit_tokenize_skip_comment(u8** c_iter, String str);
+internal void moonfruit_tokenize_read_identifier(u8** c_iter, String str, MoonFruit_Token* token);
+internal void moonfruit_tokenize_read_number(u8** c_iter, String str, MoonFruit_Token* token);
+internal void moonfruit_tokenize_read_string_literal(u8** c_iter, u8 end_char, String str, MoonFruit_Token* token);
 void moonfruit_tokenize(MoonFruit_Chunk chunk);
 
 #define moonfruit_chunk_empty(chunk) (chunk.text.size == 0)
 void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *Q);
-
-//String moonfruit_macro_extract_string(u8* macro_start);
-//MoonFruit_Macro moonfruit_macro_init(Arena* arena, Mutex* mutex, String raw_macro);
 
 #endif

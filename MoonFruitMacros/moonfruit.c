@@ -2,8 +2,8 @@
 
 MoonFruit_File *moonfruit_file_create_and_open(Arena *arena, String path) {
     MoonFruit_File *f = push_struct(arena, MoonFruit_File);
-    f->file           = File(arena, path);
-    f->pos            = 0;
+    f->file = File(arena, path);
+    f->pos = 0;
 
     moonfruit_file_open(f);
 
@@ -23,19 +23,18 @@ MoonFruit_File *moonfruit_file_create_and_open(Arena *arena, String path) {
     return f;
 }
 
-void moonfruit_file_open(MoonFruit_File *f) {
+void moonfruit_file_open(MoonFruit_File* f) {
     file_open(&f->file, FILE_READ_ONLY);
 }
 
-void moonfruit_file_close(MoonFruit_File *f) { file_close(&f->file); }
+void moonfruit_file_close(MoonFruit_File* f) { file_close(&f->file); }
 
-void moonfruit_file_push_next_chunk(MoonFruit_File       *f,
-                                    MoonFruit_ChunkQueue *Q) {
-    u64 file_pos  = atomic_load(&f->pos);
+void moonfruit_file_push_next_chunk(MoonFruit_File* f, MoonFruit_ChunkQueue* Q) {
+    u64 file_pos = atomic_load(&f->pos);
     u64 file_size = atomic_load(&f->file.size);
 
     if (file_pos < file_size) {
-        u64 new_size        = Min(file_size - file_pos, MOONFRUIT_CHUNK_SIZE);
+        u64 new_size = Min(file_size - file_pos, MOONFRUIT_CHUNK_SIZE);
         u64 old_chunk_count = atomic_fetch_add(&f->chunk_count, 1);
         MoonFruit_Chunk next_chunk = (MoonFruit_Chunk){
             .file = f,
@@ -55,24 +54,23 @@ void moonfruit_file_push_next_chunk(MoonFruit_File       *f,
     }
 }
 
-MoonFruit_ChunkQueue *moonfruit_chunk_queue_create(Arena *arena, u64 capacity) {
-    MoonFruit_ChunkQueue *Q = push_struct(arena, MoonFruit_ChunkQueue);
-    Q->chunks   = push_array(arena, MoonFruit_Chunk, capacity, true);
+MoonFruit_ChunkQueue* moonfruit_chunk_queue_create(Arena* arena, u64 capacity) {
+    MoonFruit_ChunkQueue* Q = push_struct(arena, MoonFruit_ChunkQueue);
+    Q->chunks = push_array(arena, MoonFruit_Chunk, capacity, true);
     Q->capacity = capacity;
     return Q;
 }
 
 u64 moonfruit_chunk_queue_size(MoonFruit_ChunkQueue *Q) {
-    u64 capacity  = atomic_load(&Q->capacity);
+    u64 capacity = atomic_load(&Q->capacity);
     u64 first_idx = atomic_load(&Q->first_idx);
-    u64 last_idx  = atomic_load(&Q->last_idx);
+    u64 last_idx = atomic_load(&Q->last_idx);
     return (last_idx + capacity - first_idx) % capacity;
 }
 
-void moonfruit_chunk_queue_push(MoonFruit_ChunkQueue *Q,
-                                MoonFruit_Chunk       chunk) {
+void moonfruit_chunk_queue_push(MoonFruit_ChunkQueue* Q, MoonFruit_Chunk chunk) {
     MutexBlock(Q->mutex) {
-        u64 size     = moonfruit_chunk_queue_size(Q);
+        u64 size = moonfruit_chunk_queue_size(Q);
         u64 capacity = atomic_load(&Q->capacity);
         if (size + 1 >= capacity) {
             Assert(!"Not enough space in the chunk queue");
@@ -98,7 +96,32 @@ MoonFruit_Chunk moonfruit_chunk_queue_pop(MoonFruit_ChunkQueue *Q) {
     return chunk;
 }
 
-internal b32 moonfruit_skip_comment(u8** c_iter, String str) {
+void moonfruit_chunk_align_to_line(MoonFruit_Chunk* chunk) {
+    b8 adjust_beginning_of_chunk = (!chunk->first_chunk_in_file && *(chunk->text.str - 1) != '\n');
+    if (adjust_beginning_of_chunk) {
+        u8 *c = chunk->text.str;
+        for (u64 idx = 0; idx < chunk->text.size; idx++, c++) {
+            if (*c == '\n') {
+                chunk->text = string_skip(chunk->text, idx);
+                break;
+            }
+        }
+    }
+
+    b8 adjust_end_of_chunk = (!chunk->last_chunk_in_file &&
+                              chunk->text.str[chunk->text.size - 1] != '\n');
+    if (adjust_end_of_chunk) {
+        u8 *c = &chunk->text.str[chunk->text.size - 1];
+        for (u64 idx = chunk->text.size; idx < chunk->text.size * 2; idx++, c++) {
+            if (*c == '\n') {
+                chunk->text.size = idx;
+                break;
+            }
+        }
+    }
+}
+
+internal b32 moonfruit_tokenize_skip_comment(u8** c_iter, String str) {
     Assert(c_iter != NULL);
     Assert(*c_iter != NULL);
 
@@ -124,7 +147,7 @@ internal b32 moonfruit_skip_comment(u8** c_iter, String str) {
     return skip_comment;
 }
 
-internal void moonfruit_token_identifier(u8** c_iter, String str, MoonFruit_Token* token) {
+internal void moonfruit_tokenize_read_identifier(u8** c_iter, String str, MoonFruit_Token* token) {
     // any sequence of letters, digits, or underscores, which begins with a letter or underscore
 
     Assert(token != NULL);
@@ -141,7 +164,7 @@ internal void moonfruit_token_identifier(u8** c_iter, String str, MoonFruit_Toke
     }
 }
 
-internal void moonfruit_token_number(u8** c_iter, String str, MoonFruit_Token* token) {
+internal void moonfruit_tokenize_read_number(u8** c_iter, String str, MoonFruit_Token* token) {
     // begins with optional period, a required decimal digit, and then continue with any sequence of letters, digits, underscores, periods, and exponents
 
     Assert(token != NULL);
@@ -163,7 +186,7 @@ internal void moonfruit_token_number(u8** c_iter, String str, MoonFruit_Token* t
     }
 }
 
-internal void moonfruit_token_string_literal(u8** c_iter, u8 end_char, String str, MoonFruit_Token* token) {
+internal void moonfruit_tokenize_read_string_literal(u8** c_iter, u8 end_char, String str, MoonFruit_Token* token) {
     // string constants, char constants, and header names (in between <>)
 
     Assert(token != NULL);
@@ -211,7 +234,7 @@ void moonfruit_tokenize(MoonFruit_Chunk chunk) {
     MoonFruit_TokenState token_state = MF_TOKEN_STATE_NORMAL;
     for EachChar(c, chunk.text) {
         if (char_is_whitespace(*c)) continue;
-        if (moonfruit_skip_comment(&c, chunk.text)) continue;
+        if (moonfruit_tokenize_skip_comment(&c, chunk.text)) continue;
 
         #define MoonFruit_TokenArray_Push() do { \
                         MoonFruit_Token* new_token = push_struct(LaneArena(), MoonFruit_Token); \
@@ -225,7 +248,7 @@ void moonfruit_tokenize(MoonFruit_Chunk chunk) {
         #define MoonFruit_TokenArray_Last (token_arr->data[token_arr->count-1])
         if (char_is_alpha(*c) || *c == '_') {
             MoonFruit_TokenArray_Push();
-            moonfruit_token_identifier(&c, chunk.text, &MoonFruit_TokenArray_Last);
+            moonfruit_tokenize_read_identifier(&c, chunk.text, &MoonFruit_TokenArray_Last);
             if (token_state == MF_TOKEN_STATE_HASHTAG) {
                 u64 temp = 0;
                 MemoryCopy(&temp, MoonFruit_TokenArray_Last.data.str, Min(sizeof(u64), MoonFruit_TokenArray_Last.data.size));
@@ -233,11 +256,11 @@ void moonfruit_tokenize(MoonFruit_Chunk chunk) {
             }
         } else if (char_is_digit(*c, 10)) {
             MoonFruit_TokenArray_Push();
-            moonfruit_token_number(&c, chunk.text, &MoonFruit_TokenArray_Last);
+            moonfruit_tokenize_read_number(&c, chunk.text, &MoonFruit_TokenArray_Last);
             token_state = MF_TOKEN_STATE_NORMAL;
         } else if (*c == '"' || *c == '\'') {
             MoonFruit_TokenArray_Push();
-            moonfruit_token_string_literal(&c, *c, chunk.text, &MoonFruit_TokenArray_Last);
+            moonfruit_tokenize_read_string_literal(&c, *c, chunk.text, &MoonFruit_TokenArray_Last);
             token_state = MF_TOKEN_STATE_NORMAL;
         } else {
             #define MoonFruit_TokenFromPtr(token_type, ptr, num_bytes) (MoonFruit_Token){ .type=(token_type), .data = (String) { .str=(ptr), .size=(num_bytes)} }
@@ -282,7 +305,7 @@ void moonfruit_tokenize(MoonFruit_Chunk chunk) {
                 break;
                 case '<':
                     if (token_state == MF_TOKEN_STATE_INCLUDE) {
-                        moonfruit_token_string_literal(&c, '>', chunk.text, &MoonFruit_TokenArray_Last);
+                        moonfruit_tokenize_read_string_literal(&c, '>', chunk.text, &MoonFruit_TokenArray_Last);
                         token_state = MF_TOKEN_STATE_NORMAL;
                         break;
                     }
@@ -295,7 +318,7 @@ void moonfruit_tokenize(MoonFruit_Chunk chunk) {
                 case '.':
                     if (char_is_digit(*(c+1), 10)) {
                         c++;
-                        moonfruit_token_number(&c, chunk.text, &MoonFruit_TokenArray_Last);
+                        moonfruit_tokenize_read_number(&c, chunk.text, &MoonFruit_TokenArray_Last);
                         MoonFruit_TokenArray_Last.data.str--;
                         MoonFruit_TokenArray_Last.data.size++;
                     } else if (*(c+1) == '.' && *(c+2) == '.') {
@@ -321,29 +344,8 @@ void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *Q) {
     if (moonfruit_chunk_empty(chunk))
         return;
 
-    b8 adjust_beginning_of_chunk = (!chunk.first_chunk_in_file && *(chunk.text.str - 1) != '\n');
-    if (adjust_beginning_of_chunk) {
-        u8 *c = chunk.text.str;
-        for (u64 idx = 0; idx < chunk.text.size; idx++, c++) {
-            if (*c == '\n') {
-                chunk.text = string_skip(chunk.text, idx);
-                break;
-            }
-        }
-    }
 
-    b8 adjust_end_of_chunk = (!chunk.last_chunk_in_file &&
-                              chunk.text.str[chunk.text.size - 1] != '\n');
-    if (adjust_end_of_chunk) {
-        u8 *c = &chunk.text.str[chunk.text.size - 1];
-        for (u64 idx = chunk.text.size; idx < chunk.text.size * 2; idx++, c++) {
-            if (*c == '\n') {
-                chunk.text.size = idx;
-                break;
-            }
-        }
-    }
-
+    moonfruit_chunk_align_to_line(&chunk);
     moonfruit_tokenize(chunk);
 
     if (!chunk.last_chunk_in_file) {

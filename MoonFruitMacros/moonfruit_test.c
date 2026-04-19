@@ -1,7 +1,5 @@
 #include "moonfruit.h"
 
-#include <stdio.h>
-
 #define BASE_ENTRY_POINT
 #include "base.h"
 
@@ -18,33 +16,20 @@
 #define num .4e-3
 #define bad_exponent 3tone3 // tokenizer doesn't throw an error while using gcc
 
-/* 1234
- *
- *
- * */
-// #define skip_this
-
-/*
- *
- //
- * #define also_skip_this
-#define and_this too
- */
-
 #define MULTIPLE_LINES 0, \
                        1, \
                        2
 
 const u8 test[] = "#define skipping this string literal too";
 
+void func_w_va_args(...) {
+
+}
+
 typedef struct {
     i32  argc;
     u8 **argv;
 } MainArgs;
-
-void func_w_va_args(...) {
-
-}
 
 void *parallel_main(void *main_args) {
     i32  argc = ((MainArgs *)main_args)->argc;

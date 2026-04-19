@@ -1,5 +1,26 @@
 #include "moonfruit.h"
 
+#define MF_LETTERS_TO_U64(a, b, c, d, e, f, g, h)  (((u64)(a) << (8*0)) + \
+                                                    ((u64)(b) << (8*1)) + \
+                                                    ((u64)(c) << (8*2)) + \
+                                                    ((u64)(d) << (8*3)) + \
+                                                    ((u64)(e) << (8*4)) + \
+                                                    ((u64)(f) << (8*5)) + \
+                                                    ((u64)(g) << (8*6)) + \
+                                                    ((u64)(h) << (8*7)))
+typedef enum {
+    MF_LETTERS_INCLUDE = MF_LETTERS_TO_U64('i', 'n', 'c', 'l', 'u', 'd', 'e', 0),
+    MF_LETTERS_DEFINE  = MF_LETTERS_TO_U64('d', 'e', 'f', 'i', 'n', 'e',  0,  0),
+    MF_LETTERS_UNDEF   = MF_LETTERS_TO_U64('u', 'n', 'd', 'e', 'f',  0,   0,  0),
+    MF_LETTERS_IF      = MF_LETTERS_TO_U64('i', 'f',  0,   0,   0,   0,   0,  0),
+    MF_LETTERS_IFDEF   = MF_LETTERS_TO_U64('i', 'f', 'd', 'e', 'f',  0,   0,  0),
+    MF_LETTERS_IFNDEF  = MF_LETTERS_TO_U64('i', 'f', 'n', 'd', 'e', 'f',  0,  0),
+    MF_LETTERS_ELIF    = MF_LETTERS_TO_U64('e', 'l', 'i', 'f',  0,   0,   0,  0),
+    MF_LETTERS_ELSE    = MF_LETTERS_TO_U64('e', 'l', 's', 'e',  0,   0,   0,  0),
+    MF_LETTERS_ENDIF   = MF_LETTERS_TO_U64('e', 'n', 'd', 'i', 'f',  0,   0,  0),
+    MF_LETTERS_ERROR   = MF_LETTERS_TO_U64('e', 'r', 'r', 'o', 'r',  0,   0,  0),
+} MF_Letters;
+
 MoonFruit_File *moonfruit_file_create_and_open(Arena *arena, String path) {
     MoonFruit_File *f = push_struct(arena, MoonFruit_File);
     f->file = File(arena, path);
@@ -202,36 +223,17 @@ internal void moonfruit_tokenize_read_string_literal(u8** c_iter, u8 end_char, S
     }
 }
 
-#define MF_LETTERS_TO_U64(a, b, c, d, e, f, g, h)  (((u64)(a) << (8*0)) + \
-                                                    ((u64)(b) << (8*1)) + \
-                                                    ((u64)(c) << (8*2)) + \
-                                                    ((u64)(d) << (8*3)) + \
-                                                    ((u64)(e) << (8*4)) + \
-                                                    ((u64)(f) << (8*5)) + \
-                                                    ((u64)(g) << (8*6)) + \
-                                                    ((u64)(h) << (8*7)))
-typedef enum {
-    MF_LETTERS_INCLUDE = MF_LETTERS_TO_U64('i', 'n', 'c', 'l', 'u', 'd', 'e', 0),
-    MF_LETTERS_DEFINE  = MF_LETTERS_TO_U64('d', 'e', 'f', 'i', 'n', 'e',  0,  0),
-    MF_LETTERS_UNDEF   = MF_LETTERS_TO_U64('u', 'n', 'd', 'e', 'f',  0,   0,  0),
-    MF_LETTERS_IF      = MF_LETTERS_TO_U64('i', 'f',  0,   0,   0,   0,   0,  0),
-    MF_LETTERS_IFDEF   = MF_LETTERS_TO_U64('i', 'f', 'd', 'e', 'f',  0,   0,  0),
-    MF_LETTERS_IFNDEF  = MF_LETTERS_TO_U64('i', 'f', 'n', 'd', 'e', 'f',  0,  0),
-    MF_LETTERS_ELIF    = MF_LETTERS_TO_U64('e', 'l', 'i', 'f',  0,   0,   0,  0),
-    MF_LETTERS_ELSE    = MF_LETTERS_TO_U64('e', 'l', 's', 'e',  0,   0,   0,  0),
-    MF_LETTERS_ENDIF   = MF_LETTERS_TO_U64('e', 'n', 'd', 'i', 'f',  0,   0,  0),
-    MF_LETTERS_ERROR   = MF_LETTERS_TO_U64('e', 'r', 'r', 'o', 'r',  0,   0,  0),
-} MF_Letters;
-
 typedef enum {
     MF_TOKEN_STATE_NORMAL,
     MF_TOKEN_STATE_HASHTAG,
     MF_TOKEN_STATE_INCLUDE,
 } MoonFruit_TokenState;
-void moonfruit_tokenize(MoonFruit_Chunk chunk) {
+u64 moonfruit_tokenize(MoonFruit_Chunk chunk) {
     MoonFruit_PerChunkInfo* chunk_info = &chunk.file->per_chunk_info.data[chunk.per_file_chunk_idx];
     MoonFruit_TokenArray* token_arr = &chunk_info->tokens;
     MoonFruit_TokenState token_state = MF_TOKEN_STATE_NORMAL;
+    u64 num_macros = 0;
+
     for EachChar(c, chunk.text) {
         if (char_is_whitespace(*c)) continue;
         if (moonfruit_tokenize_skip_comment(&c, chunk.text)) continue;
@@ -290,6 +292,7 @@ void moonfruit_tokenize(MoonFruit_Chunk chunk) {
                     MoonFruit_TokenArray_Last = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == *c));
                     if (MoonFruit_TokenArray_Last.data.size == 1) {
                         token_state = MF_TOKEN_STATE_HASHTAG;
+                        num_macros++;
                     }
                 break;
                 case ':':
@@ -338,15 +341,67 @@ void moonfruit_tokenize(MoonFruit_Chunk chunk) {
             #undef MoonFruit_TokenFromPtr
         }
     }
+
+    return num_macros;
+}
+
+void moonfruit_macro_find(MoonFruit_Chunk chunk, u64 num_macros) {
+    MoonFruit_PerChunkInfo* chunk_info = &chunk.file->per_chunk_info.data[chunk.per_file_chunk_idx];
+    MoonFruit_MacroArray* macro_arr = &chunk_info->macros;
+    *macro_arr = Array(LaneArena(), MoonFruit_Macro, num_macros);
+    macro_arr->count = 0;
+
+    #define MoonFruit_MacroArray_Last (macro_arr->data[macro_arr->count-1])
+    #define MoonFruit_MacroArray_Push(macro_type) do { \
+                        macro_arr->count += 1;\
+                        MoonFruit_MacroArray_Last.type = (macro_type);\
+                    } while(0)
+    for EachElement(token, MoonFruit_Token, chunk_info->tokens) {
+        if (string_compare(token->data, String("#"))) {
+            token++;
+            u64 directive = 0;
+            MemoryCopy(&directive, token->data.str, Min(token->data.size, sizeof(u64)));
+
+            switch (directive) {
+            case MF_LETTERS_INCLUDE:
+                MoonFruit_MacroArray_Push(MF_INCLUDE);
+            break;
+            case MF_LETTERS_DEFINE:
+                MoonFruit_MacroArray_Push(MF_DEFINE);
+            break;
+            case MF_LETTERS_UNDEF:
+                MoonFruit_MacroArray_Push(MF_UNDEF);
+            break;
+            case MF_LETTERS_IF:
+                MoonFruit_MacroArray_Push(MF_IF);
+            break;
+            case MF_LETTERS_IFDEF:
+                MoonFruit_MacroArray_Push(MF_IFDEF);
+            break;
+            case MF_LETTERS_IFNDEF:
+                MoonFruit_MacroArray_Push(MF_IFNDEF);
+            break;
+            case MF_LETTERS_ELIF:
+                MoonFruit_MacroArray_Push(MF_ELIF);
+            break;
+            case MF_LETTERS_ELSE:
+                MoonFruit_MacroArray_Push(MF_ELSE);
+            break;
+            case MF_LETTERS_ENDIF:
+                MoonFruit_MacroArray_Push(MF_ENDIF);
+            break;
+            }
+        }
+    }
 }
 
 void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *Q) {
     if (moonfruit_chunk_empty(chunk))
         return;
 
-
     moonfruit_chunk_align_to_line(&chunk);
-    moonfruit_tokenize(chunk);
+    u64 num_macros = moonfruit_tokenize(chunk);
+    moonfruit_macro_find(chunk, num_macros);
 
     if (!chunk.last_chunk_in_file) {
         moonfruit_file_push_next_chunk(chunk.file, Q);

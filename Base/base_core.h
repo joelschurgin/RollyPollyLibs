@@ -204,6 +204,7 @@ b32 memory_is_zero(void* ptr, u64 size);
 #define EachChar(iter, string) EachCharUntil(iter, string, false)
 #define EachCharContinueUntil(iter, string, cond) (; (u64)(iter - (string).str) < (string).size && !(cond); iter++)
 #define EachCharContinue(iter, string) EachCharContinueUntil(iter, string, false)
+#define EachElement(iter, type, array) (type * iter = (array).data; (u64)(iter - (array).data) < (array).count; iter++)
 
 // arrays
 #define ArrayName(type) Glue(type, Array)

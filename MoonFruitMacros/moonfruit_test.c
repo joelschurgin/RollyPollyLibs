@@ -1,5 +1,7 @@
 #include "moonfruit.h"
 
+#include <stdio.h>
+
 #define BASE_ENTRY_POINT
 #include "base.h"
 
@@ -53,24 +55,22 @@ void *parallel_main(void *main_args) {
     }
 
     MoonFruit_ChunkQueue *Q;
-    Arena *arena;
     if (LaneIdx() == 0) {
-        arena = default_arena();
+        Arena* Q_arena = default_arena();
         String path = String(argv[1]);
-        MoonFruit_File *f = moonfruit_file_create_and_open(arena, path);
+        MoonFruit_File *f = moonfruit_file_create_and_open(Q_arena, path);
 
-        Q = moonfruit_chunk_queue_create(arena, LaneCount() * 2);
+        Q = moonfruit_chunk_queue_create(Q_arena, LaneCount() * 2);
         mutex_assign(&Q->mutex, 0);
         for (u64 i = 0; i < LaneCount(); i++) {
             moonfruit_file_push_next_chunk(f, Q);
         }
     }
     LaneSyncPtr(Q, 0);
-    LaneSyncPtr(arena, 0);
 
     for (; moonfruit_chunk_queue_size(Q) > 0;) {
         MoonFruit_Chunk chunk = moonfruit_chunk_queue_pop(Q);
-        moonfruit_chunk_process(arena, chunk, Q);
+        moonfruit_chunk_process(chunk, Q);
     }
 }
 

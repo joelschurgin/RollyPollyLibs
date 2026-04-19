@@ -64,15 +64,11 @@ typedef struct {
     String data;
 } MoonFruit_Token;
 
-typedef struct MoonFruit_TokenNode MoonFruit_TokenNode;
-struct MoonFruit_TokenNode {
-    MoonFruit_Token token;
-    MoonFruit_TokenNode* next;
-};
+DefineArray(MoonFruit_Token);
 
 typedef struct {
     u64 start_line;
-    MoonFruit_TokenNode* token_list;
+    MoonFruit_TokenArray tokens;
     MoonFruit_MacroArray macros;
 } MoonFruit_PerChunkInfo;
 
@@ -111,15 +107,22 @@ void moonfruit_file_close(MoonFruit_File *f);
 
 void moonfruit_file_push_next_chunk(MoonFruit_File *f, MoonFruit_ChunkQueue *Q);
 
-MoonFruit_ChunkQueue *moonfruit_chunk_queue_create(Arena *arena, u64 capacity);
-u64 moonfruit_chunk_queue_size(MoonFruit_ChunkQueue *Q);
-void moonfruit_chunk_queue_push(MoonFruit_ChunkQueue *Q, MoonFruit_Chunk chunk);
-MoonFruit_Chunk moonfruit_chunk_queue_pop(MoonFruit_ChunkQueue *Q);
+MoonFruit_ChunkQueue* moonfruit_chunk_queue_create(Arena *arena, u64 capacity);
+u64                   moonfruit_chunk_queue_size(MoonFruit_ChunkQueue *Q);
+void                  moonfruit_chunk_queue_push(MoonFruit_ChunkQueue *Q, MoonFruit_Chunk chunk);
+MoonFruit_Chunk       moonfruit_chunk_queue_pop(MoonFruit_ChunkQueue *Q);
+
+internal b32  moonfruit_skip_comment(u8** c_iter, String str);
+internal void moonfruit_token_identifier(u8** c_iter, String str, MoonFruit_Token* token);
+internal void moonfruit_token_number(u8** c_iter, String str, MoonFruit_Token* token);
+internal void moonfruit_token_string_literal(u8** c_iter, u8 end_char, String str, MoonFruit_Token* token);
+
+void moonfruit_tokenize(MoonFruit_Chunk chunk);
 
 #define moonfruit_chunk_empty(chunk) (chunk.text.size == 0)
-void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *Q);
+void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *Q);
 
-String moonfruit_macro_extract_string(u8* macro_start);
-MoonFruit_Macro moonfruit_macro_init(Arena* arena, Mutex* mutex, String raw_macro);
+//String moonfruit_macro_extract_string(u8* macro_start);
+//MoonFruit_Macro moonfruit_macro_init(Arena* arena, Mutex* mutex, String raw_macro);
 
 #endif

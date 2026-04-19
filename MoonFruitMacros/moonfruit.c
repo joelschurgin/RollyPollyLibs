@@ -163,7 +163,7 @@ internal void moonfruit_token_number(u8** c_iter, String str, MoonFruit_Token* t
     }
 }
 
-internal void moonfruit_token_string_literal(u8** c_iter, String str, MoonFruit_Token* token) {
+internal void moonfruit_token_string_literal(u8** c_iter, u8 end_char, String str, MoonFruit_Token* token) {
     // string constants, char constants, and header names (in between <>)
 
     Assert(token != NULL);
@@ -172,17 +172,152 @@ internal void moonfruit_token_string_literal(u8** c_iter, String str, MoonFruit_
 
     u8* c;
     DeferBlock(c = *c_iter, *c_iter = c) {
-        u8 start_char = *c;
         token->type = MF_TOKEN_NUMBER;
         token->data.str = ++c;
-        for EachCharContinueUntil(c, str, *c == start_char);
+        for EachCharContinueUntil(c, str, *c == end_char);
         token->data.size = (u64)(c - token->data.str);
     }
 }
 
+#define MF_LETTERS_TO_U64(a, b, c, d, e, f, g, h)  (((u64)(a) << (8*0)) + \
+                                                    ((u64)(b) << (8*1)) + \
+                                                    ((u64)(c) << (8*2)) + \
+                                                    ((u64)(d) << (8*3)) + \
+                                                    ((u64)(e) << (8*4)) + \
+                                                    ((u64)(f) << (8*5)) + \
+                                                    ((u64)(g) << (8*6)) + \
+                                                    ((u64)(h) << (8*7)))
+typedef enum {
+    MF_LETTERS_INCLUDE = MF_LETTERS_TO_U64('i', 'n', 'c', 'l', 'u', 'd', 'e', 0),
+    MF_LETTERS_DEFINE  = MF_LETTERS_TO_U64('d', 'e', 'f', 'i', 'n', 'e',  0,  0),
+    MF_LETTERS_UNDEF   = MF_LETTERS_TO_U64('u', 'n', 'd', 'e', 'f',  0,   0,  0),
+    MF_LETTERS_IF      = MF_LETTERS_TO_U64('i', 'f',  0,   0,   0,   0,   0,  0),
+    MF_LETTERS_IFDEF   = MF_LETTERS_TO_U64('i', 'f', 'd', 'e', 'f',  0,   0,  0),
+    MF_LETTERS_IFNDEF  = MF_LETTERS_TO_U64('i', 'f', 'n', 'd', 'e', 'f',  0,  0),
+    MF_LETTERS_ELIF    = MF_LETTERS_TO_U64('e', 'l', 'i', 'f',  0,   0,   0,  0),
+    MF_LETTERS_ELSE    = MF_LETTERS_TO_U64('e', 'l', 's', 'e',  0,   0,   0,  0),
+    MF_LETTERS_ENDIF   = MF_LETTERS_TO_U64('e', 'n', 'd', 'i', 'f',  0,   0,  0),
+    MF_LETTERS_ERROR   = MF_LETTERS_TO_U64('e', 'r', 'r', 'o', 'r',  0,   0,  0),
+} MF_Letters;
 
+typedef enum {
+    MF_TOKEN_STATE_NORMAL,
+    MF_TOKEN_STATE_HASHTAG,
+    MF_TOKEN_STATE_INCLUDE,
+} MoonFruit_TokenState;
+void moonfruit_tokenize(MoonFruit_Chunk chunk) {
+    MoonFruit_PerChunkInfo* chunk_info = &chunk.file->per_chunk_info.data[chunk.per_file_chunk_idx];
+    MoonFruit_TokenArray* token_arr = &chunk_info->tokens;
+    MoonFruit_TokenState token_state = MF_TOKEN_STATE_NORMAL;
+    for EachChar(c, chunk.text) {
+        if (char_is_whitespace(*c)) continue;
+        if (moonfruit_skip_comment(&c, chunk.text)) continue;
 
-void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *Q) {
+        #define MoonFruit_TokenArray_Push() do { \
+                        MoonFruit_Token* new_token = push_struct(LaneArena(), MoonFruit_Token); \
+                        if (token_arr->count == 0) {\
+                            token_arr->data = new_token;\
+                            token_arr->count = 1;\
+                        } else { \
+                            token_arr->count += 1;\
+                        }\
+                    } while(0)
+        #define MoonFruit_TokenArray_Last (token_arr->data[token_arr->count-1])
+        if (char_is_alpha(*c) || *c == '_') {
+            MoonFruit_TokenArray_Push();
+            moonfruit_token_identifier(&c, chunk.text, &MoonFruit_TokenArray_Last);
+            if (token_state == MF_TOKEN_STATE_HASHTAG) {
+                u64 temp = 0;
+                MemoryCopy(&temp, MoonFruit_TokenArray_Last.data.str, Min(sizeof(u64), MoonFruit_TokenArray_Last.data.size));
+                token_state = (temp == MF_LETTERS_INCLUDE) ? MF_TOKEN_STATE_INCLUDE : MF_TOKEN_STATE_NORMAL;
+            }
+        } else if (char_is_digit(*c, 10)) {
+            MoonFruit_TokenArray_Push();
+            moonfruit_token_number(&c, chunk.text, &MoonFruit_TokenArray_Last);
+            token_state = MF_TOKEN_STATE_NORMAL;
+        } else if (*c == '"' || *c == '\'') {
+            MoonFruit_TokenArray_Push();
+            moonfruit_token_string_literal(&c, *c, chunk.text, &MoonFruit_TokenArray_Last);
+            token_state = MF_TOKEN_STATE_NORMAL;
+        } else {
+            #define MoonFruit_TokenFromPtr(token_type, ptr, num_bytes) (MoonFruit_Token){ .type=(token_type), .data = (String) { .str=(ptr), .size=(num_bytes)} }
+            MoonFruit_TokenArray_Push();
+            switch (*c) {
+                case '{':
+                case '}':
+                case '[':
+                case ']':
+                case ',':
+                case '(':
+                case ')':
+                case ';':
+                case '~':
+                case '?':
+                    MoonFruit_TokenArray_Last = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1);
+                break;
+                case '!':
+                case '*':
+                case '/':
+                case '%':
+                case '^':
+                case '=':
+                    MoonFruit_TokenArray_Last = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == '='));
+                break;
+                case '#':
+                    MoonFruit_TokenArray_Last = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == *c));
+                    if (MoonFruit_TokenArray_Last.data.size == 1) {
+                        token_state = MF_TOKEN_STATE_HASHTAG;
+                    }
+                break;
+                case ':':
+                    MoonFruit_TokenArray_Last = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == *c));
+                break;
+                case '+':
+                case '&':
+                case '|':
+                    MoonFruit_TokenArray_Last = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == '=' || *(c+1) == *c));
+                break;
+                case '-':
+                    MoonFruit_TokenArray_Last = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == '=' || *(c+1) == '-' || *(c+1) == '>'));
+                break;
+                case '<':
+                    if (token_state == MF_TOKEN_STATE_INCLUDE) {
+                        moonfruit_token_string_literal(&c, '>', chunk.text, &MoonFruit_TokenArray_Last);
+                        token_state = MF_TOKEN_STATE_NORMAL;
+                        break;
+                    }
+
+                    MoonFruit_TokenArray_Last = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == '=' || *(c+1) == '<') + (*(c+1) == '<' && *(c+2) == '='));
+                break;
+                case '>':
+                    MoonFruit_TokenArray_Last = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == '=' || *(c+1) == '>') + (*(c+1) == '>' && *(c+2) == '='));
+                break;
+                case '.':
+                    if (char_is_digit(*(c+1), 10)) {
+                        c++;
+                        moonfruit_token_number(&c, chunk.text, &MoonFruit_TokenArray_Last);
+                        MoonFruit_TokenArray_Last.data.str--;
+                        MoonFruit_TokenArray_Last.data.size++;
+                    } else if (*(c+1) == '.' && *(c+2) == '.') {
+                        MoonFruit_TokenArray_Last = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 3);
+                        c += 2;
+                    } else if (*(c+1) == '.' ){
+                        AssertAlways(!"Invalid token that starts with .. ");
+                    } else {
+                        MoonFruit_TokenArray_Last = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1);
+                    }
+                break;
+                default:
+                    MoonFruit_TokenArray_Last = MoonFruit_TokenFromPtr(MF_TOKEN_OTHER, c, 1); // any other single byte
+                    token_state = MF_TOKEN_STATE_NORMAL;
+                break;
+            }
+            #undef MoonFruit_TokenFromPtr
+        }
+    }
+}
+
+void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *Q) {
     if (moonfruit_chunk_empty(chunk))
         return;
 
@@ -209,334 +344,10 @@ void moonfruit_chunk_process(Arena *arena, MoonFruit_Chunk chunk, MoonFruit_Chun
         }
     }
 
-    // read tokens
-    {
-        MoonFruit_Token token = (MoonFruit_Token){0};
-        for EachChar(c, chunk.text) {
-            if (char_is_whitespace(*c)) continue;
-            if (moonfruit_skip_comment(&c, chunk.text)) continue;
-
-            // must be the start of a token
-            if (char_is_alpha(*c) || *c == '_') {
-                moonfruit_token_identifier(&c, chunk.text, &token);
-                printf("%.*s\n", token.data.size, token.data.str);
-            } else if (char_is_digit(*c, 10)) {
-                moonfruit_token_number(&c, chunk.text, &token);
-                printf("%.*s\n", token.data.size, token.data.str);
-            } else if (*c == '"' || *c == '\'') {
-                moonfruit_token_string_literal(&c, chunk.text, &token);
-                printf("%.*s\n", token.data.size, token.data.str);
-            } else {
-                #define MoonFruit_TokenFromPtr(token_type, ptr, num_bytes) (MoonFruit_Token){ .type=(token_type), .data = (String) { .str=(ptr), .size=(num_bytes)} }
-                switch (*c) {
-                    case '{':
-                    case '}':
-                    case '[':
-                    case ']':
-                    case ',':
-                    case '(':
-                    case ')':
-                    case ';':
-                    case '~':
-                    case '?':
-                        token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1);
-                    break;
-                    case '!':
-                    case '*':
-                    case '/':
-                    case '%':
-                    case '^':
-                    case '=':
-                        token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == '='));
-                    break;
-                    case '#':
-                    case ':':
-                        token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == *c));
-                    break;
-                    case '+':
-                    case '&':
-                    case '|':
-                        token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == '=' || *(c+1) == *c));
-                    break;
-                    case '-':
-                        token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == '=' || *(c+1) == '-' || *(c+1) == '>'));
-                    break;
-                    case '<':
-                    case '>':
-                        token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1 + (*(c+1) == '=' || *(c+1) == *c) + (*(c+1) == *c && *(c+2) == '='));
-                    break;
-                    case '.':
-                        if (char_is_digit(*(c+1), 10)) {
-                            c++;
-                            moonfruit_token_number(&c, chunk.text, &token);
-                            token.data.str--;
-                            token.data.size++;
-                        } else if (*(c+1) == '.' && *(c+2) == '.') {
-                            token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 3);
-                            c += 2;
-                        } else if (*(c+1) == '.' ){
-                            AssertAlways(!"Invalid token that starts with .. ");
-                        } else {
-                            token = MoonFruit_TokenFromPtr(MF_TOKEN_PUNCTUATOR, c, 1);
-                        }
-                    break;
-                    default:
-                        token = MoonFruit_TokenFromPtr(MF_TOKEN_OTHER, c, 1); // any other single byte
-                    break;
-                }
-                if (token.type == MF_TOKEN_PUNCTUATOR) printf("%.*s\n", token.data.size, token.data.str);
-                #undef MoonFruit_TokenFromPtr
-            }
-            // TODO: header names for string literals // MF_TOKEN_STRING_LITERAL, // string constants, char constants, and header names (in between <>)
-
-            // MF_TOKEN_PUNCTUATOR,     // All but three of the punctuation characters in ASCII are C punctuators. The exceptions are ‘@’, ‘$’, and ‘`’. => !"#%&'()*+,-./:;<=>?[]\`{}|~
-        }
-
-        /*
-        printf("|=======|\n"
-               "| CHUNK |\n"
-               "|=======|\n\n%.*s\n", chunk.text.size, chunk.text.str);
-        */
-    }
+    moonfruit_tokenize(chunk);
 
     if (!chunk.last_chunk_in_file) {
         moonfruit_file_push_next_chunk(chunk.file, Q);
         return;
     }
-
-    ////////////////////////////////////// old code //////////////////////////////////////
-    /*
-    u8 macro_starts[MOONFRUIT_CHUNK_SIZE / 8] = {0};
-
-    u64 num_lines  = 0;
-    u64 num_macros = 0;
-    {
-        u8 *c = &chunk.text.str[0];
-        for (u64 idx = 0; idx < chunk.text.size-1; idx++, c++) {
-            switch (c[0]) {
-                case '\n':
-                    num_lines++;
-                break;
-                case '"':
-                    for (idx++,c++; idx < chunk.text.size-1 && c[0] != '"'; idx++, c++);
-                break;
-                case '/':
-                if (c[1] == '/') {
-                    for (; idx < chunk.text.size-1 && c[1] != '\n'; idx++, c++);
-                } else if (c[1] == '*') {
-                    for (idx++, c++; idx < chunk.text.size-1 && !(c[0] == '*' && c[1] == '/'); idx++, c++);
-                }
-                break;
-                case '#':
-                {
-                    u64 macro_starts_idx            = (idx >> 3);
-                    u64 macro_starts_bit            = (idx & 0x7);
-                    macro_starts[macro_starts_idx] |= (1 << macro_starts_bit);
-                    num_macros++;
-                    for (; idx < chunk.text.size-1 && c[1] != '\n'; idx++, c++);
-                }
-                break;
-            }
-        }
-    }
-
-    MoonFruit_PerChunkInfo* chunk_info = &chunk.file->per_chunk_info.data[chunk.per_file_chunk_idx];
-    MutexBlock(Q->mutex) {
-        chunk_info->macros = Array(arena, MoonFruit_Macro, num_macros);
-    }
-
-    // loop through macros and add information
-    {
-        //printf("==================MACROS==================\n");
-        u8* c_start = chunk.text.str;
-        for (u64 byte_idx = 0; byte_idx < (sizeof(macro_starts)/sizeof(*macro_starts)); byte_idx++) {
-            c_start = chunk.text.str + (byte_idx * 8);
-            u8 byte = macro_starts[byte_idx];
-            while (byte > 0) {
-                if ((byte & 1) == 1) {
-                    String raw_macro = moonfruit_macro_extract_string(c_start);
-                    //printf("MACRO FOUND: %.*s\n", full_macro_string.size, full_macro_string.str);
-                    MoonFruit_Macro parsed_macro = moonfruit_macro_init(arena, Q->mutex, raw_macro);
-                }
-                c_start++;
-                byte >>= 1;
-            }
-        }
-    }
-
-    u64 num_chunks = atomic_load(&chunk.file->per_chunk_info.count);
-    for (u64 idx = chunk.per_file_chunk_idx + 1; idx < num_chunks; idx++) {
-        atomic_fetch_add(&chunk.file->per_chunk_info.data[idx].start_line, num_lines);
-    }
-
-    if (!chunk.last_chunk_in_file) {
-        moonfruit_file_push_next_chunk(chunk.file, Q);
-        return;
-    }
-    */
-
-    // still not the right place because this chunk could get processed before
-    // the rest of the chunks
-    /*
-    i64 fd = atomic_load(&chunk.file->file.fd);
-    if (fd >= 0) {
-        DeferBlock(mutex_lock(Q->mutex), mutex_unlock(Q->mutex)) {
-            moonfruit_file_close(chunk.file);
-        }
-    }
-    */
-
-}
-
-String moonfruit_macro_extract_string(u8* macro_start) {
-    u8* c = macro_start;
-    for (; c[1] != '\n' || (c[0] == '\\' && c[1] ==  '\n'); c++);
-    String raw_macro  = (String) {
-        .str = macro_start,
-        .size = (u64)(c+1 - macro_start),
-    };
-    return raw_macro;
-}
-
-#define MF_LETTERS_TO_U64(a, b, c, d, e, f, g, h)  (((u64)(a) << (8*0)) + \
-                                                    ((u64)(b) << (8*1)) + \
-                                                    ((u64)(c) << (8*2)) + \
-                                                    ((u64)(d) << (8*3)) + \
-                                                    ((u64)(e) << (8*4)) + \
-                                                    ((u64)(f) << (8*5)) + \
-                                                    ((u64)(g) << (8*6)) + \
-                                                    ((u64)(h) << (8*7)))
-typedef enum {
-    MF_LETTERS_INCLUDE = MF_LETTERS_TO_U64('i', 'n', 'c', 'l', 'u', 'd', 'e', 0),
-    MF_LETTERS_DEFINE  = MF_LETTERS_TO_U64('d', 'e', 'f', 'i', 'n', 'e',  0,  0),
-    MF_LETTERS_UNDEF   = MF_LETTERS_TO_U64('u', 'n', 'd', 'e', 'f',  0,   0,  0),
-    MF_LETTERS_IF      = MF_LETTERS_TO_U64('i', 'f',  0,   0,   0,   0,   0,  0),
-    MF_LETTERS_IFDEF   = MF_LETTERS_TO_U64('i', 'f', 'd', 'e', 'f',  0,   0,  0),
-    MF_LETTERS_IFNDEF  = MF_LETTERS_TO_U64('i', 'f', 'n', 'd', 'e', 'f',  0,  0),
-    MF_LETTERS_ELIF    = MF_LETTERS_TO_U64('e', 'l', 'i', 'f',  0,   0,   0,  0),
-    MF_LETTERS_ELSE    = MF_LETTERS_TO_U64('e', 'l', 's', 'e',  0,   0,   0,  0),
-    MF_LETTERS_ENDIF   = MF_LETTERS_TO_U64('e', 'n', 'd', 'i', 'f',  0,   0,  0),
-    MF_LETTERS_ERROR   = MF_LETTERS_TO_U64('e', 'r', 'r', 'o', 'r',  0,   0,  0),
-} MF_Letters;
-
-MoonFruit_Macro moonfruit_macro_init(Arena* arena, Mutex* mutex, String raw_macro) {
-    Assert(raw_macro.size > 0);
-    Assert(raw_macro.str[0] == '#');
-
-    MoonFruit_Macro parsed_macro = (MoonFruit_Macro){0};
-
-    raw_macro = string_skip(raw_macro, 1); // remove #
-    raw_macro = string_skip_whitespace(raw_macro);
-    raw_macro = string_chop_whitespace(raw_macro);
-
-    String macro_type = string_chop_before_whitespace(raw_macro);
-
-    String raw_expression = string_skip_whitespace((String){
-        .str = raw_macro.str + macro_type.size,
-        .size = raw_macro.size - macro_type.size,
-    });
-
-    u64 first_8_letters = 0;
-    MemoryCopy(&first_8_letters, macro_type.str, Min(sizeof(u64), macro_type.size));
-
-    switch (first_8_letters) {
-        case MF_LETTERS_INCLUDE:
-        {
-            parsed_macro.type = MF_INCLUDE;
-            if (!((raw_expression.str[0] == '"' && raw_expression.str[raw_expression.size-1] == '"') ||
-                  (raw_expression.str[0] == '<' && raw_expression.str[raw_expression.size-1] == '>'))) {
-                Assert(!"Invalid include");
-            }
-
-            String file_name;
-            file_name = string_skip(raw_expression, 1);
-            file_name = string_chop(file_name, 1);
-            parsed_macro.expr.Include.file_name = file_name;
-        }
-        break;
-        case MF_LETTERS_DEFINE:
-        {
-            parsed_macro.type = MF_DEFINE;
-            u8* c = raw_expression.str;
-            for (; !char_is_whitespace(*c) && (*c) != '('; c++);
-            parsed_macro.expr.Define.name = (String) {
-                .str = raw_expression.str,
-                .size = (u64)(c - raw_expression.str),
-            };
-
-            if (c[0] == '(' && c[1] != ')') {
-                u64 num_args = 1;
-                for (u8* _c = c; (*_c) != ')'; _c++) {
-                    num_args += (u64)((*_c) == ',');
-                }
-
-                MutexBlock(mutex) {
-                    parsed_macro.expr.Define.args = Array(arena, String, num_args);
-                }
-
-                u8* arg_start = ++c;
-                u64 num_args_parsed = 0;
-                for (; (*c) != ')'; c++) {
-                    if (*c == ',') {
-                        parsed_macro.expr.Define.args.data[num_args_parsed++] = string_skip_whitespace((String){
-                            .str = arg_start,
-                            .size = (u64)(c - arg_start),
-                        });
-                        arg_start = c+1;
-                    }
-                }
-                parsed_macro.expr.Define.args.data[num_args_parsed++] = string_skip_whitespace((String){
-                    .str = arg_start,
-                    .size = (u64)(c - arg_start),
-                });
-                c++;
-            }
- 
-            parsed_macro.expr.Define.body = string_skip_whitespace((String) {
-                .str = c,
-                .size = raw_expression.size - (u64)(c - raw_expression.str),
-            });
-        }
-        break;
-        case MF_LETTERS_UNDEF:
-        {
-            parsed_macro.type = MF_UNDEF;
-            parsed_macro.expr.Undef.name = raw_expression;
-        }
-        break;
-        case MF_LETTERS_IF:
-        {
-            parsed_macro.type = MF_IF;
-            parsed_macro.expr.If.condition = raw_expression;
-        }
-        break;
-        case MF_LETTERS_IFDEF:
-        {
-            parsed_macro.type = MF_IFDEF;
-            parsed_macro.expr.Ifdef.name = raw_expression;
-        }
-        break;
-        case MF_LETTERS_IFNDEF:
-        {
-            parsed_macro.type = MF_IFNDEF;
-            parsed_macro.expr.Ifndef.name = raw_expression;
-        }
-        break;
-        case MF_LETTERS_ELIF:
-        {
-            parsed_macro.type = MF_ELIF;
-            parsed_macro.expr.Elif.condition = raw_expression;
-        }
-        break;
-        case MF_LETTERS_ELSE:
-            parsed_macro.type = MF_ELSE;
-        break;
-        case MF_LETTERS_ENDIF:
-            parsed_macro.type = MF_ENDIF;
-        break;
-        default:
-            Assert(!"Unhandled preprocessor directive!!");
-    }
-
-    return parsed_macro;
 }

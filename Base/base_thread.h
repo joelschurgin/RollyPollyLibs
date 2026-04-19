@@ -43,6 +43,7 @@ void mutex_unlock(Mutex *mutex);
 
 typedef struct LaneCtx LaneCtx;
 struct LaneCtx {
+    Arena* arena;
     u64 lane_idx;
 };
 
@@ -50,11 +51,11 @@ DefineArray(LaneCtx);
 
 typedef struct ThreadCtx ThreadCtx;
 struct ThreadCtx {
-    Arena *shared_arena;
+    Arena* shared_arena;
     LaneCtxArray lanes;
     u64 key;
     Barrier barrier;
-    void *broadcast_memory;
+    void* broadcast_memory;
     MutexArray mutexes;
 };
 
@@ -64,6 +65,7 @@ extern ThreadCtx thread_ctx;
 #define LaneIdx()   LaneCtx()->lane_idx
 #define LaneCount() thread_ctx.lanes.count
 #define LaneSync()  barrier_sync(&thread_ctx.barrier)
+#define LaneArena() LaneCtx()->arena
 
 void *lane_alloc(Arena *arena, u64 num_bytes, u64 src_lane_idx);
 void lane_sync_data(Arena *arena, void *data, u64 num_bytes, u64 src_lane_idx);

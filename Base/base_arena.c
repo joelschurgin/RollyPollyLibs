@@ -71,15 +71,15 @@ internal void arena_release_all() {
 void *arena_push(Arena *arena, u64 size, u64 align, b8 zero) {
     size = AlignPow2(size, align);
 
-    if (arena->pos + size >= arena->commit_size) {
-        Assert(arena->pos < arena->commit_size);
+    if (arena->pos + size >= arena->committed - ARENA_HEADER_SIZE) {
+        Assert(arena->pos < arena->committed);
         u64 amount_to_commit = CeilIntegerDiv(arena->committed - arena->pos + size, arena->commit_size) * arena->commit_size;
         if (amount_to_commit >= arena->reserved) {
             AssertAlways(!"Out grown arena size");
         }
 
-        memory_commit(arena, amount_to_commit);
         arena->committed += amount_to_commit;
+        memory_commit(arena, arena->committed);
     }
 
     void *new_alloc = arena->base + arena->pos;

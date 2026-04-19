@@ -74,6 +74,7 @@ internal void thread_ctx_create(Arena* arena, u64 num_threads, u64 num_mutexes, 
     ctx->lanes = Array(arena, LaneCtx, num_threads);
     for (u64 lane_idx = 0; lane_idx < num_threads; lane_idx++) {
         ctx->lanes.data[lane_idx].lane_idx = lane_idx;
+        ctx->lanes.data[lane_idx].arena = arena_alloc(MB(1), KB(1));
     }
 
     ThreadKeyCreate(ctx->key);

@@ -198,7 +198,7 @@ b32 memory_is_zero(void* ptr, u64 size);
 #define SLLStackPush(f,n) SLLStackPush_N(f,n,next)
 #define SLLStackPop(f) SLLStackPop_N(f,next)
 
-// cool for loops
+// cool for loops and array stuff
 #define DeferBlock(begin, end)        for(i32 _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 #define EachCharUntil(iter, string, cond) (u8* iter = (string).str; (u64)(iter - (string).str) < (string).size && !(cond); iter++)
 #define EachChar(iter, string) EachCharUntil(iter, string, false)
@@ -206,6 +206,7 @@ b32 memory_is_zero(void* ptr, u64 size);
 #define EachCharContinue(iter, string) EachCharContinueUntil(iter, string, false)
 #define EachElement(iter, type, array) (type * iter = (array).data; (u64)(iter - (array).data) < (array).count; iter++)
 
+#define IncElement(iter, array, num) if ((u64)(iter - (array).data) < (array).count) (iter) += (num);
 // arrays
 #define ArrayName(type) Glue(type, Array)
 

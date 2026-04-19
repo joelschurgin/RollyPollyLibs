@@ -358,7 +358,7 @@ void moonfruit_macro_find(MoonFruit_Chunk chunk, u64 num_macros) {
                     } while(0)
     for EachElement(token, MoonFruit_Token, chunk_info->tokens) {
         if (string_compare(token->data, String("#"))) {
-            token++;
+            IncElement(token, chunk_info->tokens, 1);
             u64 directive = 0;
             MemoryCopy(&directive, token->data.str, Min(token->data.size, sizeof(u64)));
 

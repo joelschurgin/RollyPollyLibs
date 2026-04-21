@@ -35,6 +35,8 @@ typedef enum {
 
 typedef struct {
     MoonFruit_MacroType type;
+    u64 token_idx_first;
+    u64 token_idx_last;
 } MoonFruit_Macro;
 
 DefineArray(MoonFruit_Macro);

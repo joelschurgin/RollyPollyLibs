@@ -349,14 +349,15 @@ u64 moonfruit_tokenize(MoonFruit_Chunk chunk) {
     return num_macros;
 }
 
-internal void moonfruit_macro_find_end(MoonFruit_Chunk chunk, MoonFruit_Token* token) {
+internal void moonfruit_macro_find_remaining_tokens(MoonFruit_Chunk chunk, MoonFruit_Token* token, MoonFruit_Macro* macro) {
     MoonFruit_PerChunkInfo* chunk_info = &chunk.file->per_chunk_info.data[chunk.per_file_chunk_idx];
-    IncElement(token, chunk_info->tokens, 1);
     u8* c = (token)->data.str;
     for EachCharContinueUntil(c, chunk.text, *c == '\n' && *(c-1) != '\\');
     MoonFruit_Token* operand = token+1;
     for EachElementContinueUntil(operand, MoonFruit_Token, chunk_info->tokens, operand->data.str > c);
-    printf("num tokens: %llu\n", (u64)(operand - token));
+
+    macro->token_idx_first = (u64)(token+1 - chunk_info->tokens.data);
+    macro->token_idx_last  = (u64)(operand-1 - chunk_info->tokens.data);
 }
 
 void moonfruit_macro_find(MoonFruit_Chunk chunk, u64 num_macros) {
@@ -370,6 +371,7 @@ void moonfruit_macro_find(MoonFruit_Chunk chunk, u64 num_macros) {
                         macro_arr->count += 1;\
                         MoonFruit_MacroArray_Last.type = (macro_type);\
                     } while(0)
+    #define MoonFruit_MacroArray_Last_NumTokens (i64)(MoonFruit_MacroArray_Last.token_idx_last - MoonFruit_MacroArray_Last.token_idx_first + 1)
     for EachElement(token, MoonFruit_Token, chunk_info->tokens) {
         if (string_compare(token->data, String("#"))) {
             IncElement(token, chunk_info->tokens, 1);
@@ -379,39 +381,48 @@ void moonfruit_macro_find(MoonFruit_Chunk chunk, u64 num_macros) {
             switch (directive) {
             case MF_LETTERS_INCLUDE:
                 MoonFruit_MacroArray_Push(MF_INCLUDE);
-                moonfruit_macro_find_end(chunk, token);
+                moonfruit_macro_find_remaining_tokens(chunk, token, &MoonFruit_MacroArray_Last);
+                Assert(MoonFruit_MacroArray_Last_NumTokens == 1); 
             break;
             case MF_LETTERS_DEFINE:
                 MoonFruit_MacroArray_Push(MF_DEFINE);
-                moonfruit_macro_find_end(chunk, token);
+                moonfruit_macro_find_remaining_tokens(chunk, token, &MoonFruit_MacroArray_Last);
+                Assert(MoonFruit_MacroArray_Last_NumTokens >= 1); 
             break;
             case MF_LETTERS_UNDEF:
                 MoonFruit_MacroArray_Push(MF_UNDEF);
-                moonfruit_macro_find_end(chunk, token);
+                moonfruit_macro_find_remaining_tokens(chunk, token, &MoonFruit_MacroArray_Last);
+                Assert(MoonFruit_MacroArray_Last_NumTokens == 1); 
             break;
             case MF_LETTERS_IF:
                 MoonFruit_MacroArray_Push(MF_IF);
-                moonfruit_macro_find_end(chunk, token);
+                moonfruit_macro_find_remaining_tokens(chunk, token, &MoonFruit_MacroArray_Last);
+                Assert(MoonFruit_MacroArray_Last_NumTokens >= 1); 
             break;
             case MF_LETTERS_IFDEF:
                 MoonFruit_MacroArray_Push(MF_IFDEF);
-                moonfruit_macro_find_end(chunk, token);
+                moonfruit_macro_find_remaining_tokens(chunk, token, &MoonFruit_MacroArray_Last);
+                Assert(MoonFruit_MacroArray_Last_NumTokens == 1);
             break;
             case MF_LETTERS_IFNDEF:
                 MoonFruit_MacroArray_Push(MF_IFNDEF);
-                moonfruit_macro_find_end(chunk, token);
+                moonfruit_macro_find_remaining_tokens(chunk, token, &MoonFruit_MacroArray_Last);
+                Assert(MoonFruit_MacroArray_Last_NumTokens == 1);
             break;
             case MF_LETTERS_ELIF:
                 MoonFruit_MacroArray_Push(MF_ELIF);
-                moonfruit_macro_find_end(chunk, token);
+                moonfruit_macro_find_remaining_tokens(chunk, token, &MoonFruit_MacroArray_Last);
+                Assert(MoonFruit_MacroArray_Last_NumTokens >= 1);
             break;
             case MF_LETTERS_ELSE:
                 MoonFruit_MacroArray_Push(MF_ELSE);
-                moonfruit_macro_find_end(chunk, token);
+                moonfruit_macro_find_remaining_tokens(chunk, token, &MoonFruit_MacroArray_Last);
+                Assert(MoonFruit_MacroArray_Last_NumTokens == 0);
             break;
             case MF_LETTERS_ENDIF:
                 MoonFruit_MacroArray_Push(MF_ENDIF);
-                moonfruit_macro_find_end(chunk, token);
+                moonfruit_macro_find_remaining_tokens(chunk, token, &MoonFruit_MacroArray_Last);
+                Assert(MoonFruit_MacroArray_Last_NumTokens == 0);
             break;
             }
         }

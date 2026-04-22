@@ -37,7 +37,30 @@ typedef struct {
     MoonFruit_MacroType type;
     u64 token_idx_first;
     u64 token_idx_last;
+    //u64 line_num;
 } MoonFruit_Macro;
+
+/*
+typedef struct MoonFruit_DefinitionTreeData MoonFruit_DefinitionTreeData;
+struct MoonFruit_DefinitionTreeData {
+    MoonFruit_DefinitionTreeData* next;
+    u64 data;
+};
+
+typedef struct MoonFruit_DefinitionTreeNode MoonFruit_DefinitionTreeNode;
+struct MoonFruit_DefinitionTreeNode {
+    MoonFruit_DefinitionTreeNode* child;
+    MoonFruit_DefinitionTreeNode* sibling;
+
+    String letters;
+
+    MoonFruit_DefinitionTreeData* data;
+};
+
+typedef struct {
+    MoonFruit_DefinitionTreeNode*
+} MoonFruit_DefinitionTree;
+*/
 
 DefineArray(MoonFruit_Macro);
 
@@ -45,6 +68,7 @@ typedef struct {
     u64 start_line;
     MoonFruit_TokenArray tokens;
     MoonFruit_MacroArray macros;
+    //MoonFruit_DefinitionTree;
 } MoonFruit_PerChunkInfo;
 
 DefineArray(MoonFruit_PerChunkInfo);
@@ -53,7 +77,6 @@ typedef struct {
     File file;
     u64 pos;
     u64 chunk_count;
-    u64Array per_chunk_line_nums;
     MoonFruit_PerChunkInfoArray per_chunk_info;
 } MoonFruit_File;
 

@@ -1,6 +1,3 @@
-#if 1
-#endif
-
 #include "moonfruit.h"
 
 #define BASE_ENTRY_POINT

@@ -29,12 +29,6 @@ MoonFruit_File *moonfruit_file_create_and_open(Arena *arena, String path) {
     moonfruit_file_open(f);
 
     u64 num_chunks          = CeilIntDiv(f->file.size, MOONFRUIT_CHUNK_SIZE);
-    u64 num_chunks_plus_one = 1 + num_chunks;
-    f->per_chunk_line_nums  = Array(arena, u64, num_chunks_plus_one);
-    for (u64 i = 0; i < num_chunks_plus_one; i++) {
-        f->per_chunk_line_nums.data[i] = 1;
-    }
-
     f->per_chunk_info = Array(arena, MoonFruit_PerChunkInfo, num_chunks);
     for (u64 i = 0; i < num_chunks; i++) {
         f->per_chunk_info.data[i] = (MoonFruit_PerChunkInfo){
@@ -109,7 +103,7 @@ MoonFruit_Chunk moonfruit_chunk_queue_pop(MoonFruit_ChunkQueue *Q) {
         u64 size = moonfruit_chunk_queue_size(Q);
         if (size != 0) {
             u64 capacity = atomic_load(&Q->capacity);
-            chunk        = Q->chunks[Q->first_idx];
+            chunk = Q->chunks[Q->first_idx];
             atomic_fetch_add(&Q->first_idx, 1);
             atomic_compare_exchange(&Q->first_idx, &capacity, 0);
         }
@@ -129,8 +123,7 @@ void moonfruit_chunk_align_to_line(MoonFruit_Chunk* chunk) {
         }
     }
 
-    b8 adjust_end_of_chunk = (!chunk->last_chunk_in_file &&
-                              chunk->text.str[chunk->text.size - 1] != '\n');
+    b8 adjust_end_of_chunk = (!chunk->last_chunk_in_file && chunk->text.str[chunk->text.size - 1] != '\n');
     if (adjust_end_of_chunk) {
         u8 *c = &chunk->text.str[chunk->text.size - 1];
         for (u64 idx = chunk->text.size; idx < chunk->text.size * 2; idx++, c++) {
@@ -363,7 +356,7 @@ internal void moonfruit_macro_find_remaining_tokens(MoonFruit_Chunk chunk, MoonF
 void moonfruit_macro_find(MoonFruit_Chunk chunk, u64 num_macros) {
     MoonFruit_PerChunkInfo* chunk_info = &chunk.file->per_chunk_info.data[chunk.per_file_chunk_idx];
     MoonFruit_MacroArray* macro_arr = &chunk_info->macros;
-    *macro_arr = Array(LaneArena(), MoonFruit_Macro, num_macros);
+    *macro_arr = Array(LaneArena(), MoonFruit_Macro, num_macros+1);
     macro_arr->count = 0;
 
     #define MoonFruit_MacroArray_Last (macro_arr->data[macro_arr->count-1])
@@ -372,6 +365,8 @@ void moonfruit_macro_find(MoonFruit_Chunk chunk, u64 num_macros) {
                         MoonFruit_MacroArray_Last.type = (macro_type);\
                     } while(0)
     #define MoonFruit_MacroArray_Last_NumTokens (i64)(MoonFruit_MacroArray_Last.token_idx_last - MoonFruit_MacroArray_Last.token_idx_first + 1)
+
+    MoonFruit_MacroArray_Push(MF_IGNORE);
     for EachElement(token, MoonFruit_Token, chunk_info->tokens) {
         if (string_compare(token->data, String("#"))) {
             IncElement(token, chunk_info->tokens, 1);

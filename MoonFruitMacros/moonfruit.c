@@ -31,9 +31,9 @@ MoonFruit_File *moonfruit_file_create_and_open(Arena *arena, String path) {
     moonfruit_file_open(f);
 
     u64 num_chunks = CeilIntDiv(f->file.size, MOONFRUIT_CHUNK_SIZE);
-    f->per_chunk_info = Array(arena, MoonFruit_PerChunkInfo, num_chunks);
+    f->chunk_info = Array(arena, MoonFruit_ChunkInfo, num_chunks);
     for (u64 i = 0; i < num_chunks; i++) {
-        f->per_chunk_info.data[i] = (MoonFruit_PerChunkInfo){
+        f->chunk_info.data[i] = (MoonFruit_ChunkInfo){
             .start_line = 1,
         };
     }
@@ -182,7 +182,7 @@ typedef enum {
     MF_TOKEN_STATE_INCLUDE,
 } MoonFruit_TokenState;
 u64 moonfruit_tokenize(MoonFruit_Chunk chunk) {
-    MoonFruit_PerChunkInfo* chunk_info = &chunk.file->per_chunk_info.data[chunk.per_file_chunk_idx];
+    MoonFruit_ChunkInfo* chunk_info = &chunk.file->chunk_info.data[chunk.per_file_chunk_idx];
     MoonFruit_TokenArray* token_arr = &chunk_info->tokens;
     MoonFruit_TokenState token_state = MF_TOKEN_STATE_NORMAL;
     u64 num_macros = 0;
@@ -303,7 +303,7 @@ u64 moonfruit_tokenize(MoonFruit_Chunk chunk) {
 }
 
 internal void moonfruit_macro_find_remaining_tokens(MoonFruit_Chunk chunk, MoonFruit_Token* token, MoonFruit_Macro* macro) {
-    MoonFruit_PerChunkInfo* chunk_info = &chunk.file->per_chunk_info.data[chunk.per_file_chunk_idx];
+    MoonFruit_ChunkInfo* chunk_info = &chunk.file->chunk_info.data[chunk.per_file_chunk_idx];
     u8* c = (token)->data.str;
     for EachCharContinueUntil(c, chunk.text, *c == '\n' && *(c-1) != '\\');
     MoonFruit_Token* operand = token+1;
@@ -314,7 +314,7 @@ internal void moonfruit_macro_find_remaining_tokens(MoonFruit_Chunk chunk, MoonF
 }
 
 void moonfruit_macro_find(MoonFruit_Chunk chunk, u64 num_macros) {
-    MoonFruit_PerChunkInfo* chunk_info = &chunk.file->per_chunk_info.data[chunk.per_file_chunk_idx];
+    MoonFruit_ChunkInfo* chunk_info = &chunk.file->chunk_info.data[chunk.per_file_chunk_idx];
     MoonFruit_MacroArray* macro_arr = &chunk_info->macros;
     *macro_arr = Array(LaneArena(), MoonFruit_Macro, num_macros+1);
     macro_arr->count = 0;
@@ -384,7 +384,7 @@ void moonfruit_macro_find(MoonFruit_Chunk chunk, u64 num_macros) {
     }
 }
 
-void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *Q) {
+void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *chunk_Q) {
     if (moonfruit_chunk_empty(chunk))
         return;
 
@@ -393,7 +393,7 @@ void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *Q) {
     moonfruit_macro_find(chunk, num_macros);
 
     if (!chunk.last_chunk_in_file) {
-        moonfruit_file_push_next_chunk(chunk.file, Q);
+        moonfruit_file_push_next_chunk(chunk.file, chunk_Q);
         return;
     }
 }

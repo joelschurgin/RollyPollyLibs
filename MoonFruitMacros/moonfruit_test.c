@@ -39,26 +39,25 @@ void* parallel_main(void* main_args) {
         ThreadExit(NULL);
     }
 
-    MoonFruit_ChunkQueue *Q;
+    MoonFruit_ChunkQueue* chunk_Q;
     if (LaneIdx() == 0) {
         Arena* Q_arena = default_arena();
         String path = String(argv[1]);
         MoonFruit_File *f = moonfruit_file_create_and_open(Q_arena, path);
 
-        Q = moonfruit_chunk_queue_create(Q_arena, LaneCount() * 2);
-        mutex_assign(&Q->mutex, 0);
+        chunk_Q = moonfruit_chunk_queue_create(Q_arena, LaneCount() * 2);
+        mutex_assign(&chunk_Q->mutex, 0);
         for (u64 i = 0; i < LaneCount(); i++) {
-            moonfruit_file_push_next_chunk(f, Q);
+            moonfruit_file_push_next_chunk(f, chunk_Q);
         }
     }
-    LaneSyncPtr(Q, 0);
+    LaneSyncPtr(chunk_Q, 0);
 
-    if (LaneIdx() != 0 || LaneCount() == 1) {
-        for (; moonfruit_chunk_queue_size(Q) > 0;) {
-            MoonFruit_Chunk chunk = moonfruit_chunk_queue_pop(Q);
-            moonfruit_chunk_process(chunk, Q);
-        }
+    for (; moonfruit_chunk_queue_size(chunk_Q) > 0;) {
+        MoonFruit_Chunk chunk = moonfruit_chunk_queue_pop(chunk_Q);
+        moonfruit_chunk_process(chunk, chunk_Q);
     }
+    LaneSync();
     if (LaneIdx() == 0) {
         // assemble chunk info?
     }
@@ -74,7 +73,7 @@ String parent_dir(String path, u32 num_dirs) {
 }
 
 i32 main(i32 argc, u8 **argv) {
-    u64 num_threads = 1;
+    u64 num_threads = 4;
 
     Arena *arena = arena_alloc(1024, 1024);
     String dir   = parent_dir(String(argv[0]), 3);

@@ -46,15 +46,15 @@ typedef struct {
     u64 start_line;
     MoonFruit_TokenArray tokens;
     MoonFruit_MacroArray macros;
-} MoonFruit_PerChunkInfo;
+} MoonFruit_ChunkInfo;
 
-DefineArray(MoonFruit_PerChunkInfo);
+DefineArray(MoonFruit_ChunkInfo);
 
 typedef struct {
     File file;
     u64 pos;
     u64 chunk_count;
-    MoonFruit_PerChunkInfoArray per_chunk_info;
+    MoonFruit_ChunkInfoArray chunk_info; // wondering if this is a good place for this
 } MoonFruit_File;
 
 typedef struct {
@@ -67,20 +67,8 @@ typedef struct {
     b8 last_chunk_in_file;
 } MoonFruit_Chunk;
 
-/*
-typedef struct {
-    MoonFruit_Chunk *chunks;
-    u64 capacity;
-    u64 first_idx;
-    u64 last_idx;
-
-    Mutex *mutex;
-} MoonFruit_ChunkQueue;
-*/
-
 DefineAtomicQueue(MoonFruit_Chunk, moonfruit_chunk_queue);
 #define Implement_MoonFruit_ChunkQueue ImplementAtomicQueue(MoonFruit_Chunk, moonfruit_chunk_queue)
-
 
 MoonFruit_File *moonfruit_file_create_and_open(Arena *arena, String path);
 void moonfruit_file_open(MoonFruit_File *f);
@@ -97,6 +85,6 @@ internal void moonfruit_tokenize_read_string_literal(u8** c_iter, u8 end_char, S
 u64 moonfruit_tokenize(MoonFruit_Chunk chunk);
 
 #define moonfruit_chunk_empty(chunk) (chunk.text.size == 0)
-void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *Q);
+void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *chunk_Q);
 
 #endif

@@ -35,12 +35,30 @@ type Glue(func_prefix, _pop)(AtomicQueue* Q) { \
     return data; \
 }
 
-
 #define DefineAtomicQueue(type, func_prefix) \
     typedef AtomicQueue AtomicQueueName(type); \
     AtomicQueue* Glue(func_prefix, _create)(Arena* arena, u64 capacity); \
     u64          Glue(func_prefix, _size)(AtomicQueue* Q); \
     void         Glue(func_prefix, _push)(AtomicQueue* Q, type data); \
     type         Glue(func_prefix, _pop)(AtomicQueue* Q);
+
+/*
+ * Example for creating a queue
+ *
+ *
+ * HEADER FILE:
+ *
+ * typedef struct {} MyStuff;
+ *
+ * DefineAtomicQueue(MyStuff, mystuff_queue)
+ * #define Implement_MyStuffQueue Implement(MyStuff, mystuff_queue)
+ *
+ *
+ * C FILE or wherever you want the implementation to be:
+ *
+ * Implement_MyStuffQueue;
+ *
+ * ....rest of your C code goes here
+ */
 
 #endif

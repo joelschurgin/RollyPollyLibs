@@ -10,6 +10,7 @@ C_LINKAGE_BEGIN
 #include "base_thread.h"
 #include "base_string.h"
 #include "base_file.h"
+#include "base_queue.h"
 
 C_LINKAGE_END
 

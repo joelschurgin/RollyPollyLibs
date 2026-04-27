@@ -1,5 +1,7 @@
 #include "moonfruit.h"
 
+Implement_MoonFruit_ChunkQueue;
+
 #define MF_LETTERS_TO_U64(a, b, c, d, e, f, g, h)  (((u64)(a) << (8*0)) + \
                                                     ((u64)(b) << (8*1)) + \
                                                     ((u64)(c) << (8*2)) + \
@@ -28,7 +30,7 @@ MoonFruit_File *moonfruit_file_create_and_open(Arena *arena, String path) {
 
     moonfruit_file_open(f);
 
-    u64 num_chunks          = CeilIntDiv(f->file.size, MOONFRUIT_CHUNK_SIZE);
+    u64 num_chunks = CeilIntDiv(f->file.size, MOONFRUIT_CHUNK_SIZE);
     f->per_chunk_info = Array(arena, MoonFruit_PerChunkInfo, num_chunks);
     for (u64 i = 0; i < num_chunks; i++) {
         f->per_chunk_info.data[i] = (MoonFruit_PerChunkInfo){
@@ -67,48 +69,6 @@ void moonfruit_file_push_next_chunk(MoonFruit_File* f, MoonFruit_ChunkQueue* Q) 
         moonfruit_chunk_queue_push(Q, next_chunk);
         return;
     }
-}
-
-MoonFruit_ChunkQueue* moonfruit_chunk_queue_create(Arena* arena, u64 capacity) {
-    MoonFruit_ChunkQueue* Q = push_struct(arena, MoonFruit_ChunkQueue);
-    Q->chunks = push_array(arena, MoonFruit_Chunk, capacity, true);
-    Q->capacity = capacity;
-    return Q;
-}
-
-u64 moonfruit_chunk_queue_size(MoonFruit_ChunkQueue *Q) {
-    u64 capacity = atomic_load(&Q->capacity);
-    u64 first_idx = atomic_load(&Q->first_idx);
-    u64 last_idx = atomic_load(&Q->last_idx);
-    return (last_idx + capacity - first_idx) % capacity;
-}
-
-void moonfruit_chunk_queue_push(MoonFruit_ChunkQueue* Q, MoonFruit_Chunk chunk) {
-    MutexBlock(Q->mutex) {
-        u64 size = moonfruit_chunk_queue_size(Q);
-        u64 capacity = atomic_load(&Q->capacity);
-        if (size + 1 >= capacity) {
-            Assert(!"Not enough space in the chunk queue");
-        }
-
-        Q->chunks[Q->last_idx] = chunk;
-        atomic_fetch_add(&Q->last_idx, 1);
-        atomic_compare_exchange(&Q->last_idx, &capacity, 0);
-    }
-}
-
-MoonFruit_Chunk moonfruit_chunk_queue_pop(MoonFruit_ChunkQueue *Q) {
-    MoonFruit_Chunk chunk = (MoonFruit_Chunk){0};
-    MutexBlock(Q->mutex) {
-        u64 size = moonfruit_chunk_queue_size(Q);
-        if (size != 0) {
-            u64 capacity = atomic_load(&Q->capacity);
-            chunk = Q->chunks[Q->first_idx];
-            atomic_fetch_add(&Q->first_idx, 1);
-            atomic_compare_exchange(&Q->first_idx, &capacity, 0);
-        }
-    }
-    return chunk;
 }
 
 void moonfruit_chunk_align_to_line(MoonFruit_Chunk* chunk) {

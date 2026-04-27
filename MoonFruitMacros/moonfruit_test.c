@@ -31,9 +31,9 @@ typedef struct {
     u8 **argv;
 } MainArgs;
 
-void *parallel_main(void *main_args) {
-    i32  argc = ((MainArgs *)main_args)->argc;
-    u8 **argv = ((MainArgs *)main_args)->argv;
+void* parallel_main(void* main_args) {
+    i32 argc = ((MainArgs*)main_args)->argc;
+    u8** argv = ((MainArgs*)main_args)->argv;
 
     if (argc < 2) {
         ThreadExit(NULL);
@@ -53,9 +53,14 @@ void *parallel_main(void *main_args) {
     }
     LaneSyncPtr(Q, 0);
 
-    for (; moonfruit_chunk_queue_size(Q) > 0;) {
-        MoonFruit_Chunk chunk = moonfruit_chunk_queue_pop(Q);
-        moonfruit_chunk_process(chunk, Q);
+    if (LaneIdx() != 0 || LaneCount() == 1) {
+        for (; moonfruit_chunk_queue_size(Q) > 0;) {
+            MoonFruit_Chunk chunk = moonfruit_chunk_queue_pop(Q);
+            moonfruit_chunk_process(chunk, Q);
+        }
+    }
+    if (LaneIdx() == 0) {
+        // assemble chunk info?
     }
 }
 

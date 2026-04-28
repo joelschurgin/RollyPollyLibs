@@ -90,6 +90,13 @@ u64 moonfruit_tokenize(MoonFruit_Chunk chunk);
 void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *chunk_Q);
 
 typedef struct {
+    u64 first_token;
+    String path;
+} MoonFruit_FileMarker;
+
+DefineArray(MoonFruit_FileMarker);
+
+typedef struct {
     String radix;
     u64 child_idx;
     u64 sibling_idx;
@@ -103,6 +110,7 @@ typedef MoonFruit_DefinitionArray MoonFruit_DefinitionTree;
 typedef struct {
     MoonFruit_TokenArray tokens;
     MoonFruit_MacroArray macros;
+    MoonFruit_FileMarkerArray file_markers;
     MoonFruit_DefinitionTree def_tree;
 } MoonFruit_MacroInfo;
 

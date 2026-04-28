@@ -407,6 +407,7 @@ MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f) {
     {
         MoonFruit_File* curr_file = f;
         while (curr_file) {
+            macro_info.file_markers.count++;
             for EachElement(chunk_info, MoonFruit_ChunkInfo, curr_file->chunk_info) {
                 macro_info.tokens.count += chunk_info->tokens.count;
                 macro_info.macros.count += chunk_info->macros.count;
@@ -416,6 +417,7 @@ MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f) {
 
         macro_info.tokens.data = push_array(arena, MoonFruit_Token, macro_info.tokens.count, true);
         macro_info.macros.data = push_array(arena, MoonFruit_Macro, macro_info.macros.count, true);
+        macro_info.file_markers.data = push_array(arena, MoonFruit_FileMarker, macro_info.file_markers.count, true);
     }
 
     // copy macros and tokens
@@ -424,9 +426,15 @@ MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f) {
         u64 macro_idx = 0;
         u64 token_idx_offset = 0;
 
+        u64 file_idx = 0;
+
         MoonFruit_File* curr_file = f;
         while (curr_file) {
-            // might wanna mark where each file starts or ends by keeping track of the token indices or smth like that
+            macro_info.file_markers.data[file_idx++] = (MoonFruit_FileMarker){
+                .first_token = token_idx,
+                .path = string_copy(arena, curr_file->file.path),
+            };
+
             for EachElement(chunk_info, MoonFruit_ChunkInfo, curr_file->chunk_info) {
                 for EachElement(token, MoonFruit_Token, chunk_info->tokens) {
                     macro_info.tokens.data[token_idx] = (MoonFruit_Token) {

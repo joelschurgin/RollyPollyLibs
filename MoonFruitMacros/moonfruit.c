@@ -23,8 +23,8 @@ typedef enum {
     MF_LETTERS_ERROR   = MF_LETTERS_TO_U64('e', 'r', 'r', 'o', 'r',  0,   0,  0),
 } MF_Letters;
 
-MoonFruit_File *moonfruit_file_create_and_open(Arena *arena, String path) {
-    MoonFruit_File *f = push_struct(arena, MoonFruit_File);
+MoonFruit_File* moonfruit_file_create_and_open(Arena* arena, String path) {
+    MoonFruit_File* f = push_struct(arena, MoonFruit_File);
     f->file = File(arena, path);
     f->pos = 0;
 
@@ -33,7 +33,7 @@ MoonFruit_File *moonfruit_file_create_and_open(Arena *arena, String path) {
     u64 num_chunks = CeilIntDiv(f->file.size, MOONFRUIT_CHUNK_SIZE);
     f->chunk_info = Array(arena, MoonFruit_ChunkInfo, num_chunks);
     for (u64 i = 0; i < num_chunks; i++) {
-        f->chunk_info.data[i] = (MoonFruit_ChunkInfo){
+        f->chunk_info.data[i] = (MoonFruit_ChunkInfo) {
             .start_line = 1,
         };
     }
@@ -44,7 +44,9 @@ void moonfruit_file_open(MoonFruit_File* f) {
     file_open(&f->file, FILE_READ_ONLY);
 }
 
-void moonfruit_file_close(MoonFruit_File* f) { file_close(&f->file); }
+void moonfruit_file_close(MoonFruit_File* f) {
+    file_close(&f->file);
+}
 
 void moonfruit_file_push_next_chunk(MoonFruit_File* f, MoonFruit_ChunkQueue* Q) {
     u64 file_pos = atomic_load(&f->pos);
@@ -116,7 +118,7 @@ internal b32 moonfruit_tokenize_skip_comment(u8** c_iter, String str) {
                 skip_comment = true;
             }
         }
-    }
+    }https://illinois.zoom.us/j/81898855551?pwd=KBa1aDHY9APssWSznadDPCq1jpl6mW.1
 
     return skip_comment;
 }
@@ -326,7 +328,6 @@ void moonfruit_macro_find(MoonFruit_Chunk chunk, u64 num_macros) {
                     } while(0)
     #define MoonFruit_MacroArray_Last_NumTokens (i64)(MoonFruit_MacroArray_Last.token_idx_last - MoonFruit_MacroArray_Last.token_idx_first + 1)
 
-    MoonFruit_MacroArray_Push(MF_IGNORE);
     for EachElement(token, MoonFruit_Token, chunk_info->tokens) {
         if (string_compare(token->data, String("#"))) {
             IncElement(token, chunk_info->tokens, 1);
@@ -396,4 +397,62 @@ void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *chunk_
         moonfruit_file_push_next_chunk(chunk.file, chunk_Q);
         return;
     }
+}
+
+MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f) {
+    Arena* arena = thread_ctx.shared_arena;
+    MoonFruit_MacroInfo macro_info = (MoonFruit_MacroInfo){0};
+
+    // count tokens and macros
+    {
+        MoonFruit_File* curr_file = f;
+        while (curr_file) {
+            for EachElement(chunk_info, MoonFruit_ChunkInfo, curr_file->chunk_info) {
+                macro_info.tokens.count += chunk_info->tokens.count;
+                macro_info.macros.count += chunk_info->macros.count;
+            }
+            curr_file = curr_file->next;
+        }
+
+        macro_info.tokens.data = push_array(arena, MoonFruit_Token, macro_info.tokens.count, true);
+        macro_info.macros.data = push_array(arena, MoonFruit_Macro, macro_info.macros.count, true);
+    }
+
+    // copy macros and tokens
+    {
+        u64 token_idx = 0;
+        u64 macro_idx = 0;
+        u64 token_idx_offset = 0;
+
+        MoonFruit_File* curr_file = f;
+        while (curr_file) {
+            // might wanna mark where each file starts or ends by keeping track of the token indices or smth like that
+            for EachElement(chunk_info, MoonFruit_ChunkInfo, curr_file->chunk_info) {
+                for EachElement(token, MoonFruit_Token, chunk_info->tokens) {
+                    macro_info.tokens.data[token_idx] = (MoonFruit_Token) {
+                        .type = token->type,
+                        .data = string_copy(arena, token->data),
+                    };
+                    token_idx++;
+                }
+
+                for EachElement(macro, MoonFruit_Macro, chunk_info->macros) {
+                    macro_info.macros.data[macro_idx] = *macro;
+                    macro_info.macros.data[macro_idx].token_idx_first += token_idx_offset;
+                    macro_info.macros.data[macro_idx].token_idx_last += token_idx_offset;
+                    macro_idx++;
+                }
+
+                token_idx_offset += chunk_info->tokens.count;
+            }
+            curr_file = curr_file->next;
+        }
+    }
+
+    // build MoonFruit_DefinitionTree
+    {
+
+    }
+
+    return macro_info;
 }

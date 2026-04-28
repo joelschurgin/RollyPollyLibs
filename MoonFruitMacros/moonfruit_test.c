@@ -40,10 +40,11 @@ void* parallel_main(void* main_args) {
     }
 
     MoonFruit_ChunkQueue* chunk_Q;
+    MoonFruit_File* f;
     if (LaneIdx() == 0) {
         Arena* Q_arena = default_arena();
         String path = String(argv[1]);
-        MoonFruit_File *f = moonfruit_file_create_and_open(Q_arena, path);
+        f = moonfruit_file_create_and_open(thread_ctx.shared_arena, path);
 
         chunk_Q = moonfruit_chunk_queue_create(Q_arena, LaneCount() * 2);
         mutex_assign(&chunk_Q->mutex, 0);
@@ -52,15 +53,19 @@ void* parallel_main(void* main_args) {
         }
     }
     LaneSyncPtr(chunk_Q, 0);
+    LaneSyncPtr(f, 0);
 
     for (; moonfruit_chunk_queue_size(chunk_Q) > 0;) {
         MoonFruit_Chunk chunk = moonfruit_chunk_queue_pop(chunk_Q);
         moonfruit_chunk_process(chunk, chunk_Q);
     }
     LaneSync();
+
+
     if (LaneIdx() == 0) {
-        // assemble chunk info?
+        MoonFruit_MacroInfo macro_info = moonfruit_macro_info_build(f);
     }
+    LaneSync();
 }
 
 String parent_dir(String path, u32 num_dirs) {

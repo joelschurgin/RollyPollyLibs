@@ -50,12 +50,14 @@ typedef struct {
 
 DefineArray(MoonFruit_ChunkInfo);
 
-typedef struct {
+typedef struct MoonFruit_File MoonFruit_File;
+struct MoonFruit_File {
+    MoonFruit_File* next;
     File file;
     u64 pos;
     u64 chunk_count;
     MoonFruit_ChunkInfoArray chunk_info; // wondering if this is a good place for this
-} MoonFruit_File;
+};
 
 typedef struct {
     MoonFruit_File *file;
@@ -86,5 +88,25 @@ u64 moonfruit_tokenize(MoonFruit_Chunk chunk);
 
 #define moonfruit_chunk_empty(chunk) (chunk.text.size == 0)
 void moonfruit_chunk_process(MoonFruit_Chunk chunk, MoonFruit_ChunkQueue *chunk_Q);
+
+typedef struct {
+    String radix;
+    u64 child_idx;
+    u64 sibling_idx;
+    u64 macro_idx;
+} MoonFruit_Definition;
+
+DefineArray(MoonFruit_Definition);
+
+typedef MoonFruit_DefinitionArray MoonFruit_DefinitionTree;
+
+typedef struct {
+    MoonFruit_TokenArray tokens;
+    MoonFruit_MacroArray macros;
+    MoonFruit_DefinitionTree def_tree;
+} MoonFruit_MacroInfo;
+
+
+MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f);
 
 #endif

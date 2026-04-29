@@ -10,7 +10,7 @@
 #define func(y) y
 #define func2(x) (6 * func(2*(x)))
 
-#define my_exponent 4e+3
+#define my_exponent1 4e+3
 #define my_exponent2 4e3
 #define my_exponent3 4p-3
 #define num .4e-3
@@ -60,7 +60,6 @@ void* parallel_main(void* main_args) {
         moonfruit_chunk_process(chunk, chunk_Q);
     }
     LaneSync();
-
 
     if (LaneIdx() == 0) {
         MoonFruit_MacroInfo macro_info = moonfruit_macro_info_build(f);

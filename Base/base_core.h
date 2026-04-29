@@ -206,6 +206,8 @@ b32 memory_is_zero(void* ptr, u64 size);
 #define EachCharContinueUntil(iter, string, cond) (; (u64)(iter - (string).str) < (string).size && !(cond); iter++)
 #define EachCharContinue(iter, string) EachCharContinueUntil(iter, string, false)
 
+#define ElementToIdx(element, array) (u64)((element) - (array).data)
+
 #define EachElementUntil(iter, type, array, cond) (type * iter = (array).data; (u64)(iter - (array).data) < (array).count && !(cond); iter++)
 #define EachElement(iter, type, array) EachElementUntil(iter, type, array, false)
 #define EachElementContinueUntil(iter, type, array, cond) (; (u64)(iter - (array).data) < (array).count && !(cond); iter++)

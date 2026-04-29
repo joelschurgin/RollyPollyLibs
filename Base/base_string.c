@@ -137,6 +137,18 @@ String string_keep_after_perfect_match(String s, String str_match) {
     return string_skip(s, (j-i == str_match.size) ? j : i);
 }
 
+StringPair string_keep_unmatched_ends(String a, String b) {
+    if (a.size > b.size) return string_keep_unmatched_ends(b, a);
+
+    u64 i = 0;
+    for (; i < a.size && a.str[i] == b.str[i]; i++);
+
+    return (StringPair) {
+        .a = string_skip(a, i),
+        .b = string_skip(b, i),
+    };
+}
+
 String string_concat(Arena* arena, String s1, String s2) {
     String output = EmptyString(arena, s1.size + s2.size);
     MemoryCopy(output.str, s1.str, s1.size);

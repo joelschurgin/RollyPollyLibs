@@ -4,6 +4,11 @@ struct String {
     u64 size;
 };
 
+typedef struct {
+    String a;
+    String b;
+} StringPair;
+
 DefineArray(String);
 
 b32 char_is_whitespace(u8 c);
@@ -45,6 +50,8 @@ String string_chop_before_whitespace(String s);
 b32 string_compare(String a, String b);
 //String string_keep_before_perfect_match(String s, String str_match);
 String string_keep_after_perfect_match(String s, String str_match);
+
+StringPair string_keep_unmatched_ends(String a, String b);
 
 String string_concat(Arena* arena, String s1, String s2);
 String string_copy(Arena* arena, String s);

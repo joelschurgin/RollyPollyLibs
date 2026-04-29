@@ -21,16 +21,16 @@ typedef struct {
 DefineArray(MoonFruit_Token);
 
 typedef enum {
-    MF_IGNORE = 0,
-    MF_INCLUDE,
-    MF_DEFINE,
-    MF_UNDEF,
-    MF_IF,
-    MF_IFDEF,
-    MF_IFNDEF,
-    MF_ELIF,
-    MF_ELSE,
-    MF_ENDIF,
+    MF_IGNORE   = 0,
+    MF_INCLUDE  = 1,
+    MF_DEFINE   = 1 << 1,
+    MF_UNDEF    = 1 << 2,
+    MF_IF       = 1 << 3,
+    MF_IFDEF    = 1 << 4,
+    MF_IFNDEF   = 1 << 5,
+    MF_ELIF     = 1 << 6,
+    MF_ELSE     = 1 << 7,
+    MF_ENDIF    = 1 << 8,
 } MoonFruit_MacroType;
 
 typedef struct {
@@ -114,6 +114,7 @@ typedef struct {
     MoonFruit_DefinitionTree def_tree;
 } MoonFruit_MacroInfo;
 
+u64 moonfruit_definition_tree_start_idx(u8 c);
 
 MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f);
 

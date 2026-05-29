@@ -9,6 +9,11 @@ typedef struct {
     String b;
 } StringPair;
 
+typedef struct {
+    String matched;
+    String unmatched[2];
+} StringPartiallyMatchedPair;
+
 DefineArray(String);
 
 b32 char_is_whitespace(u8 c);
@@ -51,7 +56,7 @@ b32 string_compare(String a, String b);
 //String string_keep_before_perfect_match(String s, String str_match);
 String string_keep_after_perfect_match(String s, String str_match);
 
-StringPair string_keep_unmatched_ends(String a, String b);
+StringPartiallyMatchedPair string_keep_unmatched_ends(String a, String b);
 
 String string_concat(Arena* arena, String s1, String s2);
 String string_copy(Arena* arena, String s);

@@ -1,7 +1,7 @@
 .PHONY: all base misty test clean
 
 #all: base misty moonfruit test
-all: base moonfruit
+all: base moonfruit graphics
 
 base:
 	./Base/build.sh
@@ -11,6 +11,9 @@ misty:
 
 moonfruit:
 	./MoonFruitMacros/build.sh
+
+graphics:
+	./Graphics/build.sh
 
 test:
 	./test/build.sh all

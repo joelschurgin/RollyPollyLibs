@@ -490,8 +490,8 @@ MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f) {
                 if (def->radix.size == 0) {
                     def->radix = definition;
                 } else {
-                    StringPair remaining = string_keep_unmatched_ends(definition, def->radix);
-                    printf("%.*s  %.*s\n", remaining.a.size, remaining.a.str, remaining.b.size, remaining.b.str);
+                    StringPartiallyMatchedPair partially_matched_pair = string_keep_unmatched_ends(definition, def->radix);
+                    printf("|%.*s|%.*s|%.*s|\n", partially_matched_pair.matched.size, partially_matched_pair.matched.str, partially_matched_pair.unmatched[0].size, partially_matched_pair.unmatched[0].str, partially_matched_pair.unmatched[1].size, partially_matched_pair.unmatched[1].str);
                 }
             }
         }

@@ -137,15 +137,15 @@ String string_keep_after_perfect_match(String s, String str_match) {
     return string_skip(s, (j-i == str_match.size) ? j : i);
 }
 
-StringPair string_keep_unmatched_ends(String a, String b) {
+StringPartiallyMatchedPair string_keep_unmatched_ends(String a, String b) {
     if (a.size > b.size) return string_keep_unmatched_ends(b, a);
 
     u64 i = 0;
     for (; i < a.size && a.str[i] == b.str[i]; i++);
 
-    return (StringPair) {
-        .a = string_skip(a, i),
-        .b = string_skip(b, i),
+    return (StringPartiallyMatchedPair) {
+        .matched = string_prefix(a, i),
+        .unmatched = { string_skip(a, i), string_skip(b, i) },
     };
 }
 

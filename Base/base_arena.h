@@ -44,3 +44,13 @@ void arena_clear(Arena *arena);
 
 TempArena temp_arena_begin(Arena* arena);
 void temp_arena_end(TempArena arena);
+
+#define TempArenaBlock(arena, temp_arena_name)                                  \
+    Arena* temp_arena_name = NULL;                                              \
+    TempArena _temp_arena;                                                      \
+    DeferBlock({                                                                \
+        _temp_arena = temp_arena_begin(arena);                                  \
+        temp_arena_name = arena;                                                \
+    }, {                                                                        \
+        temp_arena_end(_temp_arena);                                            \
+    })

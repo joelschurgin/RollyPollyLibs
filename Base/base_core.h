@@ -30,6 +30,7 @@ typedef u32      b32;
 typedef u64      b64;
 typedef float    f32;
 typedef double   f64;
+typedef void VoidProc(void);
 
 // units
 

@@ -39,7 +39,7 @@ static struct wl_registry_listener _graphics_registry_listener = {
 
 internal void _graphics_resize(Graphics_Window* window) {
     if (!window->egl_window) {
-        window->egl_window = wl_egl_window_create(window->surface, window->height, window->height);
+        window->egl_window = wl_egl_window_create(window->surface, window->width, window->height);
         window->egl_surf = eglCreateWindowSurface(window->egl_disp, window->egl_cfg, window->egl_window, NULL);
         eglMakeCurrent(window->egl_disp, window->egl_surf, window->egl_surf, window->egl_ctx);
     } else {
@@ -107,5 +107,10 @@ internal void _graphics_regstry_global(void* data, struct wl_registry* reg, u32 
 }
 
 internal void _graphics_regstry_global_remove(void* data, struct wl_registry* reg, u32 name) {}
+
+internal VoidProc* _graphics_load_opengl_func(char *name) {
+    VoidProc *result = (VoidProc *)eglGetProcAddress(name);
+    return result;
+}
 
 

@@ -26,3 +26,5 @@ void file_close(File* f);
 
 void file_read_bytes(File* f, u64 file_pos, void* buf, u64 num_bytes_to_read);
 String file_read_cstring(Arena* arena, File* f, u64 file_pos, u64* num_bytes_read);
+
+#define FileBlock(arena, path, flag, file_var) DeferBlock({ file_var = File((arena), (path)); file_open(&file_var, (flag)); }, { file_close(&file_var); })

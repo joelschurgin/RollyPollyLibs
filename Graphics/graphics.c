@@ -4,43 +4,27 @@
 Arena* graphics_arena = 0L;
 b32 graphics_intitiallized = 0;
 
-struct Graphics_Window {
-#ifdef OS_LINUX
-    struct wl_display* wl_display;
-    struct wl_compositor* compositor;
-    struct wl_surface* surface;
-    struct xdg_wm_base* shell;
-    struct xdg_toplevel* top;
-    struct xdg_surface* x_surface;
-
-    EGLDisplay egl_disp;
-    EGLConfig egl_cfg;
-    EGLContext egl_ctx;
-    EGLSurface egl_surf;
-
-    struct wl_egl_window* egl_window;
-#endif
-
-    graphics_draw_func_t draw_func;
-    void* draw_func_data;
-
-    u32 width;
-    u32 height;
-
-    b8 closed;
-};
-
+#include "graphics_internal.c"
 #include "graphics_platform_internal.c"
 
 void graphics_init() {
     graphics_arena = default_arena();
     Assert(graphics_arena);
+
+    // load opengl funcs
+    {
+        #define X(name, r, p) name = (name##_FunctionType *)_graphics_load_opengl_func(#name);
+            Graphics_OpenGL_ProcedureXList
+        #undef X
+    }
 }
 
 Graphics_Window* graphics_window_create() {
     if (!graphics_intitiallized) graphics_init();
 
     Graphics_Window* window = push_struct(graphics_arena, Graphics_Window);
+    window->width = 1280;
+    window->height = 720;
 
     window->wl_display = wl_display_connect(NULL);
     Assert(window->wl_display);
@@ -77,7 +61,12 @@ Graphics_Window* graphics_window_create() {
     EGLint num_configs;
     eglChooseConfig(window->egl_disp, attribs, &window->egl_cfg, 1, &num_configs);
 
-    EGLint ctx_attribs[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
+    EGLint ctx_attribs[] = { 
+        EGL_CONTEXT_MAJOR_VERSION, 3,
+        EGL_CONTEXT_MINOR_VERSION, 3,
+        EGL_CONTEXT_OPENGL_PROFILE_MASK, EGL_CONTEXT_OPENGL_CORE_PROFILE_BIT,
+        EGL_NONE
+    };
     window->egl_ctx = eglCreateContext(window->egl_disp, window->egl_cfg, EGL_NO_CONTEXT, ctx_attribs);
 
     window->surface = wl_compositor_create_surface(window->compositor);
@@ -88,6 +77,46 @@ Graphics_Window* graphics_window_create() {
     window->top = xdg_surface_get_toplevel(window->x_surface);
     xdg_toplevel_add_listener(window->top, &_graphics_top_listener, window);
     wl_surface_commit(window->surface);
+
+    eglMakeCurrent(window->egl_disp, window->egl_surf, window->egl_surf, window->egl_ctx);
+
+    {
+        glViewport(0, 0, window->width, window->height);
+
+        local_persist const float rect_verts[] = {
+            0.0f, 0.0f,
+            1.0f, 0.0f,
+            0.0f, 1.0f,
+            1.0f, 1.0f,
+        };
+
+        glGenVertexArrays(1, &window->rect.vao);
+        glBindVertexArray(window->rect.vao);
+
+        glGenBuffers(1, &window->rect.vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, window->rect.vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(rect_verts), (void*)rect_verts, GL_STATIC_DRAW);
+
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glEnableVertexAttribArray(0);
+
+        glBindVertexArray(0);
+
+        String vert_shader = _graphics_shader_read(String("Graphics/Shaders/box_vert.glsl"));
+        String frag_shader = _graphics_shader_read(String("Graphics/Shaders/box_frag.glsl"));
+
+        window->rect.shader = _graphics_shader_create(vert_shader, frag_shader);
+
+        window->rect.u_fill_color = glGetUniformLocation(window->rect.shader.program, "u_fill_color");
+        window->rect.u_transform = glGetUniformLocation(window->rect.shader.program, "u_transform");
+        window->rect.u_rect = glGetUniformLocation(window->rect.shader.program, "u_rect");
+        window->rect.u_radius = glGetUniformLocation(window->rect.shader.program, "u_radius");
+        window->rect.u_border_thickness = glGetUniformLocation(window->rect.shader.program, "u_border_thickness");
+        window->rect.u_border_color = glGetUniformLocation(window->rect.shader.program, "u_border_color");
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
 
     return window;
 }
@@ -111,7 +140,41 @@ b32 graphics_poll_events(Graphics_Window* window) {
     return wl_display_dispatch(window->wl_display) && !window->closed;
 }
 
+void graphics_window_dimensions(Graphics_Window* window, u32* width, u32* height) {
+    *width = window->width;
+    *height = window->height;
+}
+
 void graphics_set_draw_callback(Graphics_Window* window, graphics_draw_func_t draw_func, void* data) {
     window->draw_func = draw_func;
     window->draw_func_data = data;
+}
+
+void graphics_rect_fill(Graphics_Window* window, Graphics_Rect* rect) {
+    glUseProgram(window->rect.shader.program);
+    glUniform4f(window->rect.u_fill_color, rect->fill_color.r, rect->fill_color.g, rect->fill_color.b, rect->fill_color.a);
+    glUniform4f(window->rect.u_border_color, rect->border_color.r, rect->border_color.g, rect->border_color.b, rect->border_color.a);
+
+    const f32 padding = 8.0f;
+
+    f32 w = 2.0f * ((f32)rect->w + padding * 2.0f) / window->width;
+    f32 h = -2.0f * ((f32)rect->h + padding * 2.0f) / window->height;
+    f32 x = 2.0f * ((f32)rect->x - padding) / window->width - 1.0f;
+    f32 y = 1.0f - 2.0f * ((f32)rect->y - padding) / window->height;
+    f32 matrix[] = {
+        w, 0, 0, 0,
+        0, h, 0, 0,
+        0, 0, 1, 0,
+        x, y, 0, 1,
+    };
+
+    glUniformMatrix4fv(window->rect.u_transform, 1, false, matrix);
+    glUniform4f(window->rect.u_rect, (f32)rect->x, (f32)rect->y, (f32)rect->w, (f32)rect->h);
+    glUniform1f(window->rect.u_radius, (f32)rect->radius);
+
+    glUniform1f(window->rect.u_border_thickness, rect->border_thickness);
+
+    glBindVertexArray(window->rect.vao);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
 }

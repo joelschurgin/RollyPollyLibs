@@ -48,8 +48,9 @@ internal void _graphics_resize(Graphics_Window* window) {
 }
 
 internal void _graphics_draw(Graphics_Window* window) {
-    if (window->draw_func) window->draw_func(window->draw_func_data);
+    glViewport(0, 0, window->width, window->height);
 
+    if (window->draw_func) window->draw_func(window->draw_func_data);
 
     struct wl_callback* callback = wl_surface_frame(window->surface);
     wl_callback_add_listener(callback, &_graphics_frame_listener, window);

@@ -3,22 +3,20 @@
 
 #include <wayland-egl.h>
 
-#define glTexImage3D glTexImage3D__static
-#define glTexSubImage3D glTexSubImage3D__static
 #define glActiveTexture glActiveTexture__static
 #include <GL/gl.h>
 #include <EGL/egl.h>
-#undef glTexImage3D
-#undef glTexSubImage3D
 #undef glActiveTexture
 
 #include "base.h"
+//#include "graphics_font.h"
 
 extern Arena* graphics_arena;
 
 typedef void (*graphics_draw_func_t)(void* data);
 typedef struct Graphics_Shader Graphics_Shader;
-typedef struct Graphics_Shape Graphics_Shape;
+typedef struct Graphics_Rect Graphics_Rect;
+typedef struct Graphics_ImageRect Graphics_ImageRect;
 
 typedef struct Graphics_Window Graphics_Window;
 
@@ -26,17 +24,6 @@ typedef struct {
     f32 r, g, b, a;
 } Graphics_Color;
 #define Graphics_Color(red, green, blue, alpha) (Graphics_Color){ .r = (red), .g = (green), .b = (blue), .a = (alpha) }
-
-typedef struct {
-    i32 x;
-    i32 y;
-    i32 w;
-    i32 h;
-    i32 radius;
-    f32 border_thickness;
-    Graphics_Color fill_color;
-    Graphics_Color border_color;
-} Graphics_Rect;
 
 void                    graphics_init();
 Graphics_Window*        graphics_window_create();
@@ -47,8 +34,11 @@ void                    graphics_window_dimensions(Graphics_Window* window, u32*
 
 void                    graphics_set_draw_callback(Graphics_Window* window, graphics_draw_func_t draw_func, void* data);
 
-void                    graphics_rect_fill(Graphics_Window* window, Graphics_Rect* rect);
+Graphics_Rect           graphics_rect_create();
+void                    graphics_rect_fill(Graphics_Window* window, f32 x, f32 y, f32 w, f32 h, f32 radius, f32 border_thickness, Graphics_Color fill_color, Graphics_Color border_color);
 
+Graphics_ImageRect      graphics_image_rect_create();
+void                    graphics_image_rect_draw(Graphics_Window* window, f32 rect_x, f32 rect_y, f32 rect_w, f32 rect_h);
 
 typedef char GLchar;
 typedef ptrdiff_t GLsizeiptr;
@@ -191,8 +181,6 @@ X(glUniform4fv, void, (GLint location, GLsizei count, const GLfloat *value))\
 X(glUniformMatrix3fv, void, (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value))\
 X(glUniformMatrix4fv, void, (GLint location, GLsizei count, GLboolean transpose, const GLfloat *value))\
 X(glUniform1i, void, (GLint location, GLint v0))\
-X(glTexImage3D, void, (GLenum target, GLint level, GLint internalformat, GLsizei width, GLsizei height, GLsizei depth, GLint border, GLenum format, GLenum type, const void *pixels))\
-X(glTexSubImage3D, void, (GLenum target, GLint level, GLint xoffset, GLint yoffset, GLint zoffset, GLsizei width, GLsizei height, GLsizei depth, GLenum format, GLenum type, const void *pixels))\
 X(glGenerateMipmap, void, (GLenum target))\
 X(glBindAttribLocation, void, (GLuint programObj, GLuint index, char *name))\
 X(glBindFragDataLocation, void, (GLuint program, GLuint color, char *name))\

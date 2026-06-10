@@ -1,17 +1,25 @@
 struct Graphics_Shader {
-    u32 program;
+    i32 program;
 };
 
-struct Graphics_Shape {
+struct Graphics_Rect {
     struct Graphics_Shader shader;
-    u32 vbo;
-    u32 vao;
-    u32 u_fill_color;
-    u32 u_transform;
-    u32 u_rect;
-    u32 u_radius;
-    u32 u_border_thickness;
-    u32 u_border_color;
+    i32 vbo;
+    i32 vao;
+    i32 u_fill_color;
+    i32 u_transform;
+    i32 u_rect;
+    i32 u_radius;
+    i32 u_border_thickness;
+    i32 u_border_color;
+};
+
+struct Graphics_ImageRect {
+    struct Graphics_Shader shader;
+    i32 vbo;
+    i32 vao;
+    i32 texture_id;
+    i32 u_transform;
 };
 
 struct Graphics_Window {
@@ -39,20 +47,20 @@ struct Graphics_Window {
 
     b8 closed;
 
-    struct Graphics_Shape rect;
+    struct Graphics_Rect rect;
+    struct Graphics_ImageRect image_rect;
 };
 
-#include <errno.h>
-internal String _graphics_shader_read(String path) {
+internal String _graphics_shader_read(Arena* arena, String path) {
     File f;
-    FileBlock(graphics_arena, path, FILE_READ_ONLY, f) {
-        String shader = EmptyString(graphics_arena, file_size(&f) + 1);
+    String shader = String("");
+    FileBlock(arena, path, FILE_READ_ONLY, f) {
+        shader = EmptyString(arena, file_size(&f) + 1);
         shader.size--;
         file_read_bytes(&f, 0, shader.str, shader.size);
-        return shader;
     }
 
-    return String("");
+    return shader;
 }
 
 internal u32 _graphics_shader_compile(u32 type, String source) {

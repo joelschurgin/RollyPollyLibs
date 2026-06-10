@@ -1,11 +1,15 @@
 #include "graphics.h"
 #include "xdg-shell-protocol.c"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 Arena* graphics_arena = 0L;
 b32 graphics_intitiallized = 0;
 
 #include "graphics_internal.c"
 #include "graphics_platform_internal.c"
+//#include "graphics_font.c"
 
 void graphics_init() {
     graphics_arena = default_arena();
@@ -83,39 +87,11 @@ Graphics_Window* graphics_window_create() {
     {
         glViewport(0, 0, window->width, window->height);
 
-        local_persist const float rect_verts[] = {
-            0.0f, 0.0f,
-            1.0f, 0.0f,
-            0.0f, 1.0f,
-            1.0f, 1.0f,
-        };
-
-        glGenVertexArrays(1, &window->rect.vao);
-        glBindVertexArray(window->rect.vao);
-
-        glGenBuffers(1, &window->rect.vbo);
-        glBindBuffer(GL_ARRAY_BUFFER, window->rect.vbo);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(rect_verts), (void*)rect_verts, GL_STATIC_DRAW);
-
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
-        glEnableVertexAttribArray(0);
-
-        glBindVertexArray(0);
-
-        String vert_shader = _graphics_shader_read(String("Graphics/Shaders/box_vert.glsl"));
-        String frag_shader = _graphics_shader_read(String("Graphics/Shaders/box_frag.glsl"));
-
-        window->rect.shader = _graphics_shader_create(vert_shader, frag_shader);
-
-        window->rect.u_fill_color = glGetUniformLocation(window->rect.shader.program, "u_fill_color");
-        window->rect.u_transform = glGetUniformLocation(window->rect.shader.program, "u_transform");
-        window->rect.u_rect = glGetUniformLocation(window->rect.shader.program, "u_rect");
-        window->rect.u_radius = glGetUniformLocation(window->rect.shader.program, "u_radius");
-        window->rect.u_border_thickness = glGetUniformLocation(window->rect.shader.program, "u_border_thickness");
-        window->rect.u_border_color = glGetUniformLocation(window->rect.shader.program, "u_border_color");
-
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+        window->rect = graphics_rect_create();
+        window->image_rect = graphics_image_rect_create();
     }
 
     return window;
@@ -150,17 +126,61 @@ void graphics_set_draw_callback(Graphics_Window* window, graphics_draw_func_t dr
     window->draw_func_data = data;
 }
 
-void graphics_rect_fill(Graphics_Window* window, Graphics_Rect* rect) {
+Graphics_Rect graphics_rect_create() {
+    Graphics_Rect rect = {0};
+
+    // verts
+    {
+        local_persist const f32 rect_verts[] = {
+            0.0f, 0.0f,
+            1.0f, 0.0f,
+            0.0f, 1.0f,
+            1.0f, 1.0f,
+        };
+
+        glGenVertexArrays(1, &rect.vao);
+        glBindVertexArray(rect.vao);
+
+        glGenBuffers(1, &rect.vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, rect.vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(rect_verts), (void*)rect_verts, GL_STATIC_DRAW);
+
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glEnableVertexAttribArray(0);
+    }
+
+    // shader
+    TempArenaBlock(graphics_arena, temp_arena) {
+        String vert_shader = _graphics_shader_read(temp_arena, String("Graphics/Shaders/box_vert.glsl"));
+        String frag_shader = _graphics_shader_read(temp_arena, String("Graphics/Shaders/box_frag.glsl"));
+
+        rect.shader = _graphics_shader_create(vert_shader, frag_shader);
+    }
+
+    // uniforms
+    {
+        rect.u_fill_color = glGetUniformLocation(rect.shader.program, "u_fill_color");
+        rect.u_transform = glGetUniformLocation(rect.shader.program, "u_transform");
+        rect.u_rect = glGetUniformLocation(rect.shader.program, "u_rect");
+        rect.u_radius = glGetUniformLocation(rect.shader.program, "u_radius");
+        rect.u_border_thickness = glGetUniformLocation(rect.shader.program, "u_border_thickness");
+        rect.u_border_color = glGetUniformLocation(rect.shader.program, "u_border_color");
+    }
+
+    return rect;
+}
+
+void graphics_rect_fill(Graphics_Window* window, f32 rect_x, f32 rect_y, f32 rect_w, f32 rect_h, f32 radius, f32 border_thickness, Graphics_Color fill_color, Graphics_Color border_color) {
     glUseProgram(window->rect.shader.program);
-    glUniform4f(window->rect.u_fill_color, rect->fill_color.r, rect->fill_color.g, rect->fill_color.b, rect->fill_color.a);
-    glUniform4f(window->rect.u_border_color, rect->border_color.r, rect->border_color.g, rect->border_color.b, rect->border_color.a);
+    glUniform4f(window->rect.u_fill_color, fill_color.r, fill_color.g, fill_color.b, fill_color.a);
+    glUniform4f(window->rect.u_border_color, border_color.r, border_color.g, border_color.b, border_color.a);
 
     const f32 padding = 8.0f;
 
-    f32 w = 2.0f * ((f32)rect->w + padding * 2.0f) / window->width;
-    f32 h = -2.0f * ((f32)rect->h + padding * 2.0f) / window->height;
-    f32 x = 2.0f * ((f32)rect->x - padding) / window->width - 1.0f;
-    f32 y = 1.0f - 2.0f * ((f32)rect->y - padding) / window->height;
+    f32 w = 2.0f * (rect_w + padding * 2.0f) / window->width;
+    f32 h = -2.0f * (rect_h + padding * 2.0f) / window->height;
+    f32 x = 2.0f * (rect_x - padding) / window->width - 1.0f;
+    f32 y = 1.0f - 2.0f * (rect_y - padding) / window->height;
     f32 matrix[] = {
         w, 0, 0, 0,
         0, h, 0, 0,
@@ -169,12 +189,100 @@ void graphics_rect_fill(Graphics_Window* window, Graphics_Rect* rect) {
     };
 
     glUniformMatrix4fv(window->rect.u_transform, 1, false, matrix);
-    glUniform4f(window->rect.u_rect, (f32)rect->x, (f32)rect->y, (f32)rect->w, (f32)rect->h);
-    glUniform1f(window->rect.u_radius, (f32)rect->radius);
+    glUniform4f(window->rect.u_rect, rect_x, rect_y, rect_w, rect_h);
+    glUniform1f(window->rect.u_radius, radius);
 
-    glUniform1f(window->rect.u_border_thickness, rect->border_thickness);
+    glUniform1f(window->rect.u_border_thickness, border_thickness);
 
     glBindVertexArray(window->rect.vao);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+}
+
+Graphics_ImageRect graphics_image_rect_create() {
+    Graphics_ImageRect rect = {0};
+
+    // verts
+    {
+        local_persist const float rect_verts[] = {
+            0.0f, 0.0f,
+            1.0f, 0.0f,
+            0.0f, 1.0f,
+            1.0f, 1.0f,
+        };
+
+        glGenVertexArrays(1, &rect.vao);
+        glBindVertexArray(rect.vao);
+
+        glGenBuffers(1, &rect.vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, rect.vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(rect_verts), (void*)rect_verts, GL_STATIC_DRAW);
+
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glEnableVertexAttribArray(0);
+    }
+
+    // texture and image loading
+    {
+        glGenTextures(1, &rect.texture_id);
+        glBindTexture(GL_TEXTURE_2D, rect.texture_id);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        i32 img_w = 0;
+        i32 img_h = 0;
+        i32 num_channels = 0;
+
+        u8* data = stbi_load("Graphics/Fonts/RobotoMono.png", &img_w, &img_h, &num_channels, 0);
+        if (!data) {
+            printf("Error loading image!!\n");
+            return rect;
+        }
+ 
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        GLenum internal_format = (num_channels == 4) ? GL_RGBA8 : GL_RGB8;
+        GLenum format = (num_channels == 4) ? GL_RGBA : GL_RGB;
+        glTexImage2D(GL_TEXTURE_2D, 0, internal_format, img_w, img_h, 0, format, GL_UNSIGNED_BYTE, data);
+        stbi_image_free(data);
+    }
+
+    // shader
+    TempArenaBlock(graphics_arena, temp_arena) {
+        String vert_shader = _graphics_shader_read(temp_arena, String("Graphics/Shaders/text_vert.glsl"));
+        String frag_shader = _graphics_shader_read(temp_arena, String("Graphics/Shaders/text_frag.glsl"));
+
+        rect.shader = _graphics_shader_create(vert_shader, frag_shader);
+    }
+
+    // uniforms
+    {
+        rect.u_transform = glGetUniformLocation(rect.shader.program, "u_transform");
+    }
+
+    return rect;
+}
+
+void graphics_image_rect_draw(Graphics_Window* window, f32 rect_x, f32 rect_y, f32 rect_w, f32 rect_h) {
+    glUseProgram(window->image_rect.shader.program);
+
+    f32 w = 2.0f * rect_w / window->width;
+    f32 h = -2.0f * rect_h / window->height;
+    f32 x = 2.0f * rect_x / window->width - 1.0f;
+    f32 y = 1.0f - 2.0f * rect_y / window->height;
+    f32 matrix[] = {
+        w, 0, 0, 0,
+        0, h, 0, 0,
+        0, 0, 1, 0,
+        x, y, 0, 1,
+    };
+
+    glUniformMatrix4fv(window->image_rect.u_transform, 1, false, matrix);
+
+    glBindTexture(GL_TEXTURE_2D, window->image_rect.texture_id);
+    glBindVertexArray(window->image_rect.vao);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     glBindVertexArray(0);
 }

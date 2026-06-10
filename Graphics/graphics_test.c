@@ -10,21 +10,23 @@ void draw(void* data) {
     u32 height = 0;
     graphics_window_dimensions(window, &width, &height);
 
-    glViewport(0, 0, width, height);
-
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT);
 
-    graphics_rect_fill(window, &(Graphics_Rect) {
-        .x = width / 4,
-        .y = height / 4,
-        .w = width / 2,
-        .h = height / 2,
-        .radius = 60,
-        .border_thickness = 1.0f,
-        .fill_color = Graphics_Color(0.0f, 0.5f, 0.5f, 1.0f),
-        .border_color = Graphics_Color(1.0f, 1.0f, 1.0f, 1.0f),
-    });
+    /*
+    graphics_rect_fill(window, (f32)width / 4.0f,
+                               (f32)height / 4.0f,
+                               (f32)width / 2.0f,
+                               (f32)height / 2.0f,
+                               60.0f, 1.0f,
+                               Graphics_Color(0.0f, 0.5f, 0.5f, 1.0f),
+                               Graphics_Color(1.0f, 1.0f, 1.0f, 1.0f));
+    */
+
+    graphics_image_rect_draw(window, 0.0f,
+                                     0.0f,
+                                     (f32)width,
+                                     (f32)height);
 }
 
 i32 main(i32 argc, u8 **argv) {

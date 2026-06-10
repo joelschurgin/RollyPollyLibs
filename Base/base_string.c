@@ -157,8 +157,9 @@ String string_concat(Arena* arena, String s1, String s2) {
 }
 
 String string_copy(Arena* arena, String s) {
-    String output = EmptyString(arena, s.size);
+    String output = EmptyString(arena, s.size+1);
     MemoryCopy(output.str, s.str, s.size);
+    output.size = s.size;
     return output;
 }
 

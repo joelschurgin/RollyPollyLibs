@@ -37,7 +37,7 @@ void                    graphics_set_draw_callback(Graphics_Window* window, grap
 Graphics_Rect           graphics_rect_create();
 void                    graphics_rect_fill(Graphics_Window* window, f32 x, f32 y, f32 w, f32 h, f32 radius, f32 border_thickness, Graphics_Color fill_color, Graphics_Color border_color);
 
-Graphics_ImageRect      graphics_image_rect_create();
+Graphics_ImageRect      graphics_image_rect_create(const char* path);
 void                    graphics_image_rect_draw(Graphics_Window* window, f32 rect_x, f32 rect_y, f32 rect_w, f32 rect_h);
 
 typedef char GLchar;

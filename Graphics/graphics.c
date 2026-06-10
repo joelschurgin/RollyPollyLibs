@@ -91,7 +91,7 @@ Graphics_Window* graphics_window_create() {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
         window->rect = graphics_rect_create();
-        window->image_rect = graphics_image_rect_create();
+        window->image_rect = graphics_image_rect_create("Graphics/Fonts/RobotoMono.png");
     }
 
     return window;
@@ -199,7 +199,7 @@ void graphics_rect_fill(Graphics_Window* window, f32 rect_x, f32 rect_y, f32 rec
     glBindVertexArray(0);
 }
 
-Graphics_ImageRect graphics_image_rect_create() {
+Graphics_ImageRect graphics_image_rect_create(const char* path) {
     Graphics_ImageRect rect = {0};
 
     // verts
@@ -236,7 +236,7 @@ Graphics_ImageRect graphics_image_rect_create() {
         i32 img_h = 0;
         i32 num_channels = 0;
 
-        u8* data = stbi_load("Graphics/Fonts/RobotoMono.png", &img_w, &img_h, &num_channels, 0);
+        u8* data = stbi_load(path, &img_w, &img_h, &num_channels, 0);
         if (!data) {
             printf("Error loading image!!\n");
             return rect;

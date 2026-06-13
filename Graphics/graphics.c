@@ -9,7 +9,7 @@ b32 graphics_intitiallized = 0;
 
 #include "graphics_internal.c"
 #include "graphics_platform_internal.c"
-//#include "graphics_font.c"
+#include "graphics_font.c"
 
 void graphics_init() {
     graphics_arena = default_arena();

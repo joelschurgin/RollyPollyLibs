@@ -31,6 +31,7 @@ void draw(void* data) {
 
 i32 main(i32 argc, u8 **argv) {
     Graphics_Window* window = graphics_window_create();
+    Graphics_Font* font = graphics_font_load(String("Graphics/Fonts/RobotoMono"));
 
     graphics_set_draw_callback(window, draw, window);
     while (graphics_poll_events(window));

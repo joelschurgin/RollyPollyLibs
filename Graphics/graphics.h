@@ -9,7 +9,7 @@
 #undef glActiveTexture
 
 #include "base.h"
-//#include "graphics_font.h"
+#include "graphics_font.h"
 
 extern Arena* graphics_arena;
 

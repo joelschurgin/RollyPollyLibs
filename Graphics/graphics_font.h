@@ -1,6 +1,8 @@
 #ifndef GRAPHICS_FONT_H
 #define GRAPHICS_FONT_H
 
+#define GRAPHICS_FONT_NUM_GLYPHS 128
+
 typedef enum {
     GRAPHICS_FONT_TYPE_NONE,
     GRAPHICS_FONT_TYPE_MSDF,
@@ -13,13 +15,27 @@ typedef enum {
 
 typedef struct {
     f32 atlas_left;
-    f32 atlas_right;
     f32 atlas_bottom;
+    f32 atlas_right;
     f32 atlas_top;
 
     f32 plane_left;
-    f32 plane_right;
     f32 plane_bottom;
+    f32 plane_right;
+    f32 plane_top;
+} Graphics_FontGlyphBounds;
+
+DefineArray(Graphics_FontGlyphBounds);
+
+typedef struct {
+    f32 atlas_left;
+    f32 atlas_bottom;
+    f32 atlas_right;
+    f32 atlas_top;
+
+    f32 plane_left;
+    f32 plane_bottom;
+    f32 plane_right;
     f32 plane_top;
  
     f32 advance;
@@ -42,12 +58,26 @@ typedef struct {
     f32 underline_y;
     f32 underline_thickness;
 
-    Graphics_FontGlyph glyphs[128];
+    Graphics_FontGlyph glyphs[GRAPHICS_FONT_NUM_GLYPHS];
 
+    // from Graphics_ImageRect
+    Graphics_Shader shader;
+    i32 vbo;
+    i32 vao;
+    i32 tbo;
+    i32 tbo_texture;
+    i32 texture_id;
+    i32 u_transform;
+    i32 u_texture;
+    i32 u_fontLibrary;
+
+    // enums here for alignment
     Graphics_FontType type;
     Graphics_FontYOrigin y_origin;
 } Graphics_Font;
 
 Graphics_Font* graphics_font_load(String font_family);
+
+void graphics_font_draw(Graphics_Window* window, Graphics_Font* font);
 
 #endif

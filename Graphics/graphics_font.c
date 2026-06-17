@@ -200,20 +200,135 @@ internal void _graphics_font_parse(String file_str, Graphics_Font* font) {
     }
 }
 
-Graphics_Font* graphics_font_load(String font_family) {
-    Graphics_Font* font = push_struct(graphics_arena, Graphics_Font);
-
-    TempArenaBlock(graphics_arena, temp_arena) {
-        String path = string_concat(temp_arena, font_family, String(".json"));
-        File f;
-        FileBlock(temp_arena, path, FILE_READ_ONLY, f) {
+internal void graphics_font_load_atlas(String font_family, Graphics_Font* font) {
+    TempArenaBlock(graphics_arena) {
+        String path = string_concat(graphics_arena, font_family, String(".json"));
+        FileBlock(graphics_arena, path, FILE_READ_ONLY, f) {
             String file_str = (String){
-                .str = (u8*)f.data,
-                .size = file_size(&f),
+                .str = (u8*)f->data,
+                .size = file_size(f),
             };
             _graphics_font_parse(file_str, font);
         }
     }
+}
+
+internal void graphics_font_load_texture(String font_family, Graphics_Font* font) {
+    Assert(font && font->type == GRAPHICS_FONT_TYPE_MSDF);
+
+    // verts
+    {
+        local_persist const float rect_verts[] = {
+            0.0f, 0.0f,
+            1.0f, 0.0f,
+            0.0f, 1.0f,
+            1.0f, 1.0f,
+        };
+
+        glGenVertexArrays(1, &font->vao);
+        glBindVertexArray(font->vao);
+
+        glGenBuffers(1, &font->vbo);
+        glBindBuffer(GL_ARRAY_BUFFER, font->vbo);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(rect_verts), (void*)rect_verts, GL_STATIC_DRAW);
+
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glEnableVertexAttribArray(0);
+    }
+
+    TempArenaBlock(graphics_arena) {
+        String path = string_concat(graphics_arena, font_family, String(".png\0"));
+
+        // texture and image loading
+        glGenTextures(1, &font->texture_id);
+        glBindTexture(GL_TEXTURE_2D, font->texture_id);
+
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+        i32 img_w = 0;
+        i32 img_h = 0;
+        i32 num_channels = 0;
+
+        u8* data = stbi_load(path.str, &img_w, &img_h, &num_channels, 0);
+        if (!data) {
+            printf("Error loading image!!\n");
+            return;
+        }
+
+        glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+        GLenum internal_format = (num_channels == 4) ? GL_RGBA8 : GL_RGB8;
+        GLenum format = (num_channels == 4) ? GL_RGBA : GL_RGB;
+        glTexImage2D(GL_TEXTURE_2D, 0, internal_format, img_w, img_h, 0, format, GL_UNSIGNED_BYTE, data);
+        stbi_image_free(data);
+    }
+
+    // Texture Buffer Object
+    TempArenaBlock(graphics_arena) {
+        Graphics_FontGlyphBoundsArray glyph_bounds = Array(graphics_arena, Graphics_FontGlyphBounds, GRAPHICS_FONT_NUM_GLYPHS);
+        for (u64 i = 0; i < GRAPHICS_FONT_NUM_GLYPHS; i++) {
+            glyph_bounds.data[i] = (Graphics_FontGlyphBounds){
+                .atlas_left = font->glyphs[i].atlas_left / font->width,
+                .atlas_bottom = font->glyphs[i].atlas_bottom / font->height,
+                .atlas_right = font->glyphs[i].atlas_right / font->width,
+                .atlas_top = font->glyphs[i].atlas_top / font->height,
+
+                .plane_left = font->glyphs[i].plane_left,
+                .plane_bottom = font->glyphs[i].plane_bottom,
+                .plane_right = font->glyphs[i].plane_right,
+                .plane_top = font->glyphs[i].plane_top,
+            };
+        }
+
+        glGenBuffers(1, &font->tbo);
+        glBindBuffer(GL_TEXTURE_BUFFER, font->tbo);
+        glBufferData(GL_TEXTURE_BUFFER, glyph_bounds.count * sizeof(Graphics_FontGlyphBounds), glyph_bounds.data, GL_STATIC_DRAW);
+
+        glGenTextures(1, &font->tbo_texture);
+        glBindTexture(GL_TEXTURE_BUFFER, font->tbo_texture);
+
+        glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, font->tbo);
+    }
+
+    // shader - could load this once for all fonts?
+    TempArenaBlock(graphics_arena) {
+        String vert_shader = _graphics_shader_read(graphics_arena, String("Graphics/Shaders/text_vert.glsl"));
+        String frag_shader = _graphics_shader_read(graphics_arena, String("Graphics/Shaders/text_frag.glsl"));
+
+        font->shader = _graphics_shader_create(vert_shader, frag_shader);
+    }
+
+    // uniforms
+    {
+        font->u_transform = glGetUniformLocation(font->shader.program, "u_transform");
+        font->u_texture = glGetUniformLocation(font->shader.program, "u_texture");
+        font->u_fontLibrary = glGetUniformLocation(font->shader.program, "u_fontLibrary");
+    }
+}
+
+Graphics_Font* graphics_font_load(String font_family) {
+    Graphics_Font* font = push_struct(graphics_arena, Graphics_Font);
+
+    graphics_font_load_atlas(font_family, font);
+    graphics_font_load_texture(font_family, font);
 
     return font;
+}
+
+void graphics_font_draw(Graphics_Window* window, Graphics_Font* font) {
+    glUseProgram(font->shader.program);
+ 
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, font->texture_id);
+    glUniform1i(font->u_texture, 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_BUFFER, font->tbo_texture);
+    glUniform1i(font->u_fontLibrary, 1);
+
+    glBindVertexArray(font->vao);
+    glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, 1);
+    glBindVertexArray(0);
 }

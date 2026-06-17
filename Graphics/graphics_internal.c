@@ -1,63 +1,11 @@
-struct Graphics_Shader {
-    i32 program;
-};
-
-struct Graphics_Rect {
-    struct Graphics_Shader shader;
-    i32 vbo;
-    i32 vao;
-    i32 u_fill_color;
-    i32 u_transform;
-    i32 u_rect;
-    i32 u_radius;
-    i32 u_border_thickness;
-    i32 u_border_color;
-};
-
-struct Graphics_ImageRect {
-    struct Graphics_Shader shader;
-    i32 vbo;
-    i32 vao;
-    i32 texture_id;
-    i32 u_transform;
-};
-
-struct Graphics_Window {
-#ifdef OS_LINUX
-    struct wl_display* wl_display;
-    struct wl_compositor* compositor;
-    struct wl_surface* surface;
-    struct xdg_wm_base* shell;
-    struct xdg_toplevel* top;
-    struct xdg_surface* x_surface;
-
-    EGLDisplay egl_disp;
-    EGLConfig egl_cfg;
-    EGLContext egl_ctx;
-    EGLSurface egl_surf;
-
-    struct wl_egl_window* egl_window;
-#endif
-
-    graphics_draw_func_t draw_func;
-    void* draw_func_data;
-
-    u32 width;
-    u32 height;
-
-    b8 closed;
-
-    struct Graphics_Rect rect;
-    struct Graphics_ImageRect image_rect;
-};
+#include "graphics_types.h"
 
 internal String _graphics_shader_read(Arena* arena, String path) {
-    File f;
     String shader = String("");
     FileBlock(arena, path, FILE_READ_ONLY, f) {
-        shader = EmptyString(arena, file_size(&f) + 1);
+        shader = EmptyString(arena, file_size(f) + 1);
         shader.size--;
-        file_read_bytes(&f, 0, shader.str, shader.size);
+        file_read_bytes(f, 0, shader.str, shader.size);
     }
 
     return shader;

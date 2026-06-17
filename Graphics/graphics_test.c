@@ -3,8 +3,14 @@
 #define BASE_ENTRY_POINT
 #include "base.h"
 
+typedef struct {
+    Graphics_Window* window;
+    Graphics_Font* font;
+} Data;
+
 void draw(void* data) {
-    Graphics_Window* window = (Graphics_Window*)data;
+    Graphics_Window* window = ((Data*)data)->window;
+    Graphics_Font* font = ((Data*)data)->font;
 
     u32 width = 0;
     u32 height = 0;
@@ -23,17 +29,21 @@ void draw(void* data) {
                                Graphics_Color(1.0f, 1.0f, 1.0f, 1.0f));
     */
 
+    /*
     graphics_image_rect_draw(window, 0.0f,
                                      0.0f,
                                      (f32)width,
                                      (f32)height);
+    */
+
+    graphics_font_draw(window, font);
 }
 
 i32 main(i32 argc, u8 **argv) {
     Graphics_Window* window = graphics_window_create();
     Graphics_Font* font = graphics_font_load(String("Graphics/Fonts/RobotoMono"));
 
-    graphics_set_draw_callback(window, draw, window);
+    graphics_set_draw_callback(window, draw, &(Data){ .window = window, .font = font });
     while (graphics_poll_events(window));
     graphics_window_close(window);
 

@@ -9,21 +9,8 @@
 #undef glActiveTexture
 
 #include "base.h"
+#include "graphics_types.h"
 #include "graphics_font.h"
-
-extern Arena* graphics_arena;
-
-typedef void (*graphics_draw_func_t)(void* data);
-typedef struct Graphics_Shader Graphics_Shader;
-typedef struct Graphics_Rect Graphics_Rect;
-typedef struct Graphics_ImageRect Graphics_ImageRect;
-
-typedef struct Graphics_Window Graphics_Window;
-
-typedef struct {
-    f32 r, g, b, a;
-} Graphics_Color;
-#define Graphics_Color(red, green, blue, alpha) (Graphics_Color){ .r = (red), .g = (green), .b = (blue), .a = (alpha) }
 
 void                    graphics_init();
 Graphics_Window*        graphics_window_create();
@@ -185,7 +172,9 @@ X(glGenerateMipmap, void, (GLenum target))\
 X(glBindAttribLocation, void, (GLuint programObj, GLuint index, char *name))\
 X(glBindFragDataLocation, void, (GLuint program, GLuint color, char *name))\
 X(glBindFramebuffer, void, (GLenum target, GLuint fbo))\
-X(glActiveTexture, void, (GLenum texture))
+X(glActiveTexture, void, (GLenum texture)) \
+X(glDrawArraysInstanced, void, (GLenum mode, GLint first, GLsizei count, GLsizei primcount)) \
+X(glTexBuffer, void, (GLenum target, GLenum internalFormat, GLuint buffer))
 
 
 #define X(name, r, p) typedef r name##_FunctionType p;

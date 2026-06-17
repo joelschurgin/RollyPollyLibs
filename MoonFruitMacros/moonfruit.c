@@ -118,7 +118,7 @@ internal b32 moonfruit_tokenize_skip_comment(u8** c_iter, String str) {
                 skip_comment = true;
             }
         }
-    }https://illinois.zoom.us/j/81898855551?pwd=KBa1aDHY9APssWSznadDPCq1jpl6mW.1
+    }
 
     return skip_comment;
 }

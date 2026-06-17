@@ -45,6 +45,6 @@ void arena_clear(Arena *arena);
 TempArena temp_arena_begin(Arena* arena);
 void temp_arena_end(TempArena arena);
 
-#define TempArenaBlock(arena_name) \
-    for(TempArena _temp_arena = temp_arena_begin(arena_name); _temp_arena.arena; _temp_arena.arena = 0) \
-    DeferBlock({}, temp_arena_end(_temp_arena))
+#define TempArenaBlock(arena_name)                                                                              \
+    for(TempArena _temp_arena_ = temp_arena_begin(arena_name); _temp_arena_.arena; _temp_arena_.arena = 0)      \
+    DeferBlock({}, temp_arena_end(_temp_arena_))

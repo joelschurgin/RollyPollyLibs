@@ -28,5 +28,5 @@ void file_read_bytes(File* f, u64 file_pos, void* buf, u64 num_bytes_to_read);
 String file_read_cstring(Arena* arena, File* f, u64 file_pos, u64* num_bytes_read);
 
 #define FileBlock(arena, path, flag, file_ptr_name) \
-    for (File* file_ptr_name = FilePtr((arena), (path)); file_is_open(file_ptr_name); ) \
+    for (File* file_ptr_name = FilePtr((arena), (path)); file_ptr_name; ) \
     DeferBlock({ file_open(file_ptr_name, (flag)); }, { file_close(file_ptr_name); file_ptr_name = NULL; })

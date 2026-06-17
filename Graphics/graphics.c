@@ -15,6 +15,8 @@ void graphics_init() {
     graphics_arena = default_arena();
     Assert(graphics_arena);
 
+    stbi_set_flip_vertically_on_load(1);
+
     // load opengl funcs
     {
         #define X(name, r, p) name = (name##_FunctionType *)_graphics_load_opengl_func(#name);
@@ -150,9 +152,9 @@ Graphics_Rect graphics_rect_create() {
     }
 
     // shader
-    TempArenaBlock(graphics_arena, temp_arena) {
-        String vert_shader = _graphics_shader_read(temp_arena, String("Graphics/Shaders/box_vert.glsl"));
-        String frag_shader = _graphics_shader_read(temp_arena, String("Graphics/Shaders/box_frag.glsl"));
+    TempArenaBlock(graphics_arena) {
+        String vert_shader = _graphics_shader_read(graphics_arena, String("Graphics/Shaders/box_vert.glsl"));
+        String frag_shader = _graphics_shader_read(graphics_arena, String("Graphics/Shaders/box_frag.glsl"));
 
         rect.shader = _graphics_shader_create(vert_shader, frag_shader);
     }
@@ -250,9 +252,9 @@ Graphics_ImageRect graphics_image_rect_create(const char* path) {
     }
 
     // shader
-    TempArenaBlock(graphics_arena, temp_arena) {
-        String vert_shader = _graphics_shader_read(temp_arena, String("Graphics/Shaders/text_vert.glsl"));
-        String frag_shader = _graphics_shader_read(temp_arena, String("Graphics/Shaders/text_frag.glsl"));
+    TempArenaBlock(graphics_arena) {
+        String vert_shader = _graphics_shader_read(graphics_arena, String("Graphics/Shaders/text_vert.glsl"));
+        String frag_shader = _graphics_shader_read(graphics_arena, String("Graphics/Shaders/text_frag.glsl"));
 
         rect.shader = _graphics_shader_create(vert_shader, frag_shader);
     }

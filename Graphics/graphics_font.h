@@ -60,16 +60,25 @@ typedef struct {
 
     Graphics_FontGlyph glyphs[GRAPHICS_FONT_NUM_GLYPHS];
 
-    // from Graphics_ImageRect
     Graphics_Shader shader;
     i32 vbo;
     i32 vao;
-    i32 tbo;
-    i32 tbo_texture;
+
+    i32 tbo_font_library;
+    i32 tbo_font_library_texture;
+    i32 u_fontLibrary;
+
+    i32 tbo_string_buffer;
+    i32 tbo_string_buffer_texture;
+    i32 u_stringBuffer;
+
     i32 texture_id;
     i32 u_transform;
     i32 u_texture;
-    i32 u_fontLibrary;
+
+    i32 u_pxRange;
+    i32 u_fontSize;
+    i32 u_pos;
 
     // enums here for alignment
     Graphics_FontType type;
@@ -78,6 +87,6 @@ typedef struct {
 
 Graphics_Font* graphics_font_load(String font_family);
 
-void graphics_font_draw(Graphics_Window* window, Graphics_Font* font);
+void graphics_font_draw(Graphics_Window* window, Graphics_Font* font, f32 x, f32 y, f32 font_size);
 
 #endif

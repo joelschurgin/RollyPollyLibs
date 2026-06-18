@@ -243,8 +243,8 @@ internal void graphics_font_load_texture(String font_family, Graphics_Font* font
         glGenTextures(1, &font->texture_id);
         glBindTexture(GL_TEXTURE_2D, font->texture_id);
 
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
@@ -270,26 +270,35 @@ internal void graphics_font_load_texture(String font_family, Graphics_Font* font
         Graphics_FontGlyphBoundsArray glyph_bounds = Array(graphics_arena, Graphics_FontGlyphBounds, GRAPHICS_FONT_NUM_GLYPHS);
         for (u64 i = 0; i < GRAPHICS_FONT_NUM_GLYPHS; i++) {
             glyph_bounds.data[i] = (Graphics_FontGlyphBounds){
-                .atlas_left = font->glyphs[i].atlas_left / font->width,
+                .atlas_left   = font->glyphs[i].atlas_left   / font->width,
                 .atlas_bottom = font->glyphs[i].atlas_bottom / font->height,
-                .atlas_right = font->glyphs[i].atlas_right / font->width,
-                .atlas_top = font->glyphs[i].atlas_top / font->height,
+                .atlas_right  = font->glyphs[i].atlas_right  / font->width,
+                .atlas_top    = font->glyphs[i].atlas_top    / font->height,
 
-                .plane_left = font->glyphs[i].plane_left,
+                .plane_left   = font->glyphs[i].plane_left,
                 .plane_bottom = font->glyphs[i].plane_bottom,
-                .plane_right = font->glyphs[i].plane_right,
-                .plane_top = font->glyphs[i].plane_top,
+                .plane_right  = font->glyphs[i].plane_right,
+                .plane_top    = font->glyphs[i].plane_top,
             };
         }
 
-        glGenBuffers(1, &font->tbo);
-        glBindBuffer(GL_TEXTURE_BUFFER, font->tbo);
+        glGenBuffers(1, &font->tbo_font_library);
+        glBindBuffer(GL_TEXTURE_BUFFER, font->tbo_font_library);
         glBufferData(GL_TEXTURE_BUFFER, glyph_bounds.count * sizeof(Graphics_FontGlyphBounds), glyph_bounds.data, GL_STATIC_DRAW);
 
-        glGenTextures(1, &font->tbo_texture);
-        glBindTexture(GL_TEXTURE_BUFFER, font->tbo_texture);
+        glGenTextures(1, &font->tbo_font_library_texture);
+        glBindTexture(GL_TEXTURE_BUFFER, font->tbo_font_library_texture);
 
-        glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, font->tbo);
+        glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, font->tbo_font_library);
+
+        glGenBuffers(1, &font->tbo_string_buffer);
+        glBindBuffer(GL_TEXTURE_BUFFER, font->tbo_string_buffer);
+        //glBufferData(GL_TEXTURE_BUFFER, glyph_bounds.count * sizeof(Graphics_FontGlyphBounds), glyph_bounds.data, GL_STATIC_DRAW);
+
+        glGenTextures(1, &font->tbo_string_buffer_texture);
+        glBindTexture(GL_TEXTURE_BUFFER, font->tbo_string_buffer_texture);
+
+        glTexBuffer(GL_TEXTURE_BUFFER, GL_RGBA32F, font->tbo_string_buffer);
     }
 
     // shader - could load this once for all fonts?
@@ -305,6 +314,10 @@ internal void graphics_font_load_texture(String font_family, Graphics_Font* font
         font->u_transform = glGetUniformLocation(font->shader.program, "u_transform");
         font->u_texture = glGetUniformLocation(font->shader.program, "u_texture");
         font->u_fontLibrary = glGetUniformLocation(font->shader.program, "u_fontLibrary");
+        font->u_stringBuffer = glGetUniformLocation(font->shader.program, "u_stringBuffer");
+        font->u_pxRange = glGetUniformLocation(font->shader.program, "u_pxRange");
+        font->u_fontSize = glGetUniformLocation(font->shader.program, "u_fontSize");
+        font->u_pos = glGetUniformLocation(font->shader.program, "u_pos");
     }
 }
 
@@ -317,7 +330,7 @@ Graphics_Font* graphics_font_load(String font_family) {
     return font;
 }
 
-void graphics_font_draw(Graphics_Window* window, Graphics_Font* font) {
+void graphics_font_draw(Graphics_Window* window, Graphics_Font* font, f32 x, f32 y, f32 font_size) {
     glUseProgram(font->shader.program);
  
     glActiveTexture(GL_TEXTURE0);
@@ -325,8 +338,24 @@ void graphics_font_draw(Graphics_Window* window, Graphics_Font* font) {
     glUniform1i(font->u_texture, 0);
 
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_BUFFER, font->tbo_texture);
+    glBindTexture(GL_TEXTURE_BUFFER, font->tbo_font_library_texture);
     glUniform1i(font->u_fontLibrary, 1);
+
+    glUniform1f(font->u_pxRange, font->distance_range);
+    glUniform1f(font->u_fontSize, font_size);
+    glUniform2f(font->u_pos, x, y);
+
+    f32 w = 2.0f / window->width;
+    f32 h = 2.0f / window->height;
+    f32 matrix[] = {
+         w,  0,  0,  0,
+         0,  h,  0,  0,
+         0,  0,  1,  0,
+        -1, -1,  0,  1,
+    };
+
+
+    glUniformMatrix4fv(font->u_transform, 1, false, matrix);
 
     glBindVertexArray(font->vao);
     glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, 1);

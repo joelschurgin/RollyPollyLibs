@@ -128,8 +128,8 @@ void graphics_set_draw_callback(Graphics_Window* window, graphics_draw_func_t dr
     window->draw_func_data = data;
 }
 
-Graphics_Rect graphics_rect_create() {
-    Graphics_Rect rect = {0};
+Graphics_FillRect graphics_rect_create() {
+    Graphics_FillRect rect = {0};
 
     // verts
     {

@@ -24,7 +24,7 @@ typedef struct {
     i32 u_radius;
     i32 u_border_thickness;
     i32 u_border_color;
-} Graphics_Rect;
+} Graphics_FillRect;
 
 typedef struct {
     Graphics_Shader shader;
@@ -59,7 +59,7 @@ typedef struct {
 
     b8 closed;
 
-    Graphics_Rect rect;
+    Graphics_FillRect rect;
     Graphics_ImageRect image_rect;
 } Graphics_Window;
 

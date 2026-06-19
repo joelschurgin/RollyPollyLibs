@@ -36,8 +36,7 @@ void draw(void* data) {
                                      (f32)height);
     */
 
-    graphics_font_draw(window, font, String("Hello World!"), 0.0f, (f32)height / 2.0f, 60.0f);
-    graphics_font_draw(window, font, String("Another line?"), 0.0f, (f32)height / 2.0f - 65.0f, 60.0f);
+    graphics_font_draw(window, font, String("Hello World!"), 10.0f, 10.0f, 60.0f);
 }
 
 i32 main(i32 argc, u8 **argv) {

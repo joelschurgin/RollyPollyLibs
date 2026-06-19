@@ -8,7 +8,6 @@ uniform mat4 u_transform;
 uniform samplerBuffer u_fontLibrary;
 uniform samplerBuffer u_stringBuffer;
 
-uniform float u_fontSize;
 uniform vec2 u_pos;
 
 void main() {

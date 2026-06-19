@@ -78,7 +78,6 @@ typedef struct {
     i32 u_texture;
 
     i32 u_pxRange;
-    i32 u_fontSize;
     i32 u_pos;
 
     // enums here for alignment

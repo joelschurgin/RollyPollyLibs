@@ -316,7 +316,6 @@ internal void graphics_font_load_texture(String font_family, Graphics_Font* font
         font->u_fontLibrary = glGetUniformLocation(font->shader.program, "u_fontLibrary");
         font->u_stringBuffer = glGetUniformLocation(font->shader.program, "u_stringBuffer");
         font->u_pxRange = glGetUniformLocation(font->shader.program, "u_pxRange");
-        font->u_fontSize = glGetUniformLocation(font->shader.program, "u_fontSize");
         font->u_pos = glGetUniformLocation(font->shader.program, "u_pos");
     }
 }
@@ -374,8 +373,7 @@ void graphics_font_draw(Graphics_Window* window, Graphics_Font* font, String tex
     // uniforms
     {
         glUniform1f(font->u_pxRange, font->distance_range);
-        glUniform1f(font->u_fontSize, font_size);
-        glUniform2f(font->u_pos, x, y);
+        glUniform2f(font->u_pos, x, window->height - y - font_size);
 
         f32 w = 2.0f / window->width;
         f32 h = 2.0f / window->height;

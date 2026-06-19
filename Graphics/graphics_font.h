@@ -2,6 +2,7 @@
 #define GRAPHICS_FONT_H
 
 #define GRAPHICS_FONT_NUM_GLYPHS 128
+#define GRAPHICS_STRING_BUFFER_MAX_SIZE 1024 * sizeof(Graphics_Char)
 
 typedef enum {
     GRAPHICS_FONT_TYPE_NONE,
@@ -85,8 +86,17 @@ typedef struct {
     Graphics_FontYOrigin y_origin;
 } Graphics_Font;
 
+typedef struct {
+    f32 x;
+    f32 y;
+    f32 font_size;
+    f32 c;
+} Graphics_Char;
+
+DefineArray(Graphics_Char);
+
 Graphics_Font* graphics_font_load(String font_family);
 
-void graphics_font_draw(Graphics_Window* window, Graphics_Font* font, f32 x, f32 y, f32 font_size);
+void graphics_font_draw(Graphics_Window* window, Graphics_Font* font, String text, f32 x, f32 y, f32 font_size);
 
 #endif

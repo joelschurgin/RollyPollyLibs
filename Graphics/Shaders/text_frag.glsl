@@ -13,8 +13,7 @@ float median(vec3 v) {
 }
 
 void main() {
-    vec3 msd = texture(u_texture, v_texCoord).rgb;
-    float dist = median(msd);
+    float dist = median(texture(u_texture, v_texCoord).rgb);
 
     vec2 unitRange = vec2(u_pxRange) / vec2(textureSize(u_texture, 0));
     vec2 screenTexSize = vec2(1.0) / fwidth(v_texCoord);

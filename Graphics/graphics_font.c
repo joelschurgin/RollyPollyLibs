@@ -293,7 +293,7 @@ internal void graphics_font_load_texture(String font_family, Graphics_Font* font
 
         glGenBuffers(1, &font->tbo_string_buffer);
         glBindBuffer(GL_TEXTURE_BUFFER, font->tbo_string_buffer);
-        //glBufferData(GL_TEXTURE_BUFFER, glyph_bounds.count * sizeof(Graphics_FontGlyphBounds), glyph_bounds.data, GL_STATIC_DRAW);
+        glBufferData(GL_TEXTURE_BUFFER, GRAPHICS_STRING_BUFFER_MAX_SIZE, NULL, GL_DYNAMIC_DRAW);
 
         glGenTextures(1, &font->tbo_string_buffer_texture);
         glBindTexture(GL_TEXTURE_BUFFER, font->tbo_string_buffer_texture);
@@ -330,34 +330,70 @@ Graphics_Font* graphics_font_load(String font_family) {
     return font;
 }
 
-void graphics_font_draw(Graphics_Window* window, Graphics_Font* font, f32 x, f32 y, f32 font_size) {
+void graphics_font_draw(Graphics_Window* window, Graphics_Font* font, String text, f32 x, f32 y, f32 font_size) {
     glUseProgram(font->shader.program);
- 
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, font->texture_id);
-    glUniform1i(font->u_texture, 0);
 
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_BUFFER, font->tbo_font_library_texture);
-    glUniform1i(font->u_fontLibrary, 1);
+    // font texture
+    {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, font->texture_id);
+        glUniform1i(font->u_texture, 0);
+    }
 
-    glUniform1f(font->u_pxRange, font->distance_range);
-    glUniform1f(font->u_fontSize, font_size);
-    glUniform2f(font->u_pos, x, y);
+    // font atlas
+    {
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_BUFFER, font->tbo_font_library_texture);
+        glUniform1i(font->u_fontLibrary, 1);
+    }
 
-    f32 w = 2.0f / window->width;
-    f32 h = 2.0f / window->height;
-    f32 matrix[] = {
-         w,  0,  0,  0,
-         0,  h,  0,  0,
-         0,  0,  1,  0,
-        -1, -1,  0,  1,
-    };
+    // the string
+    TempArenaBlock(graphics_arena) {
+        Graphics_CharArray formatted_text = Array(graphics_arena, Graphics_Char, text.size);
+        f32 text_x = 0.0f;
+        f32 text_y = 0.0f;
+        for (u64 i = 0; i < text.size; i++) {
+            formatted_text.data[i] = (Graphics_Char) {
+                .x = text_x,
+                .y = text_y,
+                .font_size = font_size,
+                .c = (f32)text.str[i],
+            };
+            text_x += font->glyphs[text.str[i]].advance;
+        }
+
+        glBindBuffer(GL_TEXTURE_BUFFER, font->tbo_string_buffer);
+        glBufferData(GL_TEXTURE_BUFFER, GRAPHICS_STRING_BUFFER_MAX_SIZE, NULL, GL_DYNAMIC_DRAW);
+        glBufferSubData(GL_TEXTURE_BUFFER, 0, formatted_text.count * sizeof(Graphics_Char), formatted_text.data);
+
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_BUFFER, font->tbo_string_buffer_texture);
+        glUniform1i(font->u_stringBuffer, 2);
+    }
+
+    // uniforms
+    {
+        glUniform1f(font->u_pxRange, font->distance_range);
+        glUniform1f(font->u_fontSize, font_size);
+        glUniform2f(font->u_pos, x, y);
+
+        f32 w = 2.0f / window->width;
+        f32 h = 2.0f / window->height;
+        f32 matrix[] = {
+            w,  0,  0,  0,
+            0,  h,  0,  0,
+            0,  0,  1,  0,
+           -1, -1,  0,  1,
+        };
 
 
-    glUniformMatrix4fv(font->u_transform, 1, false, matrix);
+        glUniformMatrix4fv(font->u_transform, 1, false, matrix);
+    }
 
-    glBindVertexArray(font->vao);
-    glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, 1);
-    glBindVertexArray(0);
+    // geometry
+    {
+        glBindVertexArray(font->vao);
+        glDrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, text.size);
+        glBindVertexArray(0);
+    }
 }

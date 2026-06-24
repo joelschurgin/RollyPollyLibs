@@ -420,6 +420,80 @@ u64 moonfruit_definition_tree_start_idx(u8 c) {
     return 0;
 }
 
+u64 moonfruit_definition_tree_new_node(Arena* arena, MoonFruit_DefinitionTree* tree) {
+    (void)push_struct(arena, MoonFruit_Definition);
+    return tree->count++;
+}
+
+void moonfruit_definition_tree_insert_child(Arena* arena, MoonFruit_DefinitionTree* tree, u64 macro_idx, String definition, u64 idx) {
+    MoonFruit_Definition* def = &tree->data[idx];
+    u64 new_idx = moonfruit_definition_tree_new_node(arena, tree);
+    MoonFruit_Definition* new_def = &tree->data[new_idx];
+    new_def->child_idx = def->child_idx;
+    def->child_idx = new_idx;
+
+    // data
+    new_def->radix = definition;
+    new_def->macro_idx = macro_idx;
+}
+
+void moonfruit_definition_tree_insert_sibling(Arena* arena, MoonFruit_DefinitionTree* tree, u64 macro_idx, String definition, u64 idx) {
+    MoonFruit_Definition* def = &tree->data[idx];
+    u64 new_idx = moonfruit_definition_tree_new_node(arena, tree);
+    MoonFruit_Definition* new_def = &tree->data[new_idx];
+    new_def->sibling_idx = def->sibling_idx;
+    def->sibling_idx = new_idx;
+
+    // data
+    new_def->radix = definition;
+    new_def->macro_idx = macro_idx;
+}
+
+void moonfruit_definition_tree_insert(Arena* arena, MoonFruit_DefinitionTree* tree, u64 macro_idx, String definition, u64 idx) {
+    MoonFruit_Definition* def = &tree->data[idx];
+    if (def->radix.size == 0) {
+        def->radix = definition;
+        def->macro_idx = macro_idx;
+        return;
+    }
+
+    StringPartiallyMatchedPair pair = string_keep_unmatched_ends(definition, def->radix);
+    b32 split_def = (pair.unmatched[0].size > 0 && pair.unmatched[1].size > 0);
+
+    if (pair.matched.size > 0) {
+        def->radix = pair.matched;
+
+        if (pair.matched.size == definition.size && !split_def) {
+            def->macro_idx = macro_idx;
+        }
+        for (i32 i = 0; i < 2; i++) {
+            if (pair.unmatched[i].size > 0 && (pair.unmatched[i].str != def->radix.str || pair.unmatched[i].size != def->radix.size)) {
+                if (def->child_idx == 0) {
+                    moonfruit_definition_tree_insert_child(arena, tree, macro_idx, pair.unmatched[i], idx);
+                } else if (pair.matched.size == definition.size) {
+                    moonfruit_definition_tree_insert_child(arena, tree, 0, pair.unmatched[i], idx);
+                } else {
+                    if (split_def) {
+                        macro_idx = def->macro_idx;
+                        def->macro_idx = 0;
+                    }
+                    moonfruit_definition_tree_insert(arena, tree, macro_idx, pair.unmatched[i], def->child_idx);
+                }
+            }
+        }
+    } else {
+        for (i32 i = 0; i < 2; i++) {
+            if (pair.unmatched[i].size > 0 && (pair.unmatched[i].str != def->radix.str || pair.unmatched[i].size != def->radix.size)) {
+                if (def->sibling_idx == 0 || pair.matched.size == definition.size) {
+                    moonfruit_definition_tree_insert_sibling(arena, tree, macro_idx, pair.unmatched[i], idx);
+                } else {
+                    moonfruit_definition_tree_insert(arena, tree, macro_idx, pair.unmatched[i], def->sibling_idx);
+                }
+            }
+        }
+    }
+}
+
 MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f) {
     Arena* arena = thread_ctx.shared_arena;
     MoonFruit_MacroInfo macro_info = (MoonFruit_MacroInfo){0};
@@ -482,18 +556,12 @@ MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f) {
     {
         macro_info.def_tree = Array(arena, MoonFruit_Definition, MOONFRUIT_DEFINITION_TREE_INIT_SIZE);
         for EachElement(macro, MoonFruit_Macro, macro_info.macros) {
-            if ((macro->type & (MF_DEFINE | MF_UNDEF | MF_IFDEF | MF_IFNDEF)) != 0) {
-                String definition = macro_info.tokens.data[macro->token_idx_first].data;
-                u64 start_idx = moonfruit_definition_tree_start_idx(definition.str[0]);
+            if ((macro->type & (MF_DEFINE | MF_UNDEF | MF_IFDEF | MF_IFNDEF)) == 0) continue;
 
-                MoonFruit_Definition* def = &macro_info.def_tree.data[start_idx];
-                if (def->radix.size == 0) {
-                    def->radix = definition;
-                } else {
-                    StringPartiallyMatchedPair partially_matched_pair = string_keep_unmatched_ends(definition, def->radix);
-                    printf("|%.*s|%.*s|%.*s|\n", partially_matched_pair.matched.size, partially_matched_pair.matched.str, partially_matched_pair.unmatched[0].size, partially_matched_pair.unmatched[0].str, partially_matched_pair.unmatched[1].size, partially_matched_pair.unmatched[1].str);
-                }
-            }
+            String definition = macro_info.tokens.data[macro->token_idx_first].data;
+            u64 start_idx = moonfruit_definition_tree_start_idx(definition.str[0]);
+
+            moonfruit_definition_tree_insert(arena, &macro_info.def_tree, (u64)(macro - macro_info.macros.data), definition, start_idx); 
         }
     }
 

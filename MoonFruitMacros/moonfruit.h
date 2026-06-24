@@ -116,6 +116,7 @@ typedef struct {
 
 u64 moonfruit_definition_tree_start_idx(u8 c);
 
+u64 moonfruit_definition_tree_new_node(Arena* arena, MoonFruit_DefinitionTree* tree);
 MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f);
 
 #endif

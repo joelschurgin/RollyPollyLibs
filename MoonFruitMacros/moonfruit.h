@@ -37,6 +37,8 @@ typedef struct {
     MoonFruit_MacroType type;
     u64 token_idx_first;
     u64 token_idx_last;
+    u64 next_idx;
+    u64 prev_idx;
     //u64 line_num;
 } MoonFruit_Macro;
 
@@ -114,9 +116,9 @@ typedef struct {
     MoonFruit_DefinitionTree def_tree;
 } MoonFruit_MacroInfo;
 
-u64 moonfruit_definition_tree_start_idx(u8 c);
-
-u64 moonfruit_definition_tree_new_node(Arena* arena, MoonFruit_DefinitionTree* tree);
+void moonfruit_definition_tree_insert(Arena* arena, MoonFruit_DefinitionTree* tree, u64 macro_idx, String definition);
 MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f);
+
+u64 moonfruit_definition_tree_find_idx(MoonFruit_DefinitionTree tree, String definition, u64 idx);
 
 #endif

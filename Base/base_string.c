@@ -138,7 +138,11 @@ String string_keep_after_perfect_match(String s, String str_match) {
 }
 
 StringPartiallyMatchedPair string_keep_unmatched_ends(String a, String b) {
-    if (a.size > b.size) return string_keep_unmatched_ends(b, a);
+    if (a.size > b.size) {
+        String temp = (String){ .str = a.str, .size = a.size };
+        a = (String){ .str = b.str, .size = b.size };
+        b = (String){ .str = temp.str, .size = temp.size };
+    }
 
     u64 i = 0;
     for (; i < a.size && a.str[i] == b.str[i]; i++);

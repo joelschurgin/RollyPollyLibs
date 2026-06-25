@@ -12,6 +12,7 @@
 #define my_exponent3 4p-3
 #define my_exp 4p-3
 #define my_exponent24 4p-3
+#define my_expander 123
 
 #define func(y) y
 #define func2(x) (6 * func(2*(x)))

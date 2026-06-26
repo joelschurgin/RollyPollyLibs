@@ -120,8 +120,19 @@ void                   moonfruit_definition_tree_insert(Arena* arena, MoonFruit_
 MoonFruit_MacroInfo    moonfruit_macro_info_build(MoonFruit_File* f);
 
 u64                    moonfruit_definition_tree_find_idx(MoonFruit_DefinitionTree tree, String definition, u64 idx);
-
 MoonFruit_Macro        moonfruit_macro_find(MoonFruit_MacroInfo* macro_info, String definition);
-String                 moonfruit_macro_format(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro);
+
+u64                    moonfruit_definition_tree_partial_match_idx(MoonFruit_DefinitionTree tree, String definition, u64 idx);
+//MoonFruit_MacroArray        moonfruit_macro_partial_match(MoonFruit_MacroInfo* macro_info, String definition);
+
+typedef enum {
+    MF_FORMAT_DEFAULT    = 0,      // defaults to MF_FORMAT_FULL
+    MF_FORMAT_IDENTIFIER = 1,
+    MF_FORMAT_DEFINITION = 1 << 1,
+    MF_FORMAT_EXPRESSION = 1 << 2,
+    MF_FORMAT_FULL       = MF_FORMAT_IDENTIFIER | MF_FORMAT_DEFINITION | MF_FORMAT_EXPRESSION,
+} MoonFruit_MacroFormatFlag;
+
+String                 moonfruit_macro_format(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro, MoonFruit_MacroFormatFlag flags);
 
 #endif

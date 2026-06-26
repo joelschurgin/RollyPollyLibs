@@ -332,6 +332,7 @@ internal void moonfruit_macro_find_in_chunk(MoonFruit_Chunk chunk, u64 num_macro
                     } while(0)
     #define MoonFruit_MacroArray_Last_NumTokens (i64)(MoonFruit_MacroArray_Last.token_idx_last - MoonFruit_MacroArray_Last.token_idx_first + 1)
 
+    MoonFruit_MacroArray_Push(MF_IGNORE);
     for EachElement(token, MoonFruit_Token, chunk_info->tokens) {
         if (string_compare(token->data, String("#"))) {
             IncElement(token, chunk_info->tokens, 1);
@@ -454,7 +455,6 @@ internal void _moonfruit_definition_tree_insert_sibling(Arena* arena, MoonFruit_
 }
 
 // TODO: add list of macros, will also need line numbers for macros too
-// TODO: need to access by definition
 internal void _moonfruit_definition_tree_insert(Arena* arena, MoonFruit_DefinitionTree* tree, u64 macro_idx, String definition, u64 idx) {
     MoonFruit_Definition* def = &tree->data[idx];
     if (def->radix.size == 0) {
@@ -575,10 +575,60 @@ MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f) {
 
     // JUST FOR TESTING
     {
-        MoonFruit_Macro macro = moonfruit_macro_find(&macro_info, String("my_expander"));
-        String macro_formatted = moonfruit_macro_format(arena, &macro_info, macro);
-        printf("%.*s\n", macro_formatted.size, macro_formatted.str);
+        String macro_format = moonfruit_macro_format(arena,
+                                                     &macro_info,
+                                                     moonfruit_macro_find(&macro_info, String("my_exponent1")),
+                                                     MF_FORMAT_DEFAULT);
+        printf("%.*s\n", macro_format.size, macro_format.str);
     }
+    {
+        String macro_format = moonfruit_macro_format(arena,
+                                                     &macro_info,
+                                                     moonfruit_macro_find(&macro_info, String("my_exponent2")),
+                                                     MF_FORMAT_DEFAULT);
+        printf("%.*s\n", macro_format.size, macro_format.str);
+    }
+    {
+        String macro_format = moonfruit_macro_format(arena,
+                                                     &macro_info,
+                                                     moonfruit_macro_find(&macro_info, String("my_exponent3")),
+                                                     MF_FORMAT_DEFAULT);
+        printf("%.*s\n", macro_format.size, macro_format.str);
+    }
+    {
+        String macro_format = moonfruit_macro_format(arena,
+                                                     &macro_info,
+                                                     moonfruit_macro_find(&macro_info, String("my_exp")),
+                                                     MF_FORMAT_DEFAULT);
+        printf("%.*s\n", macro_format.size, macro_format.str);
+    }
+    {
+        String macro_format = moonfruit_macro_format(arena,
+                                                     &macro_info,
+                                                     moonfruit_macro_find(&macro_info, String("my_exponent24")),
+                                                     MF_FORMAT_DEFAULT);
+        printf("%.*s\n", macro_format.size, macro_format.str);
+    }
+    {
+        String macro_format = moonfruit_macro_format(arena,
+                                                     &macro_info,
+                                                     moonfruit_macro_find(&macro_info, String("my_expander")),
+                                                     MF_FORMAT_DEFAULT);
+        printf("%.*s\n", macro_format.size, macro_format.str);
+    }
+    {
+        String macro_format = moonfruit_macro_format(arena,
+                                                     &macro_info,
+                                                     moonfruit_macro_find(&macro_info, String("my_expo")),
+                                                     MF_FORMAT_DEFAULT);
+        printf("%.*s\n", macro_format.size, macro_format.str);
+    }
+
+        /*
+        u64 tree_idx = moonfruit_definition_tree_partial_match_idx(macro_info.def_tree, String("my_expon"), 0);
+        u64 macro_idx = macro_info.def_tree.data[tree_idx].macro_idx;
+        printf("%llu\n", tree_idx);
+    */
 
     return macro_info;
 }
@@ -590,20 +640,15 @@ u64 moonfruit_definition_tree_find_idx(MoonFruit_DefinitionTree tree, String def
 
     MoonFruit_Definition* def = &tree.data[idx];
     StringPartiallyMatchedPair pair = string_keep_unmatched_ends(definition, def->radix);
-    if (pair.matched.size == def->radix.size) {
-        if (pair.unmatched[0].size <= 0 && pair.unmatched[1].size <= 0) return (def->macro_idx) ? idx : 0;
-        for (i32 i = 0; i < 2; i++) {
-            if (pair.unmatched[i].size > 0 &&
-                (pair.unmatched[i].str + pair.unmatched[i].size) == (definition.str + definition.size)) {
-                if (def->child_idx != 0) return moonfruit_definition_tree_find_idx(tree, pair.unmatched[i], def->child_idx);
-            }
-        }
-    } else if (pair.matched.size == 0) {
-        for (i32 i = 0; i < 2; i++) {
-            if (pair.unmatched[i].size > 0 &&
-                (pair.unmatched[i].str + pair.unmatched[i].size) == (definition.str + definition.size)) {
-                if (def->sibling_idx != 0) return moonfruit_definition_tree_find_idx(tree, pair.unmatched[i], def->sibling_idx);
-            }
+
+    if ((pair.unmatched[0].size <= 0 && pair.unmatched[1].size <= 0) ||
+        (pair.matched.size > 0 && pair.matched.size < def->radix.size)) return (def->macro_idx) ? idx : 0;
+
+    for (i32 i = 0; i < 2; i++) {
+        if (pair.unmatched[i].size > 0 &&
+            (pair.unmatched[i].str + pair.unmatched[i].size) == (definition.str + definition.size)) {
+            u64 idx = (pair.matched.size == def->radix.size) ? def->child_idx : def->sibling_idx;
+            if (idx != 0) return moonfruit_definition_tree_partial_match_idx(tree, pair.unmatched[i], idx);
         }
     }
 
@@ -616,19 +661,64 @@ MoonFruit_Macro moonfruit_macro_find(MoonFruit_MacroInfo* macro_info, String def
     return macro_info->macros.data[macro_idx];
 }
 
-String moonfruit_macro_format(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro) {
-    String macro_formatted;
+u64 moonfruit_definition_tree_partial_match_idx(MoonFruit_DefinitionTree tree, String definition, u64 idx) {
+    Assert(definition.size > 0);
 
-    StringBuilderBlock(arena, macro_formatted) {
-        for (u64 token_idx = macro.token_idx_first - 2; token_idx < macro.token_idx_first; token_idx++) {
-            MoonFruit_Token token = macro_info->tokens.data[token_idx];
-            string_builder_append(arena, &macro_formatted, token.data);
+    if (idx == 0) idx = _moonfruit_definition_tree_start_idx(definition.str[0]);
+
+    MoonFruit_Definition* def = &tree.data[idx];
+    StringPartiallyMatchedPair pair = string_keep_unmatched_ends(definition, def->radix);
+
+    if ((pair.unmatched[0].size <= 0 && pair.unmatched[1].size <= 0) ||
+        (pair.matched.size > 0 && pair.matched.size < def->radix.size)) return idx;
+
+    for (i32 i = 0; i < 2; i++) {
+        if (pair.unmatched[i].size > 0 &&
+            (pair.unmatched[i].str + pair.unmatched[i].size) == (definition.str + definition.size)) {
+            u64 idx = (pair.matched.size == def->radix.size) ? def->child_idx : def->sibling_idx;
+            if (idx != 0) return moonfruit_definition_tree_partial_match_idx(tree, pair.unmatched[i], idx);
         }
-        string_builder_append(arena, &macro_formatted, String(" "));
-        for (u64 token_idx = macro.token_idx_first; token_idx <= macro.token_idx_last; token_idx++) {
-            MoonFruit_Token token = macro_info->tokens.data[token_idx];
+    }
+
+    return idx;
+}
+
+String moonfruit_macro_format(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro, MoonFruit_MacroFormatFlag flags) {
+    if (macro.type == MF_IGNORE) return String("");
+    if (flags == MF_FORMAT_DEFAULT) flags = MF_FORMAT_FULL;
+
+    String macro_formatted;
+    StringBuilderBlock(arena, macro_formatted) {
+        if ((flags & MF_FORMAT_IDENTIFIER) != 0) {
+            for (u64 token_idx = macro.token_idx_first - 2; token_idx < macro.token_idx_first; token_idx++) {
+                MoonFruit_Token token = macro_info->tokens.data[token_idx];
+                string_builder_append(arena, &macro_formatted, token.data);
+            }
+ 
+            if (flags != MF_FORMAT_IDENTIFIER) {
+                string_builder_append(arena, &macro_formatted, String(" "));
+            }
+        }
+
+        if ((flags & MF_FORMAT_DEFINITION) != 0) {
+            MoonFruit_Token token = macro_info->tokens.data[macro.token_idx_first];
             string_builder_append(arena, &macro_formatted, token.data);
-            string_builder_append(arena, &macro_formatted, String(" "));
+            if (flags != MF_FORMAT_DEFINITION) {
+                string_builder_append(arena, &macro_formatted, String(" "));
+            }
+        }
+
+        if ((flags & MF_FORMAT_EXPRESSION) != 0) {
+            for (u64 token_idx = macro.token_idx_first + 1; token_idx < macro.token_idx_last; token_idx++) {
+                MoonFruit_Token token = macro_info->tokens.data[token_idx];
+                string_builder_append(arena, &macro_formatted, token.data);
+                string_builder_append(arena, &macro_formatted, String(" "));
+            }
+            // last one, no space
+            {
+                MoonFruit_Token token = macro_info->tokens.data[macro.token_idx_last];
+                string_builder_append(arena, &macro_formatted, token.data);
+            }
         }
     }
 

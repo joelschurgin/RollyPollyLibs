@@ -4,7 +4,7 @@
 #include "base.h"
 
 #define should_not_have_params (u64)param
-#define with_params(a, b,c) (a+b+c)
+#define with_params(a, b, c) (a+b+c)
 #define no_params()
 
 #define my_exponent1 4e+3

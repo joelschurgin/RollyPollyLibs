@@ -61,6 +61,9 @@ StringPartiallyMatchedPair string_keep_unmatched_ends(String a, String b);
 String string_concat(Arena* arena, String s1, String s2);
 String string_copy(Arena* arena, String s);
 
+#define StringBuilderBlock(arena, string) DeferBlock({ (string).str = (u8*)((arena)->pos + (arena)->base); (string).size = 0; }, {})
+void string_builder_append(Arena* arena, String* s, String string_to_append);
+
 internal String string_formatv(Arena* arena, u8* fmt, va_list args);
 String string_format(Arena* arena, u8* fmt, ...);
 #define FormatString(arena, fmt, ...) string_format(arena, fmt, __VA_ARGS__)

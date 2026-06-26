@@ -116,9 +116,12 @@ typedef struct {
     MoonFruit_DefinitionTree def_tree;
 } MoonFruit_MacroInfo;
 
-void moonfruit_definition_tree_insert(Arena* arena, MoonFruit_DefinitionTree* tree, u64 macro_idx, String definition);
-MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f);
+void                   moonfruit_definition_tree_insert(Arena* arena, MoonFruit_DefinitionTree* tree, u64 macro_idx, String definition);
+MoonFruit_MacroInfo    moonfruit_macro_info_build(MoonFruit_File* f);
 
-u64 moonfruit_definition_tree_find_idx(MoonFruit_DefinitionTree tree, String definition, u64 idx);
+u64                    moonfruit_definition_tree_find_idx(MoonFruit_DefinitionTree tree, String definition, u64 idx);
+
+MoonFruit_Macro        moonfruit_macro_find(MoonFruit_MacroInfo* macro_info, String definition);
+String                 moonfruit_macro_format(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro);
 
 #endif

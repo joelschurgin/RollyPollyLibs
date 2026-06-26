@@ -167,6 +167,13 @@ String string_copy(Arena* arena, String s) {
     return output;
 }
 
+void string_builder_append(Arena* arena, String* s, String string_to_append) {
+    u8* s_ptr = s->str + s->size;
+    (void)push_array(arena, u8, string_to_append.size, false);
+    s->size += string_to_append.size;
+    MemoryCopy(s_ptr, string_to_append.str, string_to_append.size);
+}
+
 internal String string_formatv(Arena* arena, u8* fmt, va_list args) {
     va_list args2;
     va_copy(args2, args);

@@ -10,7 +10,7 @@
 #define my_exponent1 4e+3
 #define my_exponent2 4e3
 #define my_exponent3 4p-3
-#define my_exp 4p-3
+#define my_exp            4p-3
 #define my_exponent24 4p-3
 #define my_expander 123
 

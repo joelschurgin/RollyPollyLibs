@@ -122,8 +122,8 @@ MoonFruit_MacroInfo    moonfruit_macro_info_build(MoonFruit_File* f);
 u64                    moonfruit_definition_tree_find_idx(MoonFruit_DefinitionTree tree, String definition, u64 idx);
 MoonFruit_Macro        moonfruit_macro_find(MoonFruit_MacroInfo* macro_info, String definition);
 
-u64                    moonfruit_definition_tree_partial_match_idx(MoonFruit_DefinitionTree tree, String definition, u64 idx);
-//MoonFruit_MacroArray        moonfruit_macro_partial_match(MoonFruit_MacroInfo* macro_info, String definition);
+u64                    moonfruit_definition_tree_partial_match_idx(MoonFruit_DefinitionTree tree, String definition, u64 idx, b32* match_is_partial);
+MoonFruit_MacroArray   moonfruit_macro_match(Arena* arena, MoonFruit_MacroInfo* macro_info, String definition);
 
 typedef enum {
     MF_FORMAT_DEFAULT    = 0,      // defaults to MF_FORMAT_FULL

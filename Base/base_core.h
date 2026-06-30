@@ -242,6 +242,13 @@ DefineArray(b8);
 DefineArray(f64);
 DefineArray(f32);
 
+#define ArrayBuilderBlock(arena, arr, type) DeferBlock({ (arr).data = (type*)((arena)->pos + (arena)->base); (arr).count = 0; }, { if ((arr).count == 0) (arr).data = NULL; })
+#define array_builder_push(arena, arr, new_element) do {\
+        (void)arena_push((arena), sizeof(*(arr).data), sizeof(*(arr).data), false); \
+        (arr).data[(arr).count++] = (new_element); \
+    } while(0);
+
+
 // atomics
 #define ATOMIC_MEMORDER __ATOMIC_SEQ_CST
 #if COMPILER_CLANG || COMPILER_GCC

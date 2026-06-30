@@ -174,6 +174,11 @@ void string_builder_append(Arena* arena, String* s, String string_to_append) {
     MemoryCopy(s_ptr, string_to_append.str, string_to_append.size);
 }
 
+void string_builder_step_back(Arena* arena, String* s, u64 num_chars) {
+    arena_pop(arena, num_chars);
+    *s = string_chop(*s, num_chars);
+}
+
 internal String string_formatv(Arena* arena, u8* fmt, va_list args) {
     va_list args2;
     va_copy(args2, args);

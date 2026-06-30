@@ -10,12 +10,15 @@
 #define my_exponent1 4e+3
 #define my_exponent2 4e3
 #define my_exponent3 4p-3
-#define my_exp            4p-3
+#define my_exp 4p-3
 #define my_exponent24 4p-3
 #define my_expander 123
 
 #define func(y) y
 #define func2(x) (6 * func(2*(x)))
+#undef func
+
+#define func2(y) (2 + 6 / my_exp)
 
 #define num .4e-3
 #define bad_exponent 3tone3 // tokenizer doesn't throw an error while using gcc

@@ -18,7 +18,7 @@
 #define func2(x) (6 * func(2*(x)))
 #undef func
 
-#define func2(y) (2 + 6 / my_exp)
+#define func(y) (2 + 6 / my_exp)
 
 #define num .4e-3
 #define bad_exponent 3tone3 // tokenizer doesn't throw an error while using gcc
@@ -46,8 +46,8 @@ void* parallel_main(void* main_args) {
         ThreadExit(NULL);
     }
 
-    MoonFruit_ChunkQueue* chunk_Q;
-    MoonFruit_File* f;
+    MoonFruit_ChunkQueue* chunk_Q = 0L;
+    MoonFruit_File* f = 0L;
     if (LaneIdx() == 0) {
         Arena* Q_arena = default_arena();
         String path = String(argv[1]);
@@ -68,10 +68,37 @@ void* parallel_main(void* main_args) {
     }
     LaneSync();
 
+    MoonFruit_MacroInfo* macro_info = 0L;
     if (LaneIdx() == 0) {
-        MoonFruit_MacroInfo macro_info = moonfruit_macro_info_build(f);
+        macro_info = moonfruit_macro_info_build(f);
     }
-    LaneSync();
+    LaneSyncPtr(macro_info, 0);
+
+    // JUST FOR TESTING
+    for (u32 flag = 0; flag < 0b1000; flag++) {
+        if (flag % LaneCount() != LaneIdx()) continue;
+
+        String definition = String("func");
+        MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, definition);
+
+        printf("\nLane: %d\nFlag: 0x%lx\n", LaneIdx(), flag);
+        if ((flag & MF_FORMAT_IDENTIFIER) != 0) {
+            printf("Identifier ");
+        }
+        if ((flag & MF_FORMAT_DEFINITION) != 0) {
+            printf("Definition ");
+        }
+        if ((flag & MF_FORMAT_EXPRESSION) != 0) {
+            printf("Expression ");
+        }
+        printf("\n");
+
+        for EachElement(macro, MoonFruit_Macro, macros) {
+            String macro_formatted = moonfruit_macro_format(LaneArena(), macro_info, *macro, flag);
+            printf("%.*s\n", macro_formatted.size, macro_formatted.str);
+        }
+        printf("\n");
+    }
 }
 
 String parent_dir(String path, u32 num_dirs) {

@@ -504,25 +504,25 @@ void moonfruit_definition_tree_insert(Arena* arena, MoonFruit_DefinitionTree* tr
     _moonfruit_definition_tree_insert(arena, tree, macro_idx, definition, start_idx);
 }
 
-MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f) {
+MoonFruit_MacroInfo* moonfruit_macro_info_build(MoonFruit_File* f) {
     Arena* arena = thread_ctx.shared_arena;
-    MoonFruit_MacroInfo macro_info = (MoonFruit_MacroInfo){0};
+    MoonFruit_MacroInfo* macro_info = push_struct(arena, MoonFruit_MacroInfo);
 
     // count tokens and macros
     {
         MoonFruit_File* curr_file = f;
         while (curr_file) {
-            macro_info.file_markers.count++;
+            macro_info->file_markers.count++;
             for EachElement(chunk_info, MoonFruit_ChunkInfo, curr_file->chunk_info) {
-                macro_info.tokens.count += chunk_info->tokens.count;
-                macro_info.macros.count += chunk_info->macros.count;
+                macro_info->tokens.count += chunk_info->tokens.count;
+                macro_info->macros.count += chunk_info->macros.count;
             }
             curr_file = curr_file->next;
         }
 
-        macro_info.tokens.data = push_array(arena, MoonFruit_Token, macro_info.tokens.count, true);
-        macro_info.macros.data = push_array(arena, MoonFruit_Macro, macro_info.macros.count, true);
-        macro_info.file_markers.data = push_array(arena, MoonFruit_FileMarker, macro_info.file_markers.count, true);
+        macro_info->tokens.data = push_array(arena, MoonFruit_Token, macro_info->tokens.count, true);
+        macro_info->macros.data = push_array(arena, MoonFruit_Macro, macro_info->macros.count, true);
+        macro_info->file_markers.data = push_array(arena, MoonFruit_FileMarker, macro_info->file_markers.count, true);
     }
 
     // copy macros and tokens
@@ -535,14 +535,14 @@ MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f) {
 
         MoonFruit_File* curr_file = f;
         while (curr_file) {
-            macro_info.file_markers.data[file_idx++] = (MoonFruit_FileMarker){
+            macro_info->file_markers.data[file_idx++] = (MoonFruit_FileMarker){
                 .first_token = token_idx,
                 .path = string_copy(arena, curr_file->file.path),
             };
 
             for EachElement(chunk_info, MoonFruit_ChunkInfo, curr_file->chunk_info) {
                 for EachElement(token, MoonFruit_Token, chunk_info->tokens) {
-                    macro_info.tokens.data[token_idx] = (MoonFruit_Token) {
+                    macro_info->tokens.data[token_idx] = (MoonFruit_Token) {
                         .type = token->type,
                         .data = string_copy(arena, token->data),
                     };
@@ -550,9 +550,9 @@ MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f) {
                 }
 
                 for EachElement(macro, MoonFruit_Macro, chunk_info->macros) {
-                    macro_info.macros.data[macro_idx] = *macro;
-                    macro_info.macros.data[macro_idx].token_idx_first += token_idx_offset;
-                    macro_info.macros.data[macro_idx].token_idx_last += token_idx_offset;
+                    macro_info->macros.data[macro_idx] = *macro;
+                    macro_info->macros.data[macro_idx].token_idx_first += token_idx_offset;
+                    macro_info->macros.data[macro_idx].token_idx_last += token_idx_offset;
                     macro_idx++;
                 }
 
@@ -564,37 +564,14 @@ MoonFruit_MacroInfo moonfruit_macro_info_build(MoonFruit_File* f) {
 
     // build MoonFruit_DefinitionTree
     {
-        macro_info.def_tree = Array(arena, MoonFruit_Definition, MOONFRUIT_DEFINITION_TREE_INIT_SIZE);
-        for EachElement(macro, MoonFruit_Macro, macro_info.macros) {
+        macro_info->def_tree = Array(arena, MoonFruit_Definition, MOONFRUIT_DEFINITION_TREE_INIT_SIZE);
+        for EachElement(macro, MoonFruit_Macro, macro_info->macros) {
             if ((macro->type & (MF_DEFINE | MF_UNDEF | MF_IFDEF | MF_IFNDEF)) == 0) continue;
-            String definition = macro_info.tokens.data[macro->token_idx_first].data;
-            moonfruit_definition_tree_insert(arena, &macro_info.def_tree, (u64)(macro - macro_info.macros.data), definition);
+            String definition = macro_info->tokens.data[macro->token_idx_first].data;
+            moonfruit_definition_tree_insert(arena, &macro_info->def_tree, (u64)(macro - macro_info->macros.data), definition);
         }
     }
 
-    // JUST FOR TESTING
-    for (u32 flag = 0; flag < 0b1000; flag++){
-        String definition = String("func");
-        MoonFruit_MacroArray macros = moonfruit_macro_match(arena, &macro_info, definition);
-
-        printf("\nFlag: 0x%lx\n", flag);
-        if ((flag & MF_FORMAT_IDENTIFIER) != 0) {
-            printf("Identifier ");
-        }
-        if ((flag & MF_FORMAT_DEFINITION) != 0) {
-            printf("Definition ");
-        }
-        if ((flag & MF_FORMAT_EXPRESSION) != 0) {
-            printf("Expression ");
-        }
-        printf("\n");
-
-        for EachElement(macro, MoonFruit_Macro, macros) {
-            String macro_formatted = moonfruit_macro_format(arena, &macro_info, *macro, flag);
-            printf("%.*s\n", macro_formatted.size, macro_formatted.str);
-        }
-        printf("\n");
-    }
     return macro_info;
 }
 

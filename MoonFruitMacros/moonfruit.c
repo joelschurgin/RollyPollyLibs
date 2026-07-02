@@ -775,13 +775,21 @@ func2(x)
 
 */
 
+#define MoonFruit_MacroEval_SetToLocalColor \
+        if (local_color == 0) string_builder_append(arena, &expr, String("\033[32m"));\
+        if (local_color == 1) string_builder_append(arena, &expr, String("\033[33m"));\
+        if (local_color == 2) string_builder_append(arena, &expr, String("\033[34m"));\
+        if (local_color == 3) string_builder_append(arena, &expr, String("\033[35m"));\
+        if (local_color == 4) string_builder_append(arena, &expr, String("\033[36m"));
+
 String moonfruit_macro_eval(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro, MoonFruit_ArgValArray arg_vals) {
     local_persist u8 color = 0;
     color = (color + 1) % (5);
+    u8 local_color = color;
 
     if (macro.type == MF_IGNORE) return String("");
 
-    u64 token_idx = macro.token_idx_first + 1; // token_idx_first is the name of this macro
+    u64 token_idx = macro.token_idx_first + 1;
     MoonFruit_Token token = {0};
 
     MoonFruit_ArgArray args = {0};
@@ -804,66 +812,67 @@ String moonfruit_macro_eval(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonF
     // parse expression
     String expr;
     StringBuilderBlock(arena, expr) {
+        MoonFruit_MacroEval_SetToLocalColor; 
+
         for (; token_idx <= macro.token_idx_last; token_idx++) {
             token = macro_info->tokens.data[token_idx];
-            if (token.type == MF_TOKEN_IDENTIFIER) {
-                i64 arg_idx = _moonfruit_token_find_arg(args, token);
-                if (arg_idx >= 0) {
-                    MoonFruit_ArgVal val = arg_vals.data[arg_idx];
-                    for (u64 idx = val.token_idx_first; idx <= val.token_idx_last; idx++) {
-                        string_builder_append(arena, &expr, macro_info->tokens.data[idx].data);
-                        string_builder_append(arena, &expr, String(" "));
-                    }
-                } else {
-                    MoonFruit_Macro def = moonfruit_macro_find(macro_info, token.data);
-
-                    String def_str;
-                    MoonFruit_ArgValArray def_arg_vals;
-
-                    TempArenaBlock(arena)
-                    ArrayBuilderBlock(arena, def_arg_vals, MoonFruit_ArgVal) {
-                        // find arg values
-                        token = macro_info->tokens.data[++token_idx];
-                        b32 has_args = (token.data.str[0] == '(');
-                        if (has_args) {
-                            array_builder_push(arena, def_arg_vals, (MoonFruit_ArgVal){0});
-                            ArrayLast(def_arg_vals).token_idx_first = ++token_idx;
-                            i32 num_paren = 1;
-                            for (; token_idx <= macro.token_idx_last; token_idx++) {
-                                token = macro_info->tokens.data[token_idx];
-                                num_paren += (token.data.str[0] == '(') - (token.data.str[0] == ')');
-
-                                if (num_paren <= 0) {
-                                    ArrayLast(def_arg_vals).token_idx_last = token_idx-1;
-                                    break;
-                                }
-
-                                if (token.data.str[0] == ',') {
-                                    ArrayLast(def_arg_vals).token_idx_last = token_idx-1;
-                                    array_builder_push(arena, def_arg_vals, (MoonFruit_ArgVal){0});
-                                    ArrayLast(def_arg_vals).token_idx_first = ++token_idx;
-                                }
-                            }
-                        }
-
-                        u8 temp_color = color;
-                        def_str = moonfruit_macro_eval(arena, macro_info, def, def_arg_vals);
-                        color = temp_color;
-                    }
-                    if (color == 0) string_builder_append(arena, &expr, String("\033[32m"));
-                    if (color == 1) string_builder_append(arena, &expr, String("\033[33m"));
-                    if (color == 2) string_builder_append(arena, &expr, String("\033[34m"));
-                    if (color == 3) string_builder_append(arena, &expr, String("\033[35m"));
-                    if (color == 4) string_builder_append(arena, &expr, String("\033[36m"));
-                    string_builder_append(arena, &expr, def_str);
-                    string_builder_append(arena, &expr, String("\033[0m"));
-                }
-            } else {
+            if (token.type != MF_TOKEN_IDENTIFIER) {
                 string_builder_append(arena, &expr, token.data);
                 string_builder_append(arena, &expr, String(" "));
+                continue;
             }
+
+            i64 arg_idx = _moonfruit_token_find_arg(args, token);
+            if (arg_idx >= 0) {
+                MoonFruit_ArgVal val = arg_vals.data[arg_idx];
+                for (u64 idx = val.token_idx_first; idx <= val.token_idx_last; idx++) {
+                    string_builder_append(arena, &expr, macro_info->tokens.data[idx].data);
+                    string_builder_append(arena, &expr, String(" "));
+                }
+
+                continue;
+            }
+
+            MoonFruit_Macro def = moonfruit_macro_find(macro_info, token.data);
+
+            String def_str;
+            MoonFruit_ArgValArray def_arg_vals;
+
+            TempArenaBlock(arena)
+            ArrayBuilderBlock(arena, def_arg_vals, MoonFruit_ArgVal) {
+                // find arg values
+                token = macro_info->tokens.data[++token_idx];
+                b32 has_args = (token.data.str[0] == '(');
+                if (has_args) {
+                    array_builder_push(arena, def_arg_vals, (MoonFruit_ArgVal){0});
+                    ArrayLast(def_arg_vals).token_idx_first = ++token_idx;
+                    i32 num_paren = 1;
+                    for (; token_idx <= macro.token_idx_last; token_idx++) {
+                        token = macro_info->tokens.data[token_idx];
+                        num_paren += (token.data.str[0] == '(') - (token.data.str[0] == ')');
+
+                        if (num_paren <= 0) {
+                            ArrayLast(def_arg_vals).token_idx_last = token_idx-1;
+                            break;
+                        }
+
+                        if (token.data.str[0] == ',') {
+                            ArrayLast(def_arg_vals).token_idx_last = token_idx-1;
+                            array_builder_push(arena, def_arg_vals, (MoonFruit_ArgVal){0});
+                            ArrayLast(def_arg_vals).token_idx_first = ++token_idx;
+                        }
+                    }
+                }
+
+                def_str = moonfruit_macro_eval(arena, macro_info, def, def_arg_vals);
+            }
+            string_builder_append(arena, &expr, def_str);
+            MoonFruit_MacroEval_SetToLocalColor;
         }
+
+        string_builder_append(arena, &expr, String("\033[0m"));
     }
 
     return expr;
 }
+#undef MoonFruit_MacroEval_SetColor

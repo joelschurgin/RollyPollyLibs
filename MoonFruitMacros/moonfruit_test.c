@@ -20,7 +20,7 @@
 #define func2(x) ((6 * func(2*(x), 3)))
 #undef func
 
-#define func(a, b) (2 + 6 / (a + b) % func3(124))
+#define func(a, b) (2 + 6 / (a + b) % func3(124) - 23)
 
 #define num .4e-3
 #define bad_exponent 3tone3 // tokenizer doesn't throw an error while using gcc

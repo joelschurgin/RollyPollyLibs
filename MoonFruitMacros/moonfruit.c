@@ -824,9 +824,14 @@ String moonfruit_macro_eval(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonF
 
             i64 arg_idx = _moonfruit_token_find_arg(args, token);
             if (arg_idx >= 0) {
-                MoonFruit_ArgVal val = arg_vals.data[arg_idx];
-                for (u64 idx = val.token_idx_first; idx <= val.token_idx_last; idx++) {
-                    string_builder_append(arena, &expr, macro_info->tokens.data[idx].data);
+                if (arg_vals.count > 0) {
+                    MoonFruit_ArgVal val = arg_vals.data[arg_idx];
+                    for (u64 idx = val.token_idx_first; idx <= val.token_idx_last; idx++) {
+                        string_builder_append(arena, &expr, macro_info->tokens.data[idx].data);
+                        string_builder_append(arena, &expr, String(" "));
+                    }
+                } else {
+                    string_builder_append(arena, &expr, token.data);
                     string_builder_append(arena, &expr, String(" "));
                 }
 

@@ -77,8 +77,8 @@ void* parallel_main(void* main_args) {
     LaneSyncPtr(macro_info, 0);
 
     if (LaneIdx() == 0) {
-        // TODO: check func2
-        MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, String("func2"));
+        // TODO: currently finding func instead of func3
+        MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, String("func3"));
         if (macros.count > 0) {
             String macro_eval = moonfruit_macro_eval(LaneArena(), macro_info, macros.data[0], (MoonFruit_ArgValArray){0});
             printf("%.*s\n", macro_eval.size, macro_eval.str);

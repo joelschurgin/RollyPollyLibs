@@ -52,7 +52,7 @@ String string_chop_before_whitespace(String s);
 #define Prefix(str, size) string_prefix((str), (size))
 #define Postfix(str, size) string_postfix((str), (size))
 
-b32 string_compare(String a, String b);
+b32 string_equal(String a, String b);
 //String string_keep_before_perfect_match(String s, String str_match);
 String string_keep_after_perfect_match(String s, String str_match);
 

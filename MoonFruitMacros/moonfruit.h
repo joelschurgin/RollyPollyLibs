@@ -37,8 +37,8 @@ typedef struct {
     MoonFruit_MacroType type;
     u64 token_idx_first;
     u64 token_idx_last;
-    u64 next_idx;
-    u64 prev_idx;
+    u64 next;
+    u64 prev;
     //u64 line_num;
 } MoonFruit_Macro;
 
@@ -134,5 +134,18 @@ typedef enum {
 } MoonFruit_MacroFormatFlag;
 
 String                 moonfruit_macro_format(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro, MoonFruit_MacroFormatFlag flags);
+
+typedef MoonFruit_Token MoonFruit_Arg;
+
+DefineArray(MoonFruit_Arg);
+
+typedef struct {
+    u64 token_idx_first;
+    u64 token_idx_last;
+} MoonFruit_ArgVal;
+
+DefineArray(MoonFruit_ArgVal);
+
+String                 moonfruit_macro_eval(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro, MoonFruit_ArgValArray arg_vals);
 
 #endif

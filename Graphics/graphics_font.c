@@ -28,27 +28,27 @@ internal u8* _graphics_font_parse_atlas(u8* c, String file_str, Graphics_Font* f
         for EachCharContinueUntil(c, file_str, *c == ':');
         c++;
 
-        if (string_compare(token, String("type"))) {
+        if (string_equal(token, String("type"))) {
             for EachCharContinueUntil(c, file_str, *c == '"');
             String val = _graphics_font_parse_read_string(&c, file_str);
-            Assert(string_compare(val, String("msdf")));
+            Assert(string_equal(val, String("msdf")));
             font->type = GRAPHICS_FONT_TYPE_MSDF;
-        } else if (string_compare(token, String("distanceRange"))) {
+        } else if (string_equal(token, String("distanceRange"))) {
             font->distance_range = _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("distanceRangeMiddle"))) {
+        } else if (string_equal(token, String("distanceRangeMiddle"))) {
             font->distance_range_middle = _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("size"))) {
+        } else if (string_equal(token, String("size"))) {
             font->atlas_size = _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("width"))) {
+        } else if (string_equal(token, String("width"))) {
             font->width = _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("height"))) {
+        } else if (string_equal(token, String("height"))) {
             font->height = _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("yOrigin"))) {
+        } else if (string_equal(token, String("yOrigin"))) {
             for EachCharContinueUntil(c, file_str, *c == '"');
             String val = _graphics_font_parse_read_string(&c, file_str);
-            if (string_compare(val, String("top"))) {
+            if (string_equal(val, String("top"))) {
                 font->y_origin = GRAPHICS_FONT_Y_ORIGIN_TOP;
-            } else if (string_compare(val, String("bottom"))) {
+            } else if (string_equal(val, String("bottom"))) {
                 font->y_origin = GRAPHICS_FONT_Y_ORIGIN_BOTTOM;
             } else {
                 AssertAlways(!"Unknown y origin!!!");
@@ -73,17 +73,17 @@ internal u8* _graphics_font_parse_metrics(u8* c, String file_str, Graphics_Font*
         for EachCharContinueUntil(c, file_str, *c == ':');
         c++;
 
-        if (string_compare(token, String("emSize"))) {
+        if (string_equal(token, String("emSize"))) {
             font->em_size = _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("lineHeight"))) {
+        } else if (string_equal(token, String("lineHeight"))) {
             font->line_height = _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("ascender"))) {
+        } else if (string_equal(token, String("ascender"))) {
             font->ascender = _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("descender"))) {
+        } else if (string_equal(token, String("descender"))) {
             font->descender =  _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("underlineY"))) {
+        } else if (string_equal(token, String("underlineY"))) {
             font->underline_y = _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("underlineThickness"))) {
+        } else if (string_equal(token, String("underlineThickness"))) {
             font->underline_thickness = _graphics_font_parse_read_f32(&c);
         } else {
             Assert(!"Unsupported font metrics field!!");
@@ -103,13 +103,13 @@ internal void _graphics_font_parse_glyphs_single_bounds(String data, f32* left, 
         for EachCharContinueUntil(c, data, *c == ':');
         c++;
 
-        if (string_compare(token, String("left"))) {
+        if (string_equal(token, String("left"))) {
             *left = _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("right"))) {
+        } else if (string_equal(token, String("right"))) {
             *right = _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("bottom"))) {
+        } else if (string_equal(token, String("bottom"))) {
             *bottom = _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("top"))) {
+        } else if (string_equal(token, String("top"))) {
             *top = _graphics_font_parse_read_f32(&c);
         } else {
             Assert(!"Unsupported font glyph single field!!");
@@ -126,11 +126,11 @@ internal void _graphics_font_parse_glyphs_single(String glyph_data, Graphics_Fon
         for EachCharContinueUntil(c, glyph_data, *c == ':');
         c++;
 
-        if (string_compare(token, String("unicode"))) {
+        if (string_equal(token, String("unicode"))) {
             g.unicode = _graphics_font_parse_read_u8(&c);
-        } else if (string_compare(token, String("advance"))) {
+        } else if (string_equal(token, String("advance"))) {
             g.advance = _graphics_font_parse_read_f32(&c);
-        } else if (string_compare(token, String("planeBounds"))) {
+        } else if (string_equal(token, String("planeBounds"))) {
             String data;
 
             for EachCharContinueUntil(c, glyph_data, *c == '{');
@@ -143,7 +143,7 @@ internal void _graphics_font_parse_glyphs_single(String glyph_data, Graphics_Fon
                                                     &g.plane_right,
                                                     &g.plane_bottom,
                                                     &g.plane_top);
-        } else if (string_compare(token, String("atlasBounds"))) {
+        } else if (string_equal(token, String("atlasBounds"))) {
             String data;
 
             for EachCharContinueUntil(c, glyph_data, *c == '{');
@@ -189,11 +189,11 @@ internal void _graphics_font_parse(String file_str, Graphics_Font* font) {
     for EachChar(c, file_str) {
         if (*c == '"') {
             String token = _graphics_font_parse_read_string(&c, file_str);
-            if (string_compare(token, String("atlas"))) {
+            if (string_equal(token, String("atlas"))) {
                 c = _graphics_font_parse_atlas(c, file_str, font);
-            } else if (string_compare(token, String("metrics"))) {
+            } else if (string_equal(token, String("metrics"))) {
                 c = _graphics_font_parse_metrics(c, file_str, font);
-            } else if (string_compare(token, String("glyphs"))) {
+            } else if (string_equal(token, String("glyphs"))) {
                 c = _graphics_font_parse_glyphs(c, file_str, font);
             }
         }

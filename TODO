@@ -1,0 +1,5 @@
+TODO:
+1)  Evaluates expression, need to save intermediate states
+2)  Chain of macro definitions
+3)  Keep track of line numbers
+

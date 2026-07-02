@@ -99,7 +99,7 @@ String string_chop_before_whitespace(String s) {
     return string_prefix(s, amt);
 }
 
-b32 string_compare(String a, String b) {
+b32 string_equal(String a, String b) {
     if (a.size != b.size) return false;
 
     // could make this faster by comparing u64's or even use simd then compare the remaining chars

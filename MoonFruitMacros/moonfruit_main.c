@@ -100,9 +100,9 @@ i32 main(i32 argc, u8 **argv) {
     u64 num_threads = 4;
 
     Arena *arena = arena_alloc(1024, 1024);
-    String dir   = parent_dir(String(argv[0]), 3);
+    String dir   = parent_dir(String(argv[0]), 2);
 
-    u8 *test_files[] = {"MoonFruitMacros/moonfruit_test.c"};
+    u8 *test_files[] = {"MoonFruitMacros/moonfruit_main.c"};
 
     for (u64 i = 0; i < sizeof(test_files) / sizeof(*test_files); i++) {
         u8 *test_file_name = test_files[i];

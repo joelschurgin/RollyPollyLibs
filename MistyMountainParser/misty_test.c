@@ -1,5 +1,7 @@
-#include "base.h"
 #include "misty.h"
+
+#define BASE_ENTRY_POINT
+#include "base.h"
 
 typedef struct {
     i32 argc;

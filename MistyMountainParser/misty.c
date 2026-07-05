@@ -28,7 +28,7 @@ MistyMountain_SectionHeaderTableInfo misty_read_elf_header(MistyMountain* mounta
 
     mountain->type     = type;
     mountain->endian   = endian;
-    mountain->sections = Array(mountain->arena, 1 + ElfHeaderGet(header, e_shnum), MistyMountain_Section);
+    mountain->sections = Array(mountain->arena, MistyMountain_Section, 1 + ElfHeaderGet(header, e_shnum));
 
     MistyMountain_SectionHeaderTableInfo section_header_table_info = (MistyMountain_SectionHeaderTableInfo) {
         .table_offset = ElfHeaderGet(header, e_shoff),
@@ -75,10 +75,10 @@ void misty_read_elf_section_headers(MistyMountain* mountain, File* f, MistyMount
 
         String debug_name = string_keep_after_perfect_match(section->name, String(".debug_"));
         if (debug_name.size != section->name.size) {
-            if (string_compare(debug_name, String("macro")))            mountain->debug_macro       = section_idx;
-            else if (string_compare(debug_name, String("macinfo")))     mountain->debug_macro       = section_idx;
-            else if (string_compare(debug_name, String("str")))         mountain->debug_str         = section_idx;
-            else if (string_compare(debug_name, String("str_offsets"))) mountain->debug_str_offsets = section_idx;
+            if (string_equal(debug_name, String("macro")))            mountain->debug_macro       = section_idx;
+            else if (string_equal(debug_name, String("macinfo")))     mountain->debug_macro       = section_idx;
+            else if (string_equal(debug_name, String("str")))         mountain->debug_str         = section_idx;
+            else if (string_equal(debug_name, String("str_offsets"))) mountain->debug_str_offsets = section_idx;
         }
     }
 }

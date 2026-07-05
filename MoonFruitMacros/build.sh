@@ -18,14 +18,14 @@ ar rcs libmoonfruit.a moonfruit.o
 
 echo -e "=> \033[32mBUILD COMPLETE: libmoonfruit.a\033[0m"
 
-echo "Building moonfruit_test..."
-$CC moonfruit_test.c -L. -lmoonfruit -o moonfruit_test $TEST_CFLAGS $LDFLAGS
+echo "Building moonfruit..."
+$CC moonfruit_main.c -L. -lmoonfruit -o moonfruit $TEST_CFLAGS $LDFLAGS
 
 mkdir -p ../build/lib
 rm moonfruit.o
 mv libmoonfruit.a ../build/lib/libmoonfruit.a
 
-mkdir -p ../build/tests
-mv moonfruit_test ../build/tests/moonfruit_test
+mkdir -p ../build
+mv moonfruit ../build/moonfruit
 
-echo -e "=> \033[32mBUILD COMPLETE: moonfruit_test\033[0m"
+echo -e "=> \033[32mBUILD COMPLETE: moonfruit\033[0m"

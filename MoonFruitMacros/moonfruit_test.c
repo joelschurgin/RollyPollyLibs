@@ -3,6 +3,14 @@
 #define BASE_ENTRY_POINT
 #include "base.h"
 
+#define func3(z) (z) * 10
+
+#define func(y) (y + 3)
+#define func2(x) ((6 * func(2*(x), 3)))
+#undef func
+
+#define func(a, b) (2 + 6 / (a + b) % func3(124) - 23)
+
 #define should_not_have_params (u64)param
 #define with_params(a, b, c) (a+b+c)
 #define no_params()
@@ -13,14 +21,6 @@
 #define my_exp 4p-3
 #define my_exponent24 4p-3
 #define my_expander 123
-
-#define func3(z) (z) * 10
-
-#define func(y) (y + 3)
-#define func2(x) ((6 * func(2*(x), 3)))
-#undef func
-
-#define func(a, b) (2 + 6 / (a + b) % func3(124) - 23)
 
 #define num .4e-3
 #define bad_exponent 3tone3 // tokenizer doesn't throw an error while using gcc
@@ -78,7 +78,7 @@ void* parallel_main(void* main_args) {
 
     if (LaneIdx() == 0) {
         // TODO: currently finding func instead of func3
-        MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, String("func3"));
+        MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, String("func"));
         if (macros.count > 0) {
             String macro_eval = moonfruit_macro_eval(LaneArena(), macro_info, macros.data[0], (MoonFruit_ArgValArray){0});
             printf("%.*s\n", macro_eval.size, macro_eval.str);

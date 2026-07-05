@@ -469,7 +469,9 @@ internal void _moonfruit_definition_tree_insert(Arena* arena, MoonFruit_Definiti
         def->radix = pair.matched;
 
         if (pair.matched.size == definition.size && !split_def) {
+            u64 temp = def->macro_idx;
             def->macro_idx = macro_idx;
+            macro_idx = temp;
         }
         for (i32 i = 0; i < 2; i++) {
             if (pair.unmatched[i].size > 0 && (pair.unmatched[i].str != def->radix.str || pair.unmatched[i].size != def->radix.size)) {

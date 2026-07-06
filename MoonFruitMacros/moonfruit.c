@@ -654,6 +654,7 @@ void _moonfruit_definition_tree_find_other_matches(Arena* arena, MoonFruit_Macro
 
 MoonFruit_MacroArray moonfruit_macro_match(Arena* arena, MoonFruit_MacroInfo* macro_info, String definition) {
     MoonFruit_MacroArray matches = {0};
+    if (definition.size == 0) return matches;
 
     u64 start_idx = _moonfruit_definition_tree_start_idx(definition.str[0]);
     MutexBlock(macro_info->def_tree_mutexes.data[start_idx]) {

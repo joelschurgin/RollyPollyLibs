@@ -1,5 +1,8 @@
 #include "moonfruit.h"
 
+#include <termios.h>
+#include <sys/ioctl.h>
+
 #define BASE_ENTRY_POINT
 #include "base.h"
 
@@ -76,24 +79,72 @@ void* parallel_main(void* main_args) {
     }
     LaneSyncPtr(macro_info, 0);
 
+    // basic user input
     if (LaneIdx() == 0) {
-        MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, String("my_exp"));
-        if (macros.count > 0) {
-            String macro_eval = moonfruit_macro_eval(LaneArena(), macro_info, macros.data[0], (MoonFruit_ArgValArray){0});
-            String macro_name = moonfruit_macro_format(LaneArena(), macro_info, macros.data[0], MF_FORMAT_DEFINITION);
-            printf("%.*s = %.*s\n", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
+        struct termios old_term;
+        u64 w = 0;
+        u64 h = 0;
+        DeferBlock({
+            tcgetattr(STDIN_FILENO, &old_term);
+ 
+            struct termios term;
+            term.c_iflag &= ~(BRKINT | ICRNL | INLCR | ISTRIP | IXON);
+            term.c_oflag &= ~(OPOST);
+            term.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
+            tcsetattr(STDIN_FILENO, TCSAFLUSH, &term);
+
+            struct winsize win;
+            if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &win) == 0) {
+                w = win.ws_col;
+                h = win.ws_row;
+            }
+        }, {
+            printf("\033[2J\033[H");
+            fflush(stdout);
+            tcsetattr(STDIN_FILENO, TCSAFLUSH, &old_term);
+        }) {
+            printf("\033[H\033[2J");
+
+            String input_str = EmptyString(LaneArena(), w);
+            input_str.size = 0;
+
+            u8 c[4] = {0};
+            printf("\033[H\033[30;42m");
+            for (u64 i = 0; i < w; i++) printf(" ");
+            printf("\033[HInput: \033[0m");
+            while (c[0] != '\033') {
+                fflush(stdout);
+                i32 num_read = read(STDIN_FILENO, c, 4);
+                if (num_read == 1) {
+                    if (c[0] == '\033') break;
+                    if (c[0] == 0x7f) { // backspace
+                        input_str = string_chop(input_str, 1);
+                    } else {
+                        Assert(input_str.size < w);
+                        input_str.str[input_str.size++] = c[0];
+                    }
+
+                    printf("\033[2J\033[H");
+
+                    MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, input_str);
+                    for EachElement(macro, MoonFruit_Macro, macros) {
+                        String macro_eval = moonfruit_macro_eval(LaneArena(), macro_info, *macro, (MoonFruit_ArgValArray){0});
+                        String macro_name = moonfruit_macro_format(LaneArena(), macro_info, *macro, MF_FORMAT_DEFINITION);
+                        printf("\r\n%.*s = %.*s", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
+                    }
+
+                    printf("\033[H\033[30;42m");
+                    for (u64 i = 0; i < w; i++) printf(" ");
+                    printf("\033[HInput: ");
+
+                    printf("%.*s", input_str.size, input_str.str);
+                    printf("\033[0m");
+                } else if (num_read > 1) {
+                    break;
+                }
+            }
         }
     }
-    /*
-    if (LaneIdx() == 1 || (LaneCount() <= 1 && LaneIdx() == 0)) {
-        MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, String("my_exp"));
-        if (macros.count > 0) {
-            String macro_eval = moonfruit_macro_eval(LaneArena(), macro_info, macros.data[0], (MoonFruit_ArgValArray){0});
-            String macro_name = moonfruit_macro_format(LaneArena(), macro_info, macros.data[0], MF_FORMAT_DEFINITION);
-            printf("%.*s = %.*s\n", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
-        }
-    }
-    */
     LaneSync();
 }
 

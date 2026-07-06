@@ -42,16 +42,10 @@ void barrier_sync(Barrier *barrier) {
     pthread_barrier_wait(&barrier->barrier_id);
 }
 
-void mutex_assign(Mutex** mutex, u64 idx) {
-    local_persist u64 assigned_mutexes = 0;
-    AssertAlways(thread_ctx.mutexes.count <= 64);
+void mutex_assign(Mutex** mutex) {
+    local_persist u64 idx = 0;
     AssertAlways(idx < thread_ctx.mutexes.count);
-
-    u64 curr_mutex = (1 << idx);
-    AssertAlways((assigned_mutexes | curr_mutex) != assigned_mutexes);
-    assigned_mutexes |= curr_mutex;
-
-    *mutex = &thread_ctx.mutexes.data[idx];
+    *mutex = &thread_ctx.mutexes.data[idx++];
 }
 
 void mutex_init(Mutex* mutex) {

@@ -4,6 +4,7 @@
 #include "base.h"
 
 #define MOONFRUIT_CHUNK_SIZE 1024
+#define MOONFRUIT_DEFINITION_TREE_INIT_SIZE (u64)(('z' - 'a') + ('Z' - 'A') + 2)
 
 typedef enum {
     MF_TOKEN_IDENTIFIER,     // any sequence of letters, digits, or underscores, which begins with a letter or underscore
@@ -114,10 +115,12 @@ typedef struct {
     MoonFruit_MacroArray macros;
     MoonFruit_FileMarkerArray file_markers;
     MoonFruit_DefinitionTree def_tree;
+
+    MutexPtrArray def_tree_mutexes;
 } MoonFruit_MacroInfo;
 
-void                   moonfruit_definition_tree_insert(Arena* arena, MoonFruit_DefinitionTree* tree, u64 macro_idx, String definition);
-MoonFruit_MacroInfo*   moonfruit_macro_info_build(MoonFruit_File* f);
+void                   moonfruit_definition_tree_insert(Arena* arena, MoonFruit_MacroInfo* macro_info, u64 macro_idx, String definition);
+MoonFruit_MacroInfo*   moonfruit_macro_info_build(Arena* arena, MoonFruit_File* f);
 
 u64                    moonfruit_definition_tree_find_idx(MoonFruit_DefinitionTree tree, String definition, u64 idx);
 MoonFruit_Macro        moonfruit_macro_find(MoonFruit_MacroInfo* macro_info, String definition);

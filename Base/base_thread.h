@@ -30,7 +30,10 @@ typedef struct {
 
 DefineArray(Mutex);
 
-void mutex_assign(Mutex **mutex, u64 idx);
+typedef Mutex* MutexPtr;
+DefineArray(MutexPtr);
+
+void mutex_assign(Mutex **mutex);
 void mutex_init(Mutex *mutex);
 void mutex_release(Mutex *mutex);
 void mutex_lock(Mutex *mutex);

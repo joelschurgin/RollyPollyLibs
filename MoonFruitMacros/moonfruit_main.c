@@ -56,7 +56,7 @@ void* parallel_main(void* main_args) {
         f = moonfruit_file_create_and_open(thread_ctx.shared_arena, path);
 
         chunk_Q = moonfruit_chunk_queue_create(Q_arena, LaneCount() * 2);
-        mutex_assign(&chunk_Q->mutex, 0);
+        mutex_assign(&chunk_Q->mutex);
         for (u64 i = 0; i < LaneCount(); i++) {
             moonfruit_file_push_next_chunk(f, chunk_Q);
         }
@@ -72,17 +72,28 @@ void* parallel_main(void* main_args) {
 
     MoonFruit_MacroInfo* macro_info = 0L;
     if (LaneIdx() == 0) {
-        macro_info = moonfruit_macro_info_build(f);
+        macro_info = moonfruit_macro_info_build(thread_ctx.shared_arena, f);
     }
     LaneSyncPtr(macro_info, 0);
 
     if (LaneIdx() == 0) {
-        MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, String("func"));
+        MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, String("my_exp"));
         if (macros.count > 0) {
             String macro_eval = moonfruit_macro_eval(LaneArena(), macro_info, macros.data[0], (MoonFruit_ArgValArray){0});
-            printf("%.*s\n", macro_eval.size, macro_eval.str);
+            String macro_name = moonfruit_macro_format(LaneArena(), macro_info, macros.data[0], MF_FORMAT_DEFINITION);
+            printf("%.*s = %.*s\n", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
         }
     }
+    /*
+    if (LaneIdx() == 1 || (LaneCount() <= 1 && LaneIdx() == 0)) {
+        MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, String("my_exp"));
+        if (macros.count > 0) {
+            String macro_eval = moonfruit_macro_eval(LaneArena(), macro_info, macros.data[0], (MoonFruit_ArgValArray){0});
+            String macro_name = moonfruit_macro_format(LaneArena(), macro_info, macros.data[0], MF_FORMAT_DEFINITION);
+            printf("%.*s = %.*s\n", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
+        }
+    }
+    */
     LaneSync();
 }
 
@@ -119,7 +130,7 @@ i32 main(i32 argc, u8 **argv) {
             .argv = argv_test,
         };
 
-        create_parallel_entry_point(num_threads, 1, parallel_main, &main_args);
+        create_parallel_entry_point(num_threads, 1 + MOONFRUIT_DEFINITION_TREE_INIT_SIZE, parallel_main, &main_args);
         temp_arena_end(temp_arena);
     }
 

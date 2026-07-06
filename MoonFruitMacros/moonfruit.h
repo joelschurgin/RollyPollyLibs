@@ -41,6 +41,7 @@ typedef struct {
     u64 next;
     u64 prev;
     //u64 line_num;
+    b32 has_args;
 } MoonFruit_Macro;
 
 DefineArray(MoonFruit_Macro);

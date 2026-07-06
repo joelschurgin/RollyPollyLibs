@@ -348,7 +348,8 @@ internal void moonfruit_macro_find_in_chunk(MoonFruit_Chunk chunk, u64 num_macro
             case MF_LETTERS_DEFINE:
                 MoonFruit_MacroArray_Push(MF_DEFINE);
                 moonfruit_macro_find_remaining_tokens(chunk, token, &MoonFruit_MacroArray_Last);
-                Assert(MoonFruit_MacroArray_Last_NumTokens >= 1); 
+                MoonFruit_MacroArray_Last.has_args = !char_is_whitespace((token+1)->data.str[(token+1)->data.size]);
+                Assert(MoonFruit_MacroArray_Last_NumTokens >= 1);
             break;
             case MF_LETTERS_UNDEF:
                 MoonFruit_MacroArray_Push(MF_UNDEF);
@@ -618,8 +619,6 @@ u64 moonfruit_definition_tree_partial_match_idx(MoonFruit_DefinitionTree tree, S
     Assert(definition.size > 0);
     Assert(idx != 0);
 
-    //if (idx == 0) idx = _moonfruit_definition_tree_start_idx(definition.str[0]);
-
     MoonFruit_Definition* def = &tree.data[idx];
     StringPartiallyMatchedPair pair = string_keep_unmatched_ends(definition, def->radix);
 
@@ -716,13 +715,12 @@ String moonfruit_macro_format(Arena* arena, MoonFruit_MacroInfo* macro_info, Moo
             string_builder_append(arena, &macro_formatted, token.data);
  
             token = macro_info->tokens.data[token_idx++];
-            b32 has_args = (token.data.str[0] == '(');
-            if (has_args) {
+            if (macro.has_args) {
                 string_builder_append(arena, &macro_formatted, token.data);
                 for (; token_idx <= macro.token_idx_last; token_idx++) {
                     token = macro_info->tokens.data[token_idx];
                     if (token.data.str[0] == ')') {
-                        string_builder_step_back(arena, &macro_formatted, 1);
+                        if (macro_info->tokens.data[token_idx-1].data.str[0] != '(') string_builder_step_back(arena, &macro_formatted, 1);
                         string_builder_append(arena, &macro_formatted, token.data);
                         token_idx++;
                         break;
@@ -742,8 +740,7 @@ String moonfruit_macro_format(Arena* arena, MoonFruit_MacroInfo* macro_info, Moo
 
             MoonFruit_Token token;
             token = macro_info->tokens.data[token_idx++];
-            b32 has_args = (token.data.str[0] == '(');
-            if (has_args) {
+            if (macro.has_args) {
                 for (; token_idx <= macro.token_idx_last; token_idx++) {
                     token = macro_info->tokens.data[token_idx];
                     if (token.data.str[0] == ')') {
@@ -792,6 +789,13 @@ func2(x)
 
 */
 
+#define MoonFruit_MacroEval_AppendToken(arena, expr, token) \
+        if ((token).data.str[0] == ')') \
+            string_builder_step_back((arena), &(expr), 1); \
+        string_builder_append((arena), &(expr), (token).data); \
+        if ((token).data.str[0] != '(') \
+            string_builder_append((arena), &(expr), String(" "));
+
 #define MoonFruit_MacroEval_SetToLocalColor \
         if (local_color == 0) string_builder_append(arena, &expr, String("\033[32m"));\
         if (local_color == 1) string_builder_append(arena, &expr, String("\033[33m"));\
@@ -811,9 +815,9 @@ String moonfruit_macro_eval(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonF
 
     MoonFruit_ArgArray args = {0};
     ArrayBuilderBlock(arena, args, MoonFruit_Arg) {
-        token = macro_info->tokens.data[token_idx++];
-        b32 has_args = (token.data.str[0] == '(');
-        if (has_args) {
+        if (macro.has_args) {
+            //token = macro_info->tokens.data[token_idx++];
+            token_idx++;
             for (; token_idx <= macro.token_idx_last; token_idx++) {
                 token = macro_info->tokens.data[token_idx];
                 if (token.data.str[0] == ')') {
@@ -823,8 +827,6 @@ String moonfruit_macro_eval(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonF
                     array_builder_push(arena, args, token);
                 }
             }
-        } else {
-            token_idx = macro.token_idx_first + 1;
         }
     }
 
@@ -835,9 +837,8 @@ String moonfruit_macro_eval(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonF
 
         for (; token_idx <= macro.token_idx_last; token_idx++) {
             token = macro_info->tokens.data[token_idx];
-            if (token.type != MF_TOKEN_IDENTIFIER) {
-                string_builder_append(arena, &expr, token.data);
-                string_builder_append(arena, &expr, String(" "));
+            if (token.type != MF_TOKEN_IDENTIFIER || args.count == 0) {
+                MoonFruit_MacroEval_AppendToken(arena, expr, token);
                 continue;
             }
 
@@ -846,12 +847,11 @@ String moonfruit_macro_eval(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonF
                 if (arg_vals.count > 0) {
                     MoonFruit_ArgVal val = arg_vals.data[arg_idx];
                     for (u64 idx = val.token_idx_first; idx <= val.token_idx_last; idx++) {
-                        string_builder_append(arena, &expr, macro_info->tokens.data[idx].data);
-                        string_builder_append(arena, &expr, String(" "));
+                        token = macro_info->tokens.data[idx];
+                        MoonFruit_MacroEval_AppendToken(arena, expr, token);
                     }
                 } else {
-                    string_builder_append(arena, &expr, token.data);
-                    string_builder_append(arena, &expr, String(" "));
+                    MoonFruit_MacroEval_AppendToken(arena, expr, token);
                 }
 
                 continue;
@@ -866,8 +866,7 @@ String moonfruit_macro_eval(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonF
             ArrayBuilderBlock(arena, def_arg_vals, MoonFruit_ArgVal) {
                 // find arg values
                 token = macro_info->tokens.data[++token_idx];
-                b32 has_args = (token.data.str[0] == '(');
-                if (has_args) {
+                if (macro.has_args) {
                     array_builder_push(arena, def_arg_vals, (MoonFruit_ArgVal){0});
                     ArrayLast(def_arg_vals).token_idx_first = ++token_idx;
                     i32 num_paren = 1;

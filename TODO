@@ -1,6 +1,5 @@
 TODO:
-1)  moonfruit_macro_match(LaneArena(), macro_info, String("func3")); finding func instead of func3
-2)  Evaluates expression, need to save intermediate states
-3)  Keep track of line numbers
-4)  Chain of macro definitions
+1)  Evaluates expression, need to save intermediate states
+2)  Keep track of line numbers
+3)  Chain of macro definitions
 

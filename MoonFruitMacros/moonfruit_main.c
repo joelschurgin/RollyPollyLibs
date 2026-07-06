@@ -100,10 +100,12 @@ void* parallel_main(void* main_args) {
             }
         }, {
             printf("\033[2J\033[H");
+            printf("\033]112\007");
             fflush(stdout);
             tcsetattr(STDIN_FILENO, TCSAFLUSH, &old_term);
         }) {
             printf("\033[H\033[2J");
+            printf("\033]12;#000000\007");
 
             String input_str = EmptyString(LaneArena(), w);
             input_str.size = 0;
@@ -120,6 +122,7 @@ void* parallel_main(void* main_args) {
                     if (c[0] == 0x7f) { // backspace
                         input_str = string_chop(input_str, 1);
                     } else {
+                        if (!(char_is_alpha(*c) || char_is_digit(*c, 10) || *c == '_')) continue;
                         Assert(input_str.size < w);
                         input_str.str[input_str.size++] = c[0];
                     }

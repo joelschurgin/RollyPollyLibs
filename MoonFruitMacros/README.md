@@ -12,4 +12,4 @@ For example, if you define these rules:
 Standard tools will only show you the final result: `400 * 100`. The computer completely forgets about the name `mac1`, you to guess how that `400` got there.
  
 ## The Solution
-**Moon Fruit Macros** is a tool that runs these replacements but remembers every single step of the process. It allows you to the code at any point in its transformation (e.g., seeing `mac2 = mac1 * 100` before it becomes `400 * 100`).
+**Moon Fruit Macros** is a tool that runs these replacements but remembers every single step of the process. It allows you to view the code at any point in its transformation (e.g., seeing `mac2 = mac1 * 100` before it becomes `400 * 100`).

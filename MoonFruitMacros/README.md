@@ -1,7 +1,7 @@
 ### Moon Fruit Macros
  
-In the C programming language, developers use "macros"—essentially custom shortcuts—to automatically expand short keywords larger blocks of code or numbers before the program runs (like a smart search-and-replace).
- 
+In the C programming language, developers use "macros" which are essentially custom shortcuts to automatically expand short keywords to expressions or larger blocks of code before the program runs (like a smart search-and-replace).
+
 #### The Problem
 As projects grow, these shortcuts get layered inside one another. When something goes wrong, the standard tools only show you **final expanded result**. If there is a bug, you have no way of tracing the intermediate steps to see which shortcut the error.
  

@@ -146,10 +146,25 @@ DefineArray(MoonFruit_Arg);
 typedef struct {
     u64 token_idx_first;
     u64 token_idx_last;
+    u64 macro_idx;
 } MoonFruit_ArgVal;
 
 DefineArray(MoonFruit_ArgVal);
 
 String                 moonfruit_macro_eval(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro, MoonFruit_ArgValArray arg_vals);
+
+typedef struct MoonFruit_ExprTreeNode MoonFruit_ExprTreeNode;
+struct MoonFruit_ExprTreeNode {
+    MoonFruit_Token* token;
+    MoonFruit_ExprTreeNode* child;
+    MoonFruit_ExprTreeNode* sibling;
+    u64 macro_idx;
+};
+
+typedef MoonFruit_ExprTreeNode* MoonFruit_ExprTree;
+
+MoonFruit_ExprTree     moonfruit_macro_build_expr_tree(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro* macro, MoonFruit_ArgValArray arg_vals);
+MoonFruit_ExprTree     moonfruit_macro_build_expr_tree_no_args(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro* macro);
+String                 moonfruit_expr_tree_format(Arena* arena, MoonFruit_ExprTree tree);
 
 #endif

@@ -2,4 +2,5 @@ TODO:
 1)  Evaluates expression, need to save intermediate states
 2)  Keep track of line numbers
 3)  Chain of macro definitions
+4)  Fuzzy find capital and lowercase letters? For instance B and b don't show the same macros
 

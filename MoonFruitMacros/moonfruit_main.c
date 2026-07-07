@@ -8,11 +8,11 @@
 
 #define func3(z) (z) * 10
 
-#define func(y) (y + 3)
-#define func2(x) ((6 * func(2*(x), 3)))
-#undef func
+#define func(y) (func3(y) + 3)
+//#define func2(x) ((6 * func(2*(x), 3)))
+//#undef func
 
-#define func(a, b) (2 + 6 / (a + b) % func3(124) - 23)
+//#define func(a, b) (2 + 6 / (a + b) % func3(124) - 23)
 
 #define should_not_have_params (u64)param
 #define with_params(a, b, c) (a+b+c)
@@ -130,6 +130,17 @@ void* parallel_main(void* main_args) {
                     printf("\033[2J\033[H");
 
                     MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, input_str);
+
+                    // for testing
+                    if (macros.count > 0) {
+                        MoonFruit_Macro* macro = &macros.data[0];
+                        MoonFruit_ExprTree expr_tree = moonfruit_macro_build_expr_tree_no_args(LaneArena(), macro_info, macro);
+                        String macro_eval = moonfruit_expr_tree_format(LaneArena(), expr_tree);
+                        String macro_name = moonfruit_macro_format(LaneArena(), macro_info, *macro, MF_FORMAT_DEFINITION);
+                        printf("\r\n%.*s = %.*s", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
+                    }
+                    // end testing
+
                     for EachElement(macro, MoonFruit_Macro, macros) {
                         String macro_eval = moonfruit_macro_eval(LaneArena(), macro_info, *macro, (MoonFruit_ArgValArray){0});
                         String macro_name = moonfruit_macro_format(LaneArena(), macro_info, *macro, MF_FORMAT_DEFINITION);
@@ -161,7 +172,7 @@ String parent_dir(String path, u32 num_dirs) {
 }
 
 i32 main(i32 argc, u8 **argv) {
-    u64 num_threads = 4;
+    u64 num_threads = 1;
 
     Arena *arena = arena_alloc(1024, 1024);
     String dir   = parent_dir(String(argv[0]), 2);

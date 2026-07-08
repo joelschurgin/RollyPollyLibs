@@ -955,7 +955,22 @@ internal MoonFruit_ArgValArray _moonfruit_macro_build_arg_val_array(Arena* arena
     return def_arg_vals;
 }
 
-MoonFruit_ExprTree moonfruit_macro_build_expr_tree(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro* macro, MoonFruit_ArgValArray arg_vals) {
+#define MoonFruit_ExprTreePushSibling \
+            do { \
+                MoonFruit_ExprTreeNode* new_node = push_struct(arena, MoonFruit_ExprTreeNode); \
+                if (!root) { \
+                    root = new_node; \
+                    node = new_node; \
+                } else { \
+                    node->sibling = new_node; \
+                    node = node->sibling; \
+                } \
+                node->token = &macro_info->tokens.data[token_idx]; \
+                node->macro_idx = 0; \
+            } while(0)
+
+MoonFruit_ExprTree moonfruit_macro_build_expr_tree_old(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro* macro, MoonFruit_ArgValArray arg_vals) {
+
     if (macro->type == MF_IGNORE) return 0L;
 
     u64 token_idx = macro->token_idx_first;
@@ -969,49 +984,26 @@ MoonFruit_ExprTree moonfruit_macro_build_expr_tree(Arena* arena, MoonFruit_Macro
         token = macro_info->tokens.data[token_idx];
 
         if (token.type != MF_TOKEN_IDENTIFIER) {
-            // add token to tree
-            {
-                MoonFruit_ExprTreeNode* new_node = push_struct(arena, MoonFruit_ExprTreeNode);
-                if (!root) {
-                    root = new_node;
-                    node = new_node;
-                } else {
-                    node->sibling = new_node;
-                    node = node->sibling;
-                }
-
-                node->token = &macro_info->tokens.data[token_idx];
-                node->macro_idx = 0; // TODO
-            }
+            MoonFruit_ExprTreePushSibling;
             continue;
         }
 
         i64 arg_idx = _moonfruit_token_find_arg(args, token);
         if (arg_idx >= 0) {
+            if (arg_vals.count == 0) {
+                MoonFruit_ExprTreePushSibling;
+                continue;
+            }
+
             MoonFruit_ArgVal val = arg_vals.data[arg_idx];
             for (u64 arg_idx = val.token_idx_first; arg_idx <= val.token_idx_last; arg_idx++) {
-                node->sibling = push_struct(arena, MoonFruit_ExprTreeNode);
-                node = node->sibling;
-                node->token = &macro_info->tokens.data[arg_idx];
-                node->macro_idx = 0; // TODO
+                MoonFruit_ExprTreePushSibling;
             }
             continue;
         }
 
         // add token to tree
-        {
-            MoonFruit_ExprTreeNode* new_node = push_struct(arena, MoonFruit_ExprTreeNode);
-            if (!root) {
-                root = new_node;
-                node = new_node;
-            } else {
-                node->sibling = new_node;
-                node = node->sibling;
-            }
-
-            node->token = &macro_info->tokens.data[token_idx];
-            node->macro_idx = 0; // TODO
-        }
+        MoonFruit_ExprTreePushSibling;
 
         MoonFruit_Macro def = moonfruit_macro_find(macro_info, token.data);
         if (def.type == MF_IGNORE) continue;
@@ -1030,10 +1022,7 @@ MoonFruit_ExprTree moonfruit_macro_build_expr_tree(Arena* arena, MoonFruit_Macro
                 token = macro_info->tokens.data[token_idx];
                 num_paren += (token.data.str[0] == '(') - (token.data.str[0] == ')');
 
-                node->sibling = push_struct(arena, MoonFruit_ExprTreeNode);
-                node = node->sibling;
-                node->token = &macro_info->tokens.data[token_idx];
-                node->macro_idx = 0; // TODO
+                MoonFruit_ExprTreePushSibling;
 
                 if (num_paren <= 0) {
                     ArrayLast(def_arg_vals).token_idx_last = token_idx-1;
@@ -1052,23 +1041,29 @@ MoonFruit_ExprTree moonfruit_macro_build_expr_tree(Arena* arena, MoonFruit_Macro
         branch->child = moonfruit_macro_build_expr_tree(arena, macro_info, &def, def_arg_vals);
 
         // add next token
+        Assert(token_idx + 1 <= macro->token_idx_last);
         token = macro_info->tokens.data[++token_idx];
-        Assert(token_idx <= macro->token_idx_last);
 
-        node->sibling = push_struct(arena, MoonFruit_ExprTreeNode);
-        node = node->sibling;
-        node->token = &macro_info->tokens.data[token_idx];
-        node->macro_idx = 0; // TODO
+        MoonFruit_ExprTreePushSibling;
 
         // point end of tree to next node
-        branch = branch->child;
-        while (branch && branch->sibling) {
-            branch = branch->sibling;
+        if (branch->child) {
+            branch = branch->child;
+            while (branch && branch->sibling) {
+                branch = branch->sibling;
+            }
+            branch->sibling = node;
+        } else {
+            branch->child = node;
         }
-        branch->sibling = node;
-   }
+    }
 
     return root;
+}
+#undef MoonFruit_ExprTreePushSibling
+
+MoonFruit_ExprTree moonfruit_macro_build_expr_tree(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro* macro, MoonFruit_ArgValArray arg_vals) {
+    return 0L;
 }
 
 MoonFruit_ExprTree moonfruit_macro_build_expr_tree_no_args(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro* macro) {
@@ -1078,24 +1073,40 @@ MoonFruit_ExprTree moonfruit_macro_build_expr_tree_no_args(Arena* arena, MoonFru
     return tree;
 }
 
-internal void _moonfruit_expr_tree_format(Arena* arena, MoonFruit_ExprTreeNode* node, String* expr) {
-    if (!node->token) return;
+internal void _moonfruit_expr_tree_format_section(Arena* arena, MoonFruit_ExprTreeNode* start, MoonFruit_ExprTreeNode* end, String* expr) {
+    Assert(arena);
+    Assert(expr);
 
-    string_builder_append(arena, expr, node->token->data);
+    MoonFruit_ExprTreeNode* node = start;
+    while (node && node != end) {
+        if (node->token) string_builder_append(arena, expr, node->token->data);
+        node = node->sibling;
+    }
+}
 
-    if (node->sibling) _moonfruit_expr_tree_format(arena, node->sibling, expr);
-    if (node->child) {
-        string_builder_append(arena, expr, String("\r\n"));
-        string_builder_append(arena, expr, node->token->data);
-        string_builder_append(arena, expr, String(" => "));
-        _moonfruit_expr_tree_format(arena, node->child, expr);
+internal void _moonfruit_expr_tree_format(Arena* arena, MoonFruit_ExprTreeNode* node, MoonFruit_ExprTreeNode* remaining, String* expr) {
+    Assert(arena);
+    Assert(expr);
+
+    if (!node) return;
+
+    _moonfruit_expr_tree_format_section(arena, node, NULL, expr);
+
+    MoonFruit_ExprTreeNode* root = node;
+    while (node) {
+        if (node->child) {
+            string_builder_append(arena, expr, String("\r\n => "));
+            _moonfruit_expr_tree_format_section(arena, root, node, expr);
+            _moonfruit_expr_tree_format(arena, node->child, NULL, expr);
+        }
+        node = node->sibling;
     }
 }
 
 String moonfruit_expr_tree_format(Arena* arena, MoonFruit_ExprTree tree) {
     String expr;
     StringBuilderBlock(arena, expr) {
-        if (tree) _moonfruit_expr_tree_format(arena, tree, &expr);
+        if (tree) _moonfruit_expr_tree_format(arena, tree, NULL, &expr);
     }
 
     return expr;

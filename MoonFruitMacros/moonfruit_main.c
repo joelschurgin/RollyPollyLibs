@@ -6,9 +6,6 @@
 #define BASE_ENTRY_POINT
 #include "base.h"
 
-#define func3(z) (z) * 10
-
-#define func(y) (func3(y) + 3)
 //#define func2(x) ((6 * func(2*(x), 3)))
 //#undef func
 
@@ -17,6 +14,10 @@
 #define should_not_have_params (u64)param
 #define with_params(a, b, c) (a+b+c)
 #define no_params()
+
+#define func2(a) a / 7
+#define func3(z) func2(z) * 10
+#define func(y) (func3(y) + 3) * (3 no_params())
 
 #define my_exponent1 4e+3
 #define my_exponent2 4e3
@@ -137,15 +138,17 @@ void* parallel_main(void* main_args) {
                         MoonFruit_ExprTree expr_tree = moonfruit_macro_build_expr_tree_no_args(LaneArena(), macro_info, macro);
                         String macro_eval = moonfruit_expr_tree_format(LaneArena(), expr_tree);
                         String macro_name = moonfruit_macro_format(LaneArena(), macro_info, *macro, MF_FORMAT_DEFINITION);
-                        printf("\r\n%.*s = %.*s", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
+                        printf("\r\n%.*s\r\n => %.*s", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
                     }
                     // end testing
 
+                    /*
                     for EachElement(macro, MoonFruit_Macro, macros) {
                         String macro_eval = moonfruit_macro_eval(LaneArena(), macro_info, *macro, (MoonFruit_ArgValArray){0});
                         String macro_name = moonfruit_macro_format(LaneArena(), macro_info, *macro, MF_FORMAT_DEFINITION);
                         printf("\r\n%.*s = %.*s", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
                     }
+                    */
 
                     printf("\033[H\033[30;42m");
                     for (u64 i = 0; i < w; i++) printf(" ");

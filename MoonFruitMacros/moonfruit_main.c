@@ -131,56 +131,22 @@ void* parallel_main(void* main_args) {
                     printf("\033[2J\033[H");
 
                     MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, input_str);
-                    if (macros.count > 0) {
-                        MoonFruit_Macro macro = macros.data[0];
+                    for (u64 idx = 0; idx < macros.count; idx++) {
+                        MoonFruit_Macro macro = macros.data[idx];
                         String macro_name = moonfruit_macro_format(LaneArena(), macro_info, macro, MF_FORMAT_DEFINITION);
+                        printf("\r\n%.*s", macro_name.size, macro_name.str);
 
+                        MoonFruit_ExprList expr_list = moonfruit_macro_eval(LaneArena(), macro_info, macro, (MoonFruit_ArgValArray){0});
 
-                        /*
-                        MoonFruit_TokenListNode test_list_node = {
-                            .token = &macro_info->tokens.data[1],
-                        };
-                        MoonFruit_ArgVal test_arg_val = {
-                            .first = &test_list_node,
-                            .last = &test_list_node,
-                        };
-                        MoonFruit_Expr expr = moonfruit_macro_to_expr(LaneArena(), macro_info, macro, (MoonFruit_ArgValArray){
-                            .data = &test_arg_val,
-                            .count = 1,
-                        });
-                        */
-                        MoonFruit_Expr expr = moonfruit_macro_to_expr(LaneArena(), macro_info, macro, (MoonFruit_ArgValArray){0});
-                        String macro_eval = moonfruit_expr_format(LaneArena(), expr);
-                        printf("\r\n%.*s\r\n => %.*s", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
-
-                        expr = moonfruit_expr_eval(LaneArena(), macro_info, expr, (MoonFruit_ArgValArray){0});
-                        macro_eval = moonfruit_expr_format(LaneArena(), expr);
-                        printf("\r\n%.*s\r\n => %.*s", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
-
-                        expr = moonfruit_expr_eval(LaneArena(), macro_info, expr, (MoonFruit_ArgValArray){0});
-                        macro_eval = moonfruit_expr_format(LaneArena(), expr);
-                        printf("\r\n%.*s\r\n => %.*s", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
+                        // format macro expansions
+                        MoonFruit_ExprNode* node = expr_list.first;
+                        while (node) {
+                            String macro_eval = moonfruit_expr_format(LaneArena(), node->expr);
+                            printf("\r\n => %.*s", macro_eval.size, macro_eval.str);
+                            if (node == expr_list.last) break;
+                            node = node->next;
+                        }
                     }
-
-                    /*
-                    // for testing
-                    if (macros.count > 0) {
-                        MoonFruit_Macro* macro = &macros.data[0];
-                        MoonFruit_ExprTree expr_tree = moonfruit_macro_build_expr_tree_no_args(LaneArena(), macro_info, macro);
-                        String macro_eval = moonfruit_expr_tree_format(LaneArena(), expr_tree);
-                        String macro_name = moonfruit_macro_format(LaneArena(), macro_info, *macro, MF_FORMAT_DEFINITION);
-                        printf("\r\n%.*s\r\n => %.*s", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
-                    }
-                    // end testing
-                    */
-
-                    /*
-                    for EachElement(macro, MoonFruit_Macro, macros) {
-                        String macro_eval = moonfruit_macro_eval(LaneArena(), macro_info, *macro, (MoonFruit_ArgValArray){0});
-                        String macro_name = moonfruit_macro_format(LaneArena(), macro_info, *macro, MF_FORMAT_DEFINITION);
-                        printf("\r\n%.*s = %.*s", macro_name.size, macro_name.str, macro_eval.size, macro_eval.str);
-                    }
-                    */
 
                     printf("\033[H\033[30;42m");
                     for (u64 i = 0; i < w; i++) printf(" ");

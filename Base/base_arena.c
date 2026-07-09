@@ -30,6 +30,8 @@ void memory_release(void* ptr, u64 size) {
 Arena* arena_alloc_(u64 reserve_size, u64 commit_size) {
     Assert(all_arenas_size <= ARENA_MAX_COUNT);
 
+    commit_size = AlignPow2(commit_size, PAGE_SIZE);
+
     Arena* arena = memory_reserve(reserve_size);
     memory_commit((void*)arena, commit_size);
 
@@ -73,7 +75,7 @@ void *arena_push(Arena *arena, u64 size, u64 align, b8 zero) {
 
     if (arena->pos + size >= arena->committed - ARENA_HEADER_SIZE) {
         Assert(arena->pos < arena->committed);
-        u64 amount_to_commit = CeilIntegerDiv(arena->committed - arena->pos + size, arena->commit_size) * arena->commit_size;
+        u64 amount_to_commit = AlignPow2(CeilIntegerDiv(arena->committed - arena->pos + size, arena->commit_size) * arena->commit_size, PAGE_SIZE);
         if (amount_to_commit >= arena->reserved) {
             AssertAlways(!"Out grown arena size");
         }

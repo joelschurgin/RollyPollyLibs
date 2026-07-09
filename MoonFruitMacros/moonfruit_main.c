@@ -19,6 +19,10 @@
 #define func3(z) func2(z) * 10
 #define func(y)  (func3(y) + 3) * (3 no_params())
 
+#define test3(b) b
+#define test2(a) a * 2
+#define test1 test2(test3(5))
+
 #define my_exponent1 4e+3
 #define my_exponent2 4e3
 #define my_exponent3 4p-3

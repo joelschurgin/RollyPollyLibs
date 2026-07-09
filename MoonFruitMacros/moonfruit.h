@@ -139,32 +139,32 @@ typedef enum {
 
 String                 moonfruit_macro_format(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro, MoonFruit_MacroFormatFlag flags);
 
+typedef struct MoonFruit_TokenListNode MoonFruit_TokenListNode;
+struct MoonFruit_TokenListNode {
+    MoonFruit_TokenListNode* next;
+    MoonFruit_Token* token;
+};
+
 typedef MoonFruit_Token MoonFruit_Arg;
 
 DefineArray(MoonFruit_Arg);
 
 typedef struct {
-    u64 token_idx_first;
-    u64 token_idx_last;
+    MoonFruit_TokenListNode* first;
+    MoonFruit_TokenListNode* last;
     u64 macro_idx;
 } MoonFruit_ArgVal;
 
 DefineArray(MoonFruit_ArgVal);
 
-String                 moonfruit_macro_eval(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro, MoonFruit_ArgValArray arg_vals);
+typedef struct {
+    MoonFruit_TokenListNode* first;
+    MoonFruit_TokenListNode* last;
+    MoonFruit_ArgArray args;
+} MoonFruit_Expr;
 
-typedef struct MoonFruit_ExprTreeNode MoonFruit_ExprTreeNode;
-struct MoonFruit_ExprTreeNode {
-    MoonFruit_Token* token;
-    MoonFruit_ExprTreeNode* child;
-    MoonFruit_ExprTreeNode* sibling;
-    u64 macro_idx;
-};
-
-typedef MoonFruit_ExprTreeNode* MoonFruit_ExprTree;
-
-MoonFruit_ExprTree     moonfruit_macro_build_expr_tree(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro* macro, MoonFruit_ArgValArray arg_vals);
-MoonFruit_ExprTree     moonfruit_macro_build_expr_tree_no_args(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro* macro);
-String                 moonfruit_expr_tree_format(Arena* arena, MoonFruit_ExprTree tree);
+MoonFruit_Expr         moonfruit_macro_to_expr(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro, MoonFruit_ArgValArray arg_vals);
+MoonFruit_Expr         moonfruit_expr_eval(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Expr prev_expr, MoonFruit_ArgValArray arg_vals);
+String                 moonfruit_expr_format(Arena* arena, MoonFruit_Expr expr);
 
 #endif

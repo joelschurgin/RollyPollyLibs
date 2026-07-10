@@ -1,8 +1,5 @@
 #include "moonfruit.h"
 
-#include <termios.h>
-#include <sys/ioctl.h>
-
 #define BASE_ENTRY_POINT
 #include "base.h"
 
@@ -85,11 +82,23 @@ void* parallel_main(void* main_args) {
     }
     LaneSyncPtr(macro_info, 0);
 
+    // rewrite w gooey tui
+    if (LaneIdx() == 0) {
+        Arena* arena = LaneArena();
+        GooeyTuiBlock(arena, gt) {
+            gooey_tui_clear_screen(gt);
+            gooey_tui_output_string(gt, String("Hello World!"), .x = 0, .y = 0);
+        }
+    }
+    LaneSync();
+
+    return 0L;
+
     // basic user input
     if (LaneIdx() == 0) {
         struct termios old_term;
-        u64 w = 0;
-        u64 h = 0;
+        i32 w = 0;
+        i32 h = 0;
         DeferBlock({
             tcgetattr(STDIN_FILENO, &old_term);
  
@@ -111,7 +120,7 @@ void* parallel_main(void* main_args) {
             tcsetattr(STDIN_FILENO, TCSAFLUSH, &old_term);
         }) {
             printf("\033[H\033[2J");
-            printf("\033]12;#000000\007");
+            printf("\033[12;#000000\007");
 
             String input_str = EmptyString(LaneArena(), w);
             input_str.size = 0;

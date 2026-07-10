@@ -2,6 +2,7 @@
 #define MOONFRUIT_H
 
 #include "base.h"
+#include "gooey_tui.h"
 
 #define MOONFRUIT_CHUNK_SIZE 1024
 #define MOONFRUIT_DEFINITION_TREE_INIT_SIZE (u64)(('z' - 'a') + ('Z' - 'A') + 2)

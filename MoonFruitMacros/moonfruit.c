@@ -1,4 +1,5 @@
 #include "moonfruit.h"
+#include "gooey_tui.c"
 
 Implement_MoonFruit_ChunkQueue;
 

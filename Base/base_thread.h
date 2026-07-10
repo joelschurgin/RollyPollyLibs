@@ -65,10 +65,10 @@ struct ThreadCtx {
 extern ThreadCtx thread_ctx;
 
 #define LaneCtx()   ((LaneCtx *)pthread_getspecific(thread_ctx.key))
-#define LaneIdx()   LaneCtx()->lane_idx
+#define LaneIdx()   (LaneCtx()->lane_idx)
 #define LaneCount() thread_ctx.lanes.count
 #define LaneSync()  barrier_sync(&thread_ctx.barrier)
-#define LaneArena() LaneCtx()->arena
+#define LaneArena() (LaneCtx()->arena)
 
 void *lane_alloc(Arena *arena, u64 num_bytes, u64 src_lane_idx);
 void lane_sync_data(Arena *arena, void *data, u64 num_bytes, u64 src_lane_idx);

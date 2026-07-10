@@ -19,9 +19,20 @@
 #define func3(z) func2(z) * 10
 #define func(y)  (func3(y) + 3) * (3 no_params())
 
-#define test3(b) b
+#define test4(d, e) d / e
+#define test3(b, c) b + c
 #define test2(a) a * 2
-#define test1 test2(test3(5))
+//#define test test2(test3(5, test4(3, 4)))
+#define test test2(test3(5, 3))
+
+/*
+Outside in
+    test
+        => test2(test3(5, test4(3, 4)))
+        => test3(5, test4(3, 4)) * 2
+        => 5 + test4(3, 4) * 2
+        => 5 + 3 / 4 * 2
+*/
 
 #define my_exponent1 4e+3
 #define my_exponent2 4e3
@@ -37,7 +48,7 @@
                        1, \
                        2
 
-const u8 test[] = "#define skipping this string literal too";
+//const u8 test[] = "#define skipping this string literal too";
 
 void func_w_va_args(...) {
 
@@ -134,21 +145,23 @@ void* parallel_main(void* main_args) {
 
                     printf("\033[2J\033[H");
 
-                    MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, input_str);
-                    for (u64 idx = 0; idx < macros.count; idx++) {
-                        MoonFruit_Macro macro = macros.data[idx];
-                        String macro_name = moonfruit_macro_format(LaneArena(), macro_info, macro, MF_FORMAT_DEFINITION);
-                        printf("\r\n%.*s", macro_name.size, macro_name.str);
+                    TempArenaBlock(LaneArena()) {
+                        MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, input_str);
+                        for (u64 idx = 0; idx < macros.count; idx++) {
+                            MoonFruit_Macro macro = macros.data[idx];
+                            String macro_name = moonfruit_macro_format(LaneArena(), macro_info, macro, MF_FORMAT_DEFINITION);
+                            printf("\r\n%.*s", macro_name.size, macro_name.str);
 
-                        MoonFruit_ExprList expr_list = moonfruit_macro_eval(LaneArena(), macro_info, macro, (MoonFruit_ArgValArray){0});
+                            MoonFruit_ExprList expr_list = moonfruit_macro_eval(LaneArena(), macro_info, macro, (MoonFruit_ArgValArray){0});
 
-                        // format macro expansions
-                        MoonFruit_ExprNode* node = expr_list.first;
-                        while (node) {
-                            String macro_eval = moonfruit_expr_format(LaneArena(), node->expr);
-                            printf("\r\n => %.*s", macro_eval.size, macro_eval.str);
-                            if (node == expr_list.last) break;
-                            node = node->next;
+                            // format macro expansions
+                            MoonFruit_ExprNode* node = expr_list.first;
+                            while (node) {
+                                String macro_eval = moonfruit_expr_format(LaneArena(), node->expr);
+                                printf("\r\n => %.*s", macro_eval.size, macro_eval.str);
+                                if (node == expr_list.last) break;
+                                node = node->next;
+                            }
                         }
                     }
 

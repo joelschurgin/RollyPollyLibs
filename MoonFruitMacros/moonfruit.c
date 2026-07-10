@@ -768,6 +768,22 @@ String moonfruit_macro_format(Arena* arena, MoonFruit_MacroInfo* macro_info, Moo
     return macro_formatted;
 }
 
+#define NODE_NEXT_DEBUG node = node->next;// if (node && node->token) printf("\r\nline: %llu | token: %.*s", __LINE__, node->token->data.size, node->token->data.str);
+
+internal u64 _moonfruit_macro_count_args(MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro) {
+    u64 num_args = 0;
+    if (!macro.has_args) return 0;
+
+    MoonFruit_Token token = {0};
+    for (u64 token_idx = macro.token_idx_first + 2; token_idx <= macro.token_idx_last; token_idx++) {
+        token = macro_info->tokens.data[token_idx];
+        if (token.data.str[0] == ')') return num_args;
+        if (token.data.str[0] != ',') num_args++;
+    }
+
+    return num_args;
+}
+
 internal MoonFruit_ArgArray _moonfruit_macro_build_arg_array(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro* macro, u64* next_token_idx) {
     u64 token_idx = macro->token_idx_first + 1;
     MoonFruit_Token token = {0};
@@ -820,7 +836,7 @@ internal void _moonfruit_expr_push_arg_val(Arena* arena, MoonFruit_MacroInfo* ma
     while (node) {
         _moonfruit_expr_push_token(arena, expr, node->token);
         if (node == arg_val.last) return;
-        node = node->next;
+        NODE_NEXT_DEBUG
     }
 }
 
@@ -850,49 +866,79 @@ MoonFruit_Expr moonfruit_macro_to_expr(Arena* arena, MoonFruit_MacroInfo* macro_
     return expr;
 }
 
-internal MoonFruit_ArgValArray _moonfruit_expr_find_arg_vals(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_TokenNode** start_node) {
-    MoonFruit_ArgValArray arg_vals;
-    MoonFruit_TokenNode* node = *start_node;
+internal MoonFruit_ArgValArray _moonfruit_expr_find_arg_vals(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro, MoonFruit_TokenNode** curr_node, b32 save_arg_vals);
 
-    ArrayBuilderBlock(arena, arg_vals, MoonFruit_ArgVal) {
-        if (!node) break;
+internal void _moonfruit_expr_skip_nested_macro(MoonFruit_MacroInfo* macro_info, MoonFruit_Macro nested_macro, MoonFruit_TokenNode** curr_node) {
+    (void)_moonfruit_expr_find_arg_vals(0L, macro_info, nested_macro, curr_node, false);
+}
 
-        if (!node->next) break;
-        if (node->token->data.str[0] == '(' && node->next->token && node->next->token->data.str[0] == ')') {
-            node = node->next;
-            if (node->next) node = node->next;
-            break;
+/*
+Outside in
+test
+    => test2(test3(5, test4(3, 4)))
+    => test3(5, test4(3, 4)) * 2
+    => 5 + test4(3, 4) * 2
+    => 5 + 3 / 4 * 2
+*/
+
+internal MoonFruit_ArgValArray _moonfruit_expr_find_arg_vals(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro, MoonFruit_TokenNode** curr_node, b32 save_arg_vals) {
+    MoonFruit_ArgValArray arg_vals = {0};
+    if (macro.type == MF_IGNORE) return arg_vals;
+
+    MoonFruit_TokenNode* node = *curr_node;
+
+    if (!macro.has_args) {
+        if (node) NODE_NEXT_DEBUG
+        goto _moonfruit_expr_find_arg_vals_return;
+    }
+
+    u64 num_args = _moonfruit_macro_count_args(macro_info, macro);
+    if (num_args == 0) {
+        while (node && node->token && node->token->data.str[0] != ')') {
+            NODE_NEXT_DEBUG
         }
-        node = node->next;
+        goto _moonfruit_expr_find_arg_vals_return;
+    }
 
-        i32 num_paren = 0;
-        array_builder_push(arena, arg_vals, (MoonFruit_ArgVal){0});
-        ArrayLast(arg_vals).first = node;
-        MoonFruit_TokenNode* prev = node;
-        while (node) {
-            if (node->token) {
-                num_paren += (node->token->data.str[0] == '(') - (node->token->data.str[0] == ')');
+    if (save_arg_vals) arg_vals = Array(arena, MoonFruit_ArgVal, num_args);
+
+    while (node && node->token && node->token->data.str[0] != '(') {
+        NODE_NEXT_DEBUG
+    }
+    if (node) NODE_NEXT_DEBUG
+
+    for (u64 arg_idx = 0; arg_idx < num_args; arg_idx++) {
+        u8 delimiter = (arg_idx == num_args-1) ? ')' : ',';
+
+        if (save_arg_vals) arg_vals.data[arg_idx].first = node;
+
+        while (node && node->token) {
+            if (node->token->type == MF_TOKEN_IDENTIFIER) {
+                MoonFruit_Macro nested_macro = moonfruit_macro_find(macro_info, node->token->data);
+                if (nested_macro.type != MF_IGNORE) {
+                    _moonfruit_expr_skip_nested_macro(macro_info, nested_macro, &node);
+                    if (save_arg_vals) {
+                        arg_vals.data[arg_idx].last = node;
+                    }
+                    NODE_NEXT_DEBUG
+                    continue;
+                }
             }
 
-            if (num_paren <= 0) {
-                ArrayLast(arg_vals).last = prev;
-                if (node->next) node = node->next;
-                break;
+            if (node->token->data.str[0] == delimiter) break;
+            if (save_arg_vals) {
+                arg_vals.data[arg_idx].last = node;
             }
 
-            if (node->token->data.str[0] == ',') {
-                ArrayLast(arg_vals).last = prev;
-                array_builder_push(arena, arg_vals, (MoonFruit_ArgVal){0});
-                node = node->next;
-                ArrayLast(arg_vals).first = node;
-            }
-
-            prev = node;
-            node = node->next;
+            NODE_NEXT_DEBUG
+        }
+        if (node && node->token && node->token->data.str[0] == ',') {
+            NODE_NEXT_DEBUG
         }
     }
-    *start_node = node;
 
+_moonfruit_expr_find_arg_vals_return:
+    *curr_node = node;
     return arg_vals;
 }
 
@@ -923,14 +969,10 @@ internal MoonFruit_TokenNode* _moonfruit_expr_eval_token(Arena* arena, MoonFruit
 
     next_expr->depends_on_other_macros = true;
 
-    if (!node->next) return node;
-    node = node->next;
-
-    MoonFruit_ArgValArray macro_arg_vals = _moonfruit_expr_find_arg_vals(arena, macro_info, &node);
+    MoonFruit_ArgValArray macro_arg_vals = _moonfruit_expr_find_arg_vals(arena, macro_info, macro, &node, true);
     MoonFruit_Expr macro_expr = moonfruit_macro_to_expr(arena, macro_info, macro, macro_arg_vals);
 
     if (!macro_expr.first) {
-        _moonfruit_expr_push_token(arena, next_expr, node->token);
         return node;
     }
 
@@ -953,7 +995,7 @@ MoonFruit_Expr moonfruit_expr_eval(Arena* arena, MoonFruit_MacroInfo* macro_info
 
     while (node) {
         node = _moonfruit_expr_eval_token(arena, macro_info, prev_expr, &next_expr, arg_vals, node);
-        node = node->next;
+        if (node) NODE_NEXT_DEBUG
     }
 
     return next_expr;
@@ -967,11 +1009,56 @@ String moonfruit_expr_format(Arena* arena, MoonFruit_Expr expr) {
             if (node->token) {
                 string_builder_append(arena, &expr_str, node->token->data);
             }
+            if (node == expr.last) break;
             node = node->next;
         }
     }
 
     return expr_str;
+}
+
+void moonfruit_arg_val_print(MoonFruit_ArgVal arg_val) {
+    MoonFruit_TokenNode* node = arg_val.first;
+    printf("\r\nMacro arg val: ");
+    while (node) {
+        if (node->token) {
+            printf("%.*s", node->token->data.size, node->token->data.str);
+        }
+        if (node == arg_val.last) break;
+        node = node->next;
+    }
+    printf("\r\n\r\n");
+}
+
+void moonfruit_arg_val_print_all(MoonFruit_ArgValArray arg_vals) {
+    for (u64 arg_idx = 0; arg_idx < arg_vals.count; arg_idx++) {
+        moonfruit_arg_val_print(arg_vals.data[arg_idx]);
+    }
+}
+
+
+void moonfruit_expr_print(MoonFruit_Expr expr) {
+    MoonFruit_TokenNode* node = expr.first;
+    printf("\r\nMacro Expr: ");
+    while (node) {
+        if (node->token) {
+            printf("%.*s", node->token->data.size, node->token->data.str);
+        }
+        if (node == expr.last) break;
+        node = node->next;
+    }
+    printf("\r\n\r\n");
+}
+
+void moonfruit_chain_print(MoonFruit_TokenNode* node) {
+    printf("\r\nChain: ");
+    while (node) {
+        if (node->token) {
+            printf("%.*s", node->token->data.size, node->token->data.str);
+        }
+        node = node->next;
+    }
+    printf("\r\n\r\n");
 }
 
 MoonFruit_ExprList moonfruit_macro_eval(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro, MoonFruit_ArgValArray arg_vals) {
@@ -984,6 +1071,7 @@ MoonFruit_ExprList moonfruit_macro_eval(Arena* arena, MoonFruit_MacroInfo* macro
 
     MoonFruit_Expr curr_expr;
     curr_expr = moonfruit_expr_eval(LaneArena(), macro_info, new_node->expr, (MoonFruit_ArgValArray){0});
+
     while (curr_expr.depends_on_other_macros) {
         new_node = push_struct(arena, MoonFruit_ExprNode);
         new_node->expr = curr_expr;

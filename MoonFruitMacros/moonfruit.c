@@ -768,8 +768,6 @@ String moonfruit_macro_format(Arena* arena, MoonFruit_MacroInfo* macro_info, Moo
     return macro_formatted;
 }
 
-#define NODE_NEXT_DEBUG node = node->next;// if (node && node->token) printf("\r\nline: %llu | token: %.*s", __LINE__, node->token->data.size, node->token->data.str);
-
 internal u64 _moonfruit_macro_count_args(MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro) {
     u64 num_args = 0;
     if (!macro.has_args) return 0;
@@ -836,7 +834,7 @@ internal void _moonfruit_expr_push_arg_val(Arena* arena, MoonFruit_MacroInfo* ma
     while (node) {
         _moonfruit_expr_push_token(arena, expr, node->token);
         if (node == arg_val.last) return;
-        NODE_NEXT_DEBUG
+        node = node->next;
     }
 }
 
@@ -872,15 +870,6 @@ internal void _moonfruit_expr_skip_nested_macro(MoonFruit_MacroInfo* macro_info,
     (void)_moonfruit_expr_find_arg_vals(0L, macro_info, nested_macro, curr_node, false);
 }
 
-/*
-Outside in
-test
-    => test2(test3(5, test4(3, 4)))
-    => test3(5, test4(3, 4)) * 2
-    => 5 + test4(3, 4) * 2
-    => 5 + 3 / 4 * 2
-*/
-
 internal MoonFruit_ArgValArray _moonfruit_expr_find_arg_vals(Arena* arena, MoonFruit_MacroInfo* macro_info, MoonFruit_Macro macro, MoonFruit_TokenNode** curr_node, b32 save_arg_vals) {
     MoonFruit_ArgValArray arg_vals = {0};
     if (macro.type == MF_IGNORE) return arg_vals;
@@ -888,14 +877,14 @@ internal MoonFruit_ArgValArray _moonfruit_expr_find_arg_vals(Arena* arena, MoonF
     MoonFruit_TokenNode* node = *curr_node;
 
     if (!macro.has_args) {
-        if (node) NODE_NEXT_DEBUG
+        if (node) node = node->next;
         goto _moonfruit_expr_find_arg_vals_return;
     }
 
     u64 num_args = _moonfruit_macro_count_args(macro_info, macro);
     if (num_args == 0) {
         while (node && node->token && node->token->data.str[0] != ')') {
-            NODE_NEXT_DEBUG
+            node = node->next;
         }
         goto _moonfruit_expr_find_arg_vals_return;
     }
@@ -903,9 +892,9 @@ internal MoonFruit_ArgValArray _moonfruit_expr_find_arg_vals(Arena* arena, MoonF
     if (save_arg_vals) arg_vals = Array(arena, MoonFruit_ArgVal, num_args);
 
     while (node && node->token && node->token->data.str[0] != '(') {
-        NODE_NEXT_DEBUG
+        node = node->next;
     }
-    if (node) NODE_NEXT_DEBUG
+    if (node) node = node->next;
 
     for (u64 arg_idx = 0; arg_idx < num_args; arg_idx++) {
         u8 delimiter = (arg_idx == num_args-1) ? ')' : ',';
@@ -920,7 +909,7 @@ internal MoonFruit_ArgValArray _moonfruit_expr_find_arg_vals(Arena* arena, MoonF
                     if (save_arg_vals) {
                         arg_vals.data[arg_idx].last = node;
                     }
-                    NODE_NEXT_DEBUG
+                    node = node->next;
                     continue;
                 }
             }
@@ -930,10 +919,10 @@ internal MoonFruit_ArgValArray _moonfruit_expr_find_arg_vals(Arena* arena, MoonF
                 arg_vals.data[arg_idx].last = node;
             }
 
-            NODE_NEXT_DEBUG
+            node = node->next;
         }
         if (node && node->token && node->token->data.str[0] == ',') {
-            NODE_NEXT_DEBUG
+            node = node->next;
         }
     }
 
@@ -995,7 +984,7 @@ MoonFruit_Expr moonfruit_expr_eval(Arena* arena, MoonFruit_MacroInfo* macro_info
 
     while (node) {
         node = _moonfruit_expr_eval_token(arena, macro_info, prev_expr, &next_expr, arg_vals, node);
-        if (node) NODE_NEXT_DEBUG
+        if (node) node = node->next;
     }
 
     return next_expr;

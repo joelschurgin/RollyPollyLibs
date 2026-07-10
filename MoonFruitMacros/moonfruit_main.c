@@ -22,17 +22,7 @@
 #define test4(d, e) d / e
 #define test3(b, c) b + c
 #define test2(a) a * 2
-//#define test test2(test3(5, test4(3, 4)))
-#define test test2(test3(5, 3))
-
-/*
-Outside in
-    test
-        => test2(test3(5, test4(3, 4)))
-        => test3(5, test4(3, 4)) * 2
-        => 5 + test4(3, 4) * 2
-        => 5 + 3 / 4 * 2
-*/
+#define test test2(test3(5, test4(3, 4)))
 
 #define my_exponent1 4e+3
 #define my_exponent2 4e3

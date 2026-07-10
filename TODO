@@ -1,6 +1,18 @@
 TODO:
-1)  Evaluates expression, need to save intermediate states
-2)  Keep track of line numbers
-3)  Chain of macro definitions
-4)  Fuzzy find capital and lowercase letters? For instance B and b don't show the same macros
-
+=> Create TUI library and replace elements in moonfruit_main.c (can be incomplete, but should replace all printf statments in moonfruit_main.c)
+=> Add more actions. Some ideas are...
+    => Arrow keys to navigate macros, view all definitions and expansions (color code)
+    => Space is goto line number (useful once keeping track of line numbers)
+=> Keep track of line numbers
+    1) Mark line numbers in each chunk
+    2) Combine line numbers when merging chunk data
+    3) Display source code
+=> Parse includes
+=> Parse commandline args
+    => Arg Ideas:
+        => Directory of source code
+        => Single file path
+        => -j# and --num-procs=# for number of threads (also worth printing max # of threads if entering too many)
+    => Add a bash file to test moonfruit with a specific set of args
+=> Chain of macro definitions
+=> Fuzzy find capital and lowercase letters? For instance B and b don't show the same macros

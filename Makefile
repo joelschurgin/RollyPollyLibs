@@ -1,7 +1,7 @@
 .PHONY: all base misty test clean
 
 #all: base misty moonfruit graphics gooey_tui test
-all: moonfruit
+all: base misty 
 
 base:
 	./Base/build.sh

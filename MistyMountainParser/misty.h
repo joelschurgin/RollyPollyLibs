@@ -46,9 +46,9 @@ typedef struct {
     ElfType type;
     ElfEndian endian;
 
-    u64 debug_macro;
     u64 debug_str;
     u64 debug_str_offsets;
+    u64 debug_line;
 
     MistyMountain_SectionArray sections;
 } MistyMountain;
@@ -72,15 +72,5 @@ void misty_read_elf_section_headers(MistyMountain* mountain, File* f, MistyMount
 // ubyte = u8
 // uhalf = u16
 // uword = u32
-
-typedef struct {
-    u16 version;
-    u8 flags;
-    u64 debug_line_offset;
-
-    u8 address_size_bytes;
-} MistyMountain_MacroHeader;
-
-void misty_macros(MistyMountain* mountain, File* f);
 
 #endif

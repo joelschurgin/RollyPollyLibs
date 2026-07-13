@@ -35,7 +35,7 @@ void* parallel_main(void* main_args) {
 
     LaneSync();
     if (LaneIdx() == 0) {
-        misty_macros(mountain, f);
+
     }
 }
 

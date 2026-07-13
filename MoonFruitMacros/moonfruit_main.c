@@ -87,7 +87,62 @@ void* parallel_main(void* main_args) {
         Arena* arena = LaneArena();
         GooeyTuiBlock(arena, gt) {
             gooey_tui_clear_screen(gt);
-            gooey_tui_output_string(gt, String("Hello World!"), .x = 0, .y = 0);
+
+            String input_str = EmptyString(LaneArena(), gt->w);
+            input_str.size = 0;
+
+            u8 c[4] = {0};
+            printf("\033[H\033[30;42m");
+            //gooey_tui_write(gt, String("_"), .num_repeats = gt->w, .flush = true);
+            for (i32 i = 0; i < gt->w; i++) printf(" ");
+            printf("\033[HInput: \033[0m");
+            while (c[0] != '\033') {
+                fflush(stdout);
+                i32 num_read = read(STDIN_FILENO, c, 4);
+                if (num_read == 1) {
+                    if (c[0] == '\033') break;
+                    if (c[0] == 0x7f) { // backspace
+                        input_str = string_chop(input_str, 1);
+                    } else {
+                        if (!(char_is_alpha(*c) || char_is_digit(*c, 10) || *c == '_')) continue;
+                        Assert(input_str.size < gt->w);
+                        input_str.str[input_str.size++] = c[0];
+                    }
+
+                    gooey_tui_clear_screen(gt);
+
+                    TempArenaBlock(LaneArena()) {
+                        MoonFruit_MacroArray macros = moonfruit_macro_match(LaneArena(), macro_info, input_str);
+                        for (u64 idx = 0; idx < macros.count; idx++) {
+                            MoonFruit_Macro macro = macros.data[idx];
+                            String macro_name = moonfruit_macro_format(LaneArena(), macro_info, macro, MF_FORMAT_DEFINITION);
+                            printf("\r\n%.*s", macro_name.size, macro_name.str);
+
+                            MoonFruit_ExprList expr_list = moonfruit_macro_eval(LaneArena(), macro_info, macro, (MoonFruit_ArgValArray){0});
+
+                            // format macro expansions
+                            MoonFruit_ExprNode* node = expr_list.first;
+                            while (node) {
+                                String macro_eval = moonfruit_expr_format(LaneArena(), node->expr);
+                                printf("\r\n => %.*s", macro_eval.size, macro_eval.str);
+                                if (node == expr_list.last) break;
+                                node = node->next;
+                            }
+                        }
+                    }
+
+                    printf("\033[H\033[30;42m");
+                    for (i32 i = 0; i < gt->w; i++) printf(" ");
+                    //gooey_tui_write(gt, String("_"), .num_repeats = gt->w, .flush = true);
+                    printf("\033[HInput: ");
+
+                    printf("%.*s", input_str.size, input_str.str);
+                    printf("\033[0m");
+                } else if (num_read > 1) {
+                    break;
+                }
+            }
+
         }
     }
     LaneSync();

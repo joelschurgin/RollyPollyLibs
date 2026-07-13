@@ -20,11 +20,12 @@ void        gooey_tui_release(GooeyTui** gt);
 typedef struct {
     i64 x;
     i64 y;
+    u64 num_repeats;
     b32 flush;
-} GooeyTui_OutputString_Params;
-void        gooey_tui_output_string_(GooeyTui* gt, String str, GooeyTui_OutputString_Params* params);
-#define     gooey_tui_output_string(gt, str, ...) \
-    gooey_tui_output_string_(gt, str, &(GooeyTui_OutputString_Params){ .x = -1, .y = -1, .flush = false, __VA_ARGS__ })
+} GooeyTui_Write_Params;
+void        gooey_tui_write_(GooeyTui* gt, String str, GooeyTui_Write_Params* params);
+#define     gooey_tui_write(gt, str, ...) \
+    gooey_tui_write_(gt, str, &(GooeyTui_Write_Params){ .x = -1, .y = -1, .flush = false, .num_repeats = 1, __VA_ARGS__ })
 
 void        gooey_tui_clear_screen(GooeyTui* gt);
 void        gooey_tui_move_cursor(GooeyTui* gt, i32 x, i32 y);

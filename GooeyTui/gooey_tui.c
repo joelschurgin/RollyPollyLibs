@@ -35,25 +35,28 @@ void gooey_tui_release(GooeyTui** gt) {
     //printf("\033[2J\033[H");
     //printf("\033]112\007");
     //printf("\033[0m");
-    fflush(stdout);
+    gooey_tui_clear_screen(*gt);
 
     tcsetattr(STDIN_FILENO, TCSAFLUSH, &((*gt)->old_terminal));
 
     *gt = 0L;
 }
 
-internal void _gooey_tui_output_string(String str) {
+internal void _gooey_tui_write(String str) {
     AssertAlways(write(STDOUT_FILENO, str.str, str.size) == (i64)str.size);
 }
 
-void gooey_tui_output_string_(GooeyTui* gt, String str, GooeyTui_OutputString_Params* params) {
+void gooey_tui_write_(GooeyTui* gt, String str, GooeyTui_Write_Params* params) {
     gooey_tui_move_cursor(gt, params->x, params->y);
-    _gooey_tui_output_string(str);
+
+    for (u64 repeat = 0; repeat < params->num_repeats; repeat++)
+        _gooey_tui_write(str);
+
     if (params->flush) fflush(stdout);
 }
 
 void gooey_tui_clear_screen(GooeyTui* gt) {
-    gooey_tui_output_string(gt, String("\033[2J\033[H"), .flush = true);
+    gooey_tui_write(gt, String("\033[2J\033[H"), .flush = true);
 }
 
 void gooey_tui_move_cursor(GooeyTui* gt, i32 x, i32 y) {
@@ -61,6 +64,6 @@ void gooey_tui_move_cursor(GooeyTui* gt, i32 x, i32 y) {
 
     TempArenaBlock(gt->arena) {
         String cursor_pos = string_format(gt->arena, "\033[%d;%dH", y+1, x+1);
-        gooey_tui_output_string(gt, cursor_pos, .flush = false);
+        gooey_tui_write(gt, cursor_pos, .flush = false);
     }
 }

@@ -32,7 +32,7 @@
 
 /* DWARF Unit Header Types.  */
 enum
-  {
+{
     DW_UT_compile = 0x01,
     DW_UT_type = 0x02,
     DW_UT_partial = 0x03,
@@ -42,11 +42,10 @@ enum
 
     DW_UT_lo_user = 0x80,
     DW_UT_hi_user = 0xff
-  };
+};
 
 /* DWARF tags.  */
-enum
-  {
+typedef enum {
     DW_TAG_array_type = 0x01,
     DW_TAG_class_type = 0x02,
     DW_TAG_entry_point = 0x03,
@@ -140,20 +139,20 @@ enum
     DW_TAG_GNU_call_site_parameter = 0x410a,
 
     DW_TAG_hi_user = 0xffff
-  };
+} DwarfTagType;
 
 
 /* Children determination encodings.  */
 enum
-  {
+{
     DW_CHILDREN_no = 0,
     DW_CHILDREN_yes = 1
-  };
+};
 
 
 /* DWARF attributes encodings.  */
 enum
-  {
+{
     DW_AT_sibling = 0x01,
     DW_AT_location = 0x02,
     DW_AT_name = 0x03,
@@ -363,7 +362,7 @@ enum
     DW_AT_GNU_bias = 0x2305,
 
     DW_AT_hi_user = 0x3fff
-  };
+};
 
 /* Old unofficially attribute names.  Should not be used.
    Will not appear in known-dwarf.h  */
@@ -376,8 +375,7 @@ enum
 #define DW_AT_member		0x14
 
 /* DWARF form encodings.  */
-enum
-  {
+typedef enum {
     DW_FORM_addr = 0x01,
     DW_FORM_block2 = 0x03,
     DW_FORM_block4 = 0x04,
@@ -428,12 +426,12 @@ enum
 
     DW_FORM_GNU_ref_alt = 0x1f20, /* offset in alternate .debuginfo.  */
     DW_FORM_GNU_strp_alt = 0x1f21 /* offset in alternate .debug_str. */
-  };
+} DwarfFormType;
 
 
 /* DWARF location operation encodings.  */
 enum
-  {
+{
     DW_OP_addr = 0x03,		/* Constant address.  */
     DW_OP_deref = 0x06,
     DW_OP_const1u = 0x08,	/* Unsigned 1-byte constant.  */
@@ -621,12 +619,12 @@ enum
 
     DW_OP_lo_user = 0xe0,	/* Implementation-defined range start.  */
     DW_OP_hi_user = 0xff	/* Implementation-defined range end.  */
-  };
+};
 
 
 /* DWARF base type encodings.  */
 enum
-  {
+{
     DW_ATE_void = 0x0,
     DW_ATE_address = 0x1,
     DW_ATE_boolean = 0x2,
@@ -649,57 +647,57 @@ enum
 
     DW_ATE_lo_user = 0x80,
     DW_ATE_hi_user = 0xff
-  };
+};
 
 
 /* DWARF decimal sign encodings.  */
 enum
-  {
+{
     DW_DS_unsigned = 1,
     DW_DS_leading_overpunch = 2,
     DW_DS_trailing_overpunch = 3,
     DW_DS_leading_separate = 4,
     DW_DS_trailing_separate = 5,
-  };
+};
 
 
 /* DWARF endianity encodings.  */
 enum
-  {
+{
     DW_END_default = 0,
     DW_END_big = 1,
     DW_END_little = 2,
 
     DW_END_lo_user = 0x40,
     DW_END_hi_user = 0xff
-  };
+};
 
 
 /* DWARF accessibility encodings.  */
 enum
-  {
+{
     DW_ACCESS_public = 1,
     DW_ACCESS_protected = 2,
     DW_ACCESS_private = 3
-  };
+};
 
 
 /* DWARF visibility encodings.  */
 enum
-  {
+{
     DW_VIS_local = 1,
     DW_VIS_exported = 2,
     DW_VIS_qualified = 3
-  };
+};
 
 
 /* DWARF virtuality encodings.  */
 enum
-  {
+{
     DW_VIRTUALITY_none = 0,
     DW_VIRTUALITY_virtual = 1,
     DW_VIRTUALITY_pure_virtual = 2
-  };
+};
 
 
 /* DWARF language encodings.
@@ -708,7 +706,7 @@ enum
    after DWARF5 was published (but before DWARF6 has been released,
    which will introduce a new DW_AT_language_name/version scheme).  */
 enum
-  {
+{
     DW_LANG_C89 = 0x0001,	     /* ISO C:1989 */
     DW_LANG_C = 0x0002,		     /* C */
     DW_LANG_Ada83 = 0x0003,	     /* ISO Ada:1983 */
@@ -782,14 +780,14 @@ enum
     DW_LANG_lo_user = 0x8000,
     DW_LANG_Mips_Assembler = 0x8001, /* Assembler */
     DW_LANG_hi_user = 0xffff
-  };
+};
 
 /* Old (typo) '1' != 'I'.  */
 #define DW_LANG_PL1 DW_LANG_PLI
 
 /* https://dwarfstd.org/languages-v6.html  */
 enum
-  {
+{
     DW_LNAME_Ada = 0x0001,
     DW_LNAME_BLISS = 0x0002,
     DW_LNAME_C = 0x0003,
@@ -840,16 +838,16 @@ enum
 
     DW_LNAME_lo_user = 0x8000,
     DW_LNAME_hi_user = 0xffff
-  };
+};
 
 /* DWARF identifier case encodings.  */
 enum
-  {
+{
     DW_ID_case_sensitive = 0,
     DW_ID_up_case = 1,
     DW_ID_down_case = 2,
     DW_ID_case_insensitive = 3
-  };
+};
 
 
 /* DWARF calling conventions encodings.
@@ -857,7 +855,7 @@ enum
    (normal, program or nocall) or structures, unions and class types
    (normal, reference or value).  */
 enum
-  {
+{
     DW_CC_normal = 0x1,
     DW_CC_program = 0x2,
     DW_CC_nocall = 0x3,
@@ -865,45 +863,45 @@ enum
     DW_CC_pass_by_value = 0x5,
     DW_CC_lo_user = 0x40,
     DW_CC_hi_user = 0xff
-  };
+};
 
 
 /* DWARF inline encodings.  */
 enum
-  {
+{
     DW_INL_not_inlined = 0,
     DW_INL_inlined = 1,
     DW_INL_declared_not_inlined = 2,
     DW_INL_declared_inlined = 3
-  };
+};
 
 
 /* DWARF ordering encodings.  */
 enum
-  {
+{
     DW_ORD_row_major = 0,
     DW_ORD_col_major = 1
-  };
+};
 
 
 /* DWARF discriminant descriptor encodings.  */
 enum
-  {
+{
     DW_DSC_label = 0,
     DW_DSC_range = 1
-  };
+};
 
 /* DWARF defaulted member function encodings.  */
 enum
-  {
+{
     DW_DEFAULTED_no = 0,
     DW_DEFAULTED_in_class = 1,
     DW_DEFAULTED_out_of_class = 2
-  };
+};
 
 /* DWARF line content descriptions.  */
 enum
-  {
+{
     DW_LNCT_path = 0x1,
     DW_LNCT_directory_index = 0x2,
     DW_LNCT_timestamp = 0x3,
@@ -911,11 +909,11 @@ enum
     DW_LNCT_MD5 = 0x5,
     DW_LNCT_lo_user = 0x2000,
     DW_LNCT_hi_user = 0x3fff
-  };
+};
 
 /* DWARF standard opcode encodings.  */
 enum
-  {
+{
     DW_LNS_copy = 1,
     DW_LNS_advance_pc = 2,
     DW_LNS_advance_line = 3,
@@ -928,12 +926,12 @@ enum
     DW_LNS_set_prologue_end = 10,
     DW_LNS_set_epilogue_begin = 11,
     DW_LNS_set_isa = 12
-  };
+};
 
 
 /* DWARF extended opcode encodings.  */
 enum
-  {
+{
     DW_LNE_end_sequence = 1,
     DW_LNE_set_address = 2,
     DW_LNE_define_file = 3,
@@ -945,23 +943,23 @@ enum
     DW_LNE_NVIDIA_set_function_name = 145,
 
     DW_LNE_hi_user = 255
-  };
+};
 
 
 /* DWARF macinfo type encodings.  */
 enum
-  {
+{
     DW_MACINFO_define = 1,
     DW_MACINFO_undef = 2,
     DW_MACINFO_start_file = 3,
     DW_MACINFO_end_file = 4,
     DW_MACINFO_vendor_ext = 255
-  };
+};
 
 
 /* DWARF debug_macro type encodings.  */
 enum
-  {
+{
     DW_MACRO_define = 0x01,
     DW_MACRO_undef = 0x02,
     DW_MACRO_start_file = 0x03,
@@ -976,7 +974,7 @@ enum
     DW_MACRO_undef_strx = 0x0c,
     DW_MACRO_lo_user = 0xe0,
     DW_MACRO_hi_user = 0xff
-  };
+};
 
 /* Old GNU extension names for DWARF5 debug_macro type encodings.
    There are no equivalents for the supplementary object file (sup)
@@ -994,7 +992,7 @@ enum
 
 /* Range list entry encoding.  */
 enum
-  {
+{
     DW_RLE_end_of_list = 0x0,
     DW_RLE_base_addressx = 0x1,
     DW_RLE_startx_endx = 0x2,
@@ -1003,12 +1001,12 @@ enum
     DW_RLE_base_address = 0x5,
     DW_RLE_start_end = 0x6,
     DW_RLE_start_length = 0x7
-  };
+};
 
 
 /* Location list entry encoding.  */
 enum
-  {
+{
     DW_LLE_end_of_list = 0x0,
     DW_LLE_base_addressx = 0x1,
     DW_LLE_startx_endx = 0x2,
@@ -1018,12 +1016,12 @@ enum
     DW_LLE_base_address = 0x6,
     DW_LLE_start_end = 0x7,
     DW_LLE_start_length = 0x8
-  };
+};
 
 
 /* GNU DebugFission list entry encodings (.debug_loc.dwo).  */
 enum
-  {
+{
     DW_LLE_GNU_end_of_list_entry = 0x0,
     DW_LLE_GNU_base_address_selection_entry = 0x1,
     DW_LLE_GNU_start_end_entry = 0x2,
@@ -1032,11 +1030,11 @@ enum
     // http://www.fsfla.org/~lxoliva/papers/sfn/dwarf6-sfn-lvu.txt
     // https://dwarfstd.org/ShowIssue.php?issue=170427.1
     DW_LLE_GNU_view_pair = 0x9
-  };
+};
 
 /* DWARF5 package file section identifiers.  */
 enum
-  {
+{
     DW_SECT_INFO = 1,
     DW_SECT_TYPES = 2, /* Only DWARF4 GNU DebugFission. Reserved in DWARF5.  */
     DW_SECT_ABBREV = 3,
@@ -1045,12 +1043,12 @@ enum
     DW_SECT_STR_OFFSETS = 6,
     DW_SECT_MACRO = 7,
     DW_SECT_RNGLISTS = 8,
-  };
+};
 
 
 /* DWARF call frame instruction encodings.  */
 enum
-  {
+{
     DW_CFA_advance_loc = 0x40,
     DW_CFA_offset = 0x80,
     DW_CFA_restore = 0xc0,
@@ -1087,19 +1085,19 @@ enum
     DW_CFA_GNU_args_size = 0x2e,
     DW_CFA_GNU_negative_offset_extended = 0x2f,
     DW_CFA_high_user = 0x3f
-  };
+};
 
 /* ID indicating CIE as opposed to FDE in .debug_frame.  */
 enum
-  {
+{
     DW_CIE_ID_32 = 0xffffffffU,		 /* In 32-bit format CIE header.  */
     DW_CIE_ID_64 = 0xffffffffffffffffULL /* In 64-bit format CIE header.  */
-  };
+};
 
 
 /* Information for GNU unwind information.  */
 enum
-  {
+{
     DW_EH_PE_absptr = 0x00,
     DW_EH_PE_omit = 0xff,
 
@@ -1122,7 +1120,7 @@ enum
     DW_EH_PE_aligned = 0x50,
 
     DW_EH_PE_indirect = 0x80
-  };
+};
 
 
 /* DWARF XXX.  */

@@ -25,6 +25,7 @@ void file_open(File* f, FileFlag flag);
 void file_close(File* f);
 
 void file_read_bytes(File* f, u64 file_pos, void* buf, u64 num_bytes_to_read);
+String file_read_cstring_no_copy(File* f, u64 file_pos, u64* num_bytes_read);
 String file_read_cstring(Arena* arena, File* f, u64 file_pos, u64* num_bytes_read);
 
 #define FileBlock(arena, path, flag, file_ptr_name) \

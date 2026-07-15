@@ -80,6 +80,8 @@ typedef struct {
 typedef struct {
     String file_name;
     u64 dir_idx;
+    u64 timestamp;
+    u64 size;
 } Misty_FilePath;
 
 DefineArray(Misty_FilePath);

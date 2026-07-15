@@ -55,12 +55,12 @@ i32 main(i32 argc, u8** argv) {
     u8* test_execs[] = {
         //"test32_dwarf2",
         //"test32_dwarf3",
-        //"test32_dwarf4",
+        "test32_dwarf4",
         //"test32_dwarf5",
         //"test64_dwarf2",
         //"test64_dwarf3",
         //"test64_dwarf4",
-        "test64_dwarf5",
+        //"test64_dwarf5",
     };
 
     for (u64 i = 0; i < sizeof(test_execs)/sizeof(*test_execs); i++) {

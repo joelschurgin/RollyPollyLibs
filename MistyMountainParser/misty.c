@@ -102,6 +102,13 @@ internal String DwarfSectionRead_String(Arena* arena, File* f, Misty_Section* se
     return s;
 }
 
+internal String DwarfSectionRead_String_no_copy(File* f, Misty_Section* section) {
+    u64 num_bytes_read = 0;
+    String s = file_read_cstring_no_copy(f, section->offset + section->pos, &num_bytes_read);
+    section->pos += num_bytes_read;
+    return s;
+}
+
 internal String DwarfSectionRead_StringAt(Arena* arena, File* f, Misty_Section* section, u64 offset) {
     u64 num_bytes_read = 0;
     return file_read_cstring(arena, f, section->offset + offset, &num_bytes_read);
@@ -187,33 +194,8 @@ Misty_Value misty_read_line_content_description(Misty* mountain, File* f, Misty_
     return val;
 }
 
-Misty_LineInfoHeader misty_read_line_info_header(Misty* mountain, File* f, Misty_Section* section) {
-    Misty_LineInfoHeader header = {0};
-    header.unit_length = misty_read_initial_length_value(f, section, &header.type);
-
-    section->addr_type = header.type;
-
-    DwarfSectionRead_Struct(f, section, header.version);
-    Assert(header.version == 5);
-
-    DwarfSectionRead_Struct(f, section, header.address_size_bytes);
-    DwarfSectionRead_Struct(f, section, header.segment_selector_size_bytes);
-
-    DwarfSectionRead_Addr(f, section, header.header_length, header.type);
-
-    //u64 header_start_pos = section->pos;
-
-    DwarfSectionRead_Struct(f, section, header.min_instr_length);
-    DwarfSectionRead_Struct(f, section, header.max_ops_per_instr);
-    DwarfSectionRead_Struct(f, section, header.default_is_stmt);
-    DwarfSectionRead_Struct(f, section, header.line_base);
-    DwarfSectionRead_Struct(f, section, header.line_range);
-
-    DwarfSectionRead_Struct(f, section, header.opcode_base);
-
-    header.standard_opcode_lengths = Array(mountain->arena, u8, header.opcode_base-1);
-    DwarfSectionRead_Array(f, section, header.standard_opcode_lengths);
-
+internal void _misty_read_line_info_header_dirs_and_files_dwarf5(Misty* mountain, File* f, Misty_Section* section) {
+    // dirs
     {
         Misty_LineHeaderEntryFormatArray dir_entry_format = {0};
         DwarfSectionRead_Data(f, section, &dir_entry_format.count, 1);
@@ -235,6 +217,7 @@ Misty_LineInfoHeader misty_read_line_info_header(Misty* mountain, File* f, Misty
         }
     }
 
+    // file paths
     {
         Misty_LineHeaderEntryFormatArray file_entry_format = {0};
         DwarfSectionRead_Data(f, section, &file_entry_format.count, 1);
@@ -260,6 +243,103 @@ Misty_LineInfoHeader misty_read_line_info_header(Misty* mountain, File* f, Misty
                 }
             }
         }
+    }
+}
+
+internal void _misty_read_line_info_header_dirs_and_files_dwarf4(Misty* mountain, File* f, Misty_Section* section) {
+    // dirs
+    {
+        // count
+        u64 section_pos = section->pos;
+
+        String dir = {0};
+        u64 num_dirs = 0;
+        do {
+            dir = DwarfSectionRead_String_no_copy(f, section);
+            num_dirs++;
+        } while (dir.size > 0);
+
+        section->pos = section_pos;
+
+        // read
+        mountain->dirs = Array(mountain->arena, String, num_dirs+1);
+        for (u64 dir_idx = 1; dir_idx < num_dirs; dir_idx++) {
+            mountain->dirs.data[dir_idx] = DwarfSectionRead_String(mountain->arena, f, section);
+            String dir = mountain->dirs.data[dir_idx];
+            printf("%d: %.*s\n", dir_idx, dir.size, dir.str);
+        }
+
+        section->pos += 1;
+    }
+
+    // files
+    {
+        // count
+        u64 section_pos = section->pos;
+
+        String file_path = {0};
+        u64 num_file_paths = 0;
+        do {
+            file_path = DwarfSectionRead_String_no_copy(f, section);
+            (void)DwarfSectionRead_uleb128(f, section);
+            (void)DwarfSectionRead_uleb128(f, section);
+            (void)DwarfSectionRead_uleb128(f, section);
+            num_file_paths++;
+        } while (file_path.size > 0);
+
+        section->pos = section_pos;
+
+        // read
+        mountain->file_paths = Array(mountain->arena, Misty_FilePath, num_file_paths+1);
+        for (u64 file_path_idx = 1; file_path_idx < num_file_paths; file_path_idx++) {
+            mountain->file_paths.data[file_path_idx].file_name = DwarfSectionRead_String(mountain->arena, f, section);
+            mountain->file_paths.data[file_path_idx].dir_idx   = DwarfSectionRead_uleb128(f, section);
+            mountain->file_paths.data[file_path_idx].timestamp = DwarfSectionRead_uleb128(f, section);
+            mountain->file_paths.data[file_path_idx].size      = DwarfSectionRead_uleb128(f, section);
+            String file_path = mountain->file_paths.data[file_path_idx].file_name;
+            printf("%d: %.*s => size: %llu\n", file_path_idx, file_path.size, file_path.str,  mountain->file_paths.data[file_path_idx].size);
+        }
+    }
+
+    section->pos += 1;
+}
+
+
+Misty_LineInfoHeader misty_read_line_info_header(Misty* mountain, File* f, Misty_Section* section) {
+    Misty_LineInfoHeader header = {0};
+    header.unit_length = misty_read_initial_length_value(f, section, &header.type);
+
+    section->addr_type = header.type;
+
+    DwarfSectionRead_Struct(f, section, header.version);
+    Assert(header.version >= 4 && header.version <= 5);
+
+    if (header.version == 5) {
+        DwarfSectionRead_Struct(f, section, header.address_size_bytes);
+        DwarfSectionRead_Struct(f, section, header.segment_selector_size_bytes);
+    } else {
+        header.address_size_bytes = (header.type == DWARF_32) ? 4 : 8;
+    }
+
+    DwarfSectionRead_Addr(f, section, header.header_length, header.type);
+
+    //u64 header_start_pos = section->pos;
+
+    DwarfSectionRead_Struct(f, section, header.min_instr_length);
+    DwarfSectionRead_Struct(f, section, header.max_ops_per_instr);
+    DwarfSectionRead_Struct(f, section, header.default_is_stmt);
+    DwarfSectionRead_Struct(f, section, header.line_base);
+    DwarfSectionRead_Struct(f, section, header.line_range);
+
+    DwarfSectionRead_Struct(f, section, header.opcode_base);
+
+    header.standard_opcode_lengths = Array(mountain->arena, u8, header.opcode_base-1);
+    DwarfSectionRead_Array(f, section, header.standard_opcode_lengths);
+
+    if (header.version == 5) {
+        _misty_read_line_info_header_dirs_and_files_dwarf5(mountain, f, section);
+    } else if (header.version == 4) {
+        _misty_read_line_info_header_dirs_and_files_dwarf4(mountain, f, section);
     }
 
     {
@@ -319,10 +399,9 @@ void misty_read_line_info(Misty* mountain, File* f) {
                     state.end_sequence = true;
                 break;
                 case DW_LNE_set_address:
-                    Assert(header.address_size_bytes == (u64)(ext_opcode_length-1));
+                    Assert(sizeof(state.addr) >= (u64)(ext_opcode_length-1));
                     MemoryCopy(&state.addr, ext_opcode + 1, header.address_size_bytes);
                     state.op_idx = 0;
-                    Misty_PrintLineInfoState;
                 break;
                 case DW_LNE_define_file:
                 case DW_LNE_set_discriminator:
@@ -407,9 +486,11 @@ void misty_read_line_info(Misty* mountain, File* f) {
             state.basic_block = 0;
             state.prologue_end = 0;
             state.epilogue_begin = 0;
+ 
+            Misty_PrintLineInfoState;
         }
-        Misty_PrintLineInfoState;
     }
+    Misty_PrintLineInfoState;
 }
 
 

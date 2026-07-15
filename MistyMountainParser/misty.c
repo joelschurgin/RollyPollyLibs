@@ -201,7 +201,7 @@ Misty_LineInfoHeader misty_read_line_info_header(Misty* mountain, File* f, Misty
 
     DwarfSectionRead_Addr(f, section, header.header_length, header.type);
 
-    u64 header_start_pos = section->pos;
+    //u64 header_start_pos = section->pos;
 
     DwarfSectionRead_Struct(f, section, header.min_instr_length);
     DwarfSectionRead_Struct(f, section, header.max_ops_per_instr);
@@ -283,6 +283,9 @@ typedef struct {
     b8 prologue_end;
     b8 epilogue_begin;
 } Misty_LineInfoState;
+
+#define Misty_PrintLineInfoState printf("0x%08llx %6d %6d %6d %3d %13d %6d\n", state.addr, state.line, state.column, state.file_idx, state.isa, state.discriminator, state.op_idx, state.is_stmt)
+
 void misty_read_line_info(Misty* mountain, File* f) {
     Misty_Section* section = &misty_section(mountain, debug_line);
     Misty_LineInfoHeader header = misty_read_line_info_header(mountain, f, section);
@@ -301,6 +304,8 @@ void misty_read_line_info(Misty* mountain, File* f) {
         .epilogue_begin = 0,
     };
 
+    printf("Address    Line   Column File   ISA Discriminator OpIndex Flags \n");
+    printf("---------- ------ ------ ------ --- ------------- ------- ------\n");
     for (; !state.end_sequence ;) {
         u8 opcode = 0;
         DwarfSectionRead_Struct(f, section, opcode);
@@ -317,6 +322,7 @@ void misty_read_line_info(Misty* mountain, File* f) {
                     Assert(header.address_size_bytes == (u64)(ext_opcode_length-1));
                     MemoryCopy(&state.addr, ext_opcode + 1, header.address_size_bytes);
                     state.op_idx = 0;
+                    Misty_PrintLineInfoState;
                 break;
                 case DW_LNE_define_file:
                 case DW_LNE_set_discriminator:
@@ -359,10 +365,24 @@ void misty_read_line_info(Misty* mountain, File* f) {
                     state.basic_block = 1;
                 break;
                 case DW_LNS_const_add_pc:
-                case DW_LNS_fixed_advance_pc:
+                {
+                    u8 adjusted_opcode = 255 - header.opcode_base;
+                    u64 op_adv = adjusted_opcode / header.line_range;
+
+                    state.addr += header.min_instr_length * ((state.op_idx + op_adv) / header.max_ops_per_instr);
+                    state.op_idx = (state.op_idx + op_adv) % header.max_ops_per_instr;
+                }
+                break;
                 case DW_LNS_set_prologue_end:
+                    state.prologue_end = 1;
+                break;
                 case DW_LNS_set_epilogue_begin:
+                    state.epilogue_begin = 1;
+                break;
                 case DW_LNS_set_isa:
+                    state.isa = 1;
+                break;
+                case DW_LNS_fixed_advance_pc:
                     Assert(!"Unhandled line program standard opcode");
                 break;
                 default:
@@ -371,12 +391,24 @@ void misty_read_line_info(Misty* mountain, File* f) {
                     for (u8 i = 0; i < num_ops; i++) {
                         (void)DwarfSectionRead_uleb128(f, section);
                     }
+                    Assert(!"Unhandled line program standard opcode");
                 }
             }
         } else {
             // special opcode
-            Assert(!"Unhandled line program special opcode");
+            u8 adjusted_opcode = opcode - header.opcode_base;
+            u64 op_adv = adjusted_opcode / header.line_range;
+
+            state.addr += header.min_instr_length * ((state.op_idx + op_adv) / header.max_ops_per_instr);
+            state.op_idx = (state.op_idx + op_adv) % header.max_ops_per_instr;
+            state.line += header.line_base + (adjusted_opcode % header.line_range);
+
+            state.discriminator = 0;
+            state.basic_block = 0;
+            state.prologue_end = 0;
+            state.epilogue_begin = 0;
         }
+        Misty_PrintLineInfoState;
     }
 }
 

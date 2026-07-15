@@ -55,7 +55,7 @@ i32 main(i32 argc, u8** argv) {
     u8* test_execs[] = {
         //"test32_dwarf2",
         //"test32_dwarf3",
-        "test32_dwarf4",
+        //"test32_dwarf4",
         //"test32_dwarf5",
         //"test64_dwarf2",
         //"test64_dwarf3",

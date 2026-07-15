@@ -35,7 +35,7 @@ void* parallel_main(void* main_args) {
 
     LaneSync();
     if (LaneIdx() == 0) {
-        misty_read_line_info(mountain, f);
+        Misty_LineInfoArray line_info = misty_read_line_info(mountain, f);
     }
 }
 
@@ -60,7 +60,7 @@ i32 main(i32 argc, u8** argv) {
         //"test64_dwarf2",
         //"test64_dwarf3",
         //"test64_dwarf4",
-        //"test64_dwarf5",
+        "test64_dwarf5",
     };
 
     for (u64 i = 0; i < sizeof(test_execs)/sizeof(*test_execs); i++) {

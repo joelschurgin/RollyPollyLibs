@@ -105,6 +105,14 @@ typedef struct {
 } Misty_LineInfoHeader;
 
 typedef struct {
+    u64 addr;
+    u64 line;
+    u64 file_idx;
+} Misty_LineInfo;
+
+DefineArray(Misty_LineInfo);
+
+typedef struct {
     Arena* arena;
     ElfType type;
     ElfEndian endian;
@@ -136,11 +144,10 @@ u8*                              misty_read_shstrtab(Misty* mountain, File* f, u
 
 void                             misty_read_elf_section_headers(Misty* mountain, File* f, Misty_SectionHeaderTableInfo section_header_table_info);
 
-
 Misty_Value                      misty_read_form_val(Misty* mountain, File* f, Misty_Section* section, DwarfFormType form);
-
 u64                              misty_read_initial_length_value(File* f, Misty_Section* section, DwarfType* type);
+
 Misty_LineInfoHeader             misty_read_line_info_header(Misty* mountain, File* f, Misty_Section* section);
-void                             misty_read_line_info(Misty* mountain, File* f);
+Misty_LineInfoArray              misty_read_line_info(Misty* mountain, File* f);
 
 #endif

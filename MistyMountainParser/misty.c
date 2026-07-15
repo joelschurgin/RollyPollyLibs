@@ -362,9 +362,7 @@ typedef struct {
     b8 epilogue_begin;
 } Misty_LineInfoState;
 
-#define Misty_PrintLineInfoState printf("0x%08llx %6d %6d %6d %3d %13d %6d\n", state.addr, state.line, state.column, state.file_idx, state.isa, state.discriminator, state.op_idx, state.is_stmt)
-
-void misty_read_line_info(Misty* mountain, File* f) {
+Misty_LineInfoArray misty_read_line_info(Misty* mountain, File* f) {
     Misty_Section* section = &misty_section(mountain, debug_line);
     Misty_LineInfoHeader header = misty_read_line_info_header(mountain, f, section);
     Misty_LineInfoState state = {
@@ -382,113 +380,126 @@ void misty_read_line_info(Misty* mountain, File* f) {
         .epilogue_begin = 0,
     };
 
-    printf("Address    Line   Column File   ISA Discriminator OpIndex Flags \n");
-    printf("---------- ------ ------ ------ --- ------------- ------- ------\n");
-    for (; !state.end_sequence ;) {
-        u8 opcode = 0;
-        DwarfSectionRead_Struct(f, section, opcode);
+    Misty_LineInfoArray line_info = {0};
+    ArrayBuilderBlock(mountain->arena, line_info, Misty_LineInfo) {
+        for (; !state.end_sequence ;) {
+            u8 opcode = 0;
+            DwarfSectionRead_Struct(f, section, opcode);
 
-        if (opcode == 0) {
-            u8 ext_opcode_length = DwarfSectionRead_uleb128(f, section);
-            u8 ext_opcode[ext_opcode_length];
-            DwarfSectionRead_Data(f, section, &ext_opcode, ext_opcode_length);
-            switch (ext_opcode[0]) {
-                case DW_LNE_end_sequence:
-                    state.end_sequence = true;
-                break;
-                case DW_LNE_set_address:
-                    Assert(sizeof(state.addr) >= (u64)(ext_opcode_length-1));
-                    MemoryCopy(&state.addr, ext_opcode + 1, header.address_size_bytes);
-                    state.op_idx = 0;
-                break;
-                case DW_LNE_define_file:
-                case DW_LNE_set_discriminator:
-                case DW_LNE_lo_user:
-                case DW_LNE_hi_user:
-                case DW_LNE_NVIDIA_inlined_call:
-                case DW_LNE_NVIDIA_set_function_name:
-                default:
-                    Assert(!"Unhandled line program extended opcode");
-            }
-        } else if (opcode < header.opcode_base) {
-            DwarfLineNumberStandardOpcode standard_opcode = (DwarfLineNumberStandardOpcode)opcode;
-            switch (standard_opcode) {
-                case DW_LNS_copy:
-                    state.discriminator = 0;
-                    state.basic_block = 0;
-                    state.prologue_end = 0;
-                    state.epilogue_begin = 0;
-                break;
-                case DW_LNS_advance_pc:
-                {
-                    u64 op_adv = DwarfSectionRead_uleb128(f, section);
-                    state.addr += header.min_instr_length * ((state.op_idx + op_adv) / header.max_ops_per_instr);
-                    state.op_idx = (state.op_idx + op_adv) % header.max_ops_per_instr;
+            if (opcode == 0) {
+                u8 ext_opcode_length = DwarfSectionRead_uleb128(f, section);
+                u8 ext_opcode[ext_opcode_length];
+                DwarfSectionRead_Data(f, section, &ext_opcode, ext_opcode_length);
+                switch (ext_opcode[0]) {
+                    case DW_LNE_end_sequence:
+                        state.end_sequence = true;
+                    break;
+                    case DW_LNE_set_address:
+                        Assert(sizeof(state.addr) >= (u64)(ext_opcode_length-1));
+                        MemoryCopy(&state.addr, ext_opcode + 1, header.address_size_bytes);
+                        state.op_idx = 0;
+                    break;
+                    case DW_LNE_define_file:
+                    case DW_LNE_set_discriminator:
+                    case DW_LNE_lo_user:
+                    case DW_LNE_hi_user:
+                    case DW_LNE_NVIDIA_inlined_call:
+                    case DW_LNE_NVIDIA_set_function_name:
+                    default:
+                        Assert(!"Unhandled line program extended opcode");
                 }
-                break;
-                case DW_LNS_advance_line:
-                    state.line += DwarfSectionRead_uleb128(f, section);
-                break;
-                case DW_LNS_set_file:
-                    state.file_idx = DwarfSectionRead_uleb128(f, section);
-                break;
-                case DW_LNS_set_column:
-                    state.column = DwarfSectionRead_uleb128(f, section);
-                break;
-                case DW_LNS_negate_stmt:
-                    state.is_stmt = !state.is_stmt;
-                break;
-                case DW_LNS_set_basic_block:
-                    state.basic_block = 1;
-                break;
-                case DW_LNS_const_add_pc:
-                {
-                    u8 adjusted_opcode = 255 - header.opcode_base;
-                    u64 op_adv = adjusted_opcode / header.line_range;
-
-                    state.addr += header.min_instr_length * ((state.op_idx + op_adv) / header.max_ops_per_instr);
-                    state.op_idx = (state.op_idx + op_adv) % header.max_ops_per_instr;
-                }
-                break;
-                case DW_LNS_set_prologue_end:
-                    state.prologue_end = 1;
-                break;
-                case DW_LNS_set_epilogue_begin:
-                    state.epilogue_begin = 1;
-                break;
-                case DW_LNS_set_isa:
-                    state.isa = 1;
-                break;
-                case DW_LNS_fixed_advance_pc:
-                    Assert(!"Unhandled line program standard opcode");
-                break;
-                default:
-                {
-                    u8 num_ops = header.standard_opcode_lengths.data[opcode - 1];
-                    for (u8 i = 0; i < num_ops; i++) {
-                        (void)DwarfSectionRead_uleb128(f, section);
+            } else if (opcode < header.opcode_base) {
+                DwarfLineNumberStandardOpcode standard_opcode = (DwarfLineNumberStandardOpcode)opcode;
+                switch (standard_opcode) {
+                    case DW_LNS_copy:
+                        state.discriminator = 0;
+                        state.basic_block = 0;
+                        state.prologue_end = 0;
+                        state.epilogue_begin = 0;
+                    break;
+                    case DW_LNS_advance_pc:
+                    {
+                        u64 op_adv = DwarfSectionRead_uleb128(f, section);
+                        state.addr += header.min_instr_length * ((state.op_idx + op_adv) / header.max_ops_per_instr);
+                        state.op_idx = (state.op_idx + op_adv) % header.max_ops_per_instr;
                     }
-                    Assert(!"Unhandled line program standard opcode");
+                    break;
+                    case DW_LNS_advance_line:
+                        state.line += DwarfSectionRead_uleb128(f, section);
+                    break;
+                    case DW_LNS_set_file:
+                        state.file_idx = DwarfSectionRead_uleb128(f, section);
+                    break;
+                    case DW_LNS_set_column:
+                        state.column = DwarfSectionRead_uleb128(f, section);
+                    break;
+                    case DW_LNS_negate_stmt:
+                        state.is_stmt = !state.is_stmt;
+                    break;
+                    case DW_LNS_set_basic_block:
+                        state.basic_block = 1;
+                    break;
+                    case DW_LNS_const_add_pc:
+                    {
+                        u8 adjusted_opcode = 255 - header.opcode_base;
+                        u64 op_adv = adjusted_opcode / header.line_range;
+
+                        state.addr += header.min_instr_length * ((state.op_idx + op_adv) / header.max_ops_per_instr);
+                        state.op_idx = (state.op_idx + op_adv) % header.max_ops_per_instr;
+                    }
+                    break;
+                    case DW_LNS_set_prologue_end:
+                        state.prologue_end = 1;
+                    break;
+                    case DW_LNS_set_epilogue_begin:
+                        state.epilogue_begin = 1;
+                    break;
+                    case DW_LNS_set_isa:
+                        state.isa = 1;
+                    break;
+                    case DW_LNS_fixed_advance_pc:
+                        Assert(!"Unhandled line program standard opcode");
+                    break;
+                    default:
+                    {
+                        u8 num_ops = header.standard_opcode_lengths.data[opcode - 1];
+                        for (u8 i = 0; i < num_ops; i++) {
+                            (void)DwarfSectionRead_uleb128(f, section);
+                        }
+                        Assert(!"Unhandled line program standard opcode");
+                    }
                 }
+            } else {
+                // special opcode
+                u8 adjusted_opcode = opcode - header.opcode_base;
+                u64 op_adv = adjusted_opcode / header.line_range;
+
+                state.addr += header.min_instr_length * ((state.op_idx + op_adv) / header.max_ops_per_instr);
+                state.op_idx = (state.op_idx + op_adv) % header.max_ops_per_instr;
+                state.line += header.line_base + (adjusted_opcode % header.line_range);
+
+                state.discriminator = 0;
+                state.basic_block = 0;
+                state.prologue_end = 0;
+                state.epilogue_begin = 0;
+
+                array_builder_push(mountain->arena, line_info, ((Misty_LineInfo){
+                    .addr = state.addr,
+                    .line = state.line,
+                    .column = state.column,
+                    .file_idx = state.file_idx,
+                }));
             }
-        } else {
-            // special opcode
-            u8 adjusted_opcode = opcode - header.opcode_base;
-            u64 op_adv = adjusted_opcode / header.line_range;
-
-            state.addr += header.min_instr_length * ((state.op_idx + op_adv) / header.max_ops_per_instr);
-            state.op_idx = (state.op_idx + op_adv) % header.max_ops_per_instr;
-            state.line += header.line_base + (adjusted_opcode % header.line_range);
-
-            state.discriminator = 0;
-            state.basic_block = 0;
-            state.prologue_end = 0;
-            state.epilogue_begin = 0;
- 
-            Misty_PrintLineInfoState;
         }
+        array_builder_push(mountain->arena, line_info, ((Misty_LineInfo){
+            .addr = state.addr,
+            .line = state.line,
+            .column = state.column,
+            .file_idx = state.file_idx,
+        }));
     }
-    Misty_PrintLineInfoState;
+
+    return line_info;
 }
 
 

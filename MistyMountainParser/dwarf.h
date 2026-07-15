@@ -900,8 +900,7 @@ enum
 };
 
 /* DWARF line content descriptions.  */
-enum
-{
+typedef enum {
     DW_LNCT_path = 0x1,
     DW_LNCT_directory_index = 0x2,
     DW_LNCT_timestamp = 0x3,
@@ -909,11 +908,10 @@ enum
     DW_LNCT_MD5 = 0x5,
     DW_LNCT_lo_user = 0x2000,
     DW_LNCT_hi_user = 0x3fff
-};
+} DwarfLineContentType;
 
 /* DWARF standard opcode encodings.  */
-enum
-{
+typedef enum {
     DW_LNS_copy = 1,
     DW_LNS_advance_pc = 2,
     DW_LNS_advance_line = 3,
@@ -926,12 +924,11 @@ enum
     DW_LNS_set_prologue_end = 10,
     DW_LNS_set_epilogue_begin = 11,
     DW_LNS_set_isa = 12
-};
+} DwarfLineNumberStandardOpcode;
 
 
 /* DWARF extended opcode encodings.  */
-enum
-{
+typedef enum {
     DW_LNE_end_sequence = 1,
     DW_LNE_set_address = 2,
     DW_LNE_define_file = 3,
@@ -943,7 +940,7 @@ enum
     DW_LNE_NVIDIA_set_function_name = 145,
 
     DW_LNE_hi_user = 255
-};
+} DwarfLineNumberExtendedOpcode;
 
 
 /* DWARF macinfo type encodings.  */

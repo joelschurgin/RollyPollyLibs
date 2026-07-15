@@ -142,6 +142,12 @@ Misty_Value misty_read_form_val(Misty* mountain, File* f, Misty_Section* section
             val.val.str = DwarfSectionRead_StringAt(mountain->arena, f, &misty_section(mountain, debug_line_str), offset);
         }
         break;
+        case DW_FORM_udata:
+        {
+            val.type = MISTY_UINT;
+            val.val.uint = DwarfSectionRead_uleb128(f, section);
+        }
+        break;
         default:
             Assert(!"Form Type Not Handled");
     }
@@ -164,7 +170,24 @@ u64 misty_read_initial_length_value(File* f, Misty_Section* section, DwarfType* 
     return length_64;
 }
 
-void misty_read_line_info_header(Misty* mountain, File* f, Misty_Section* section) {
+Misty_Value misty_read_line_content_description(Misty* mountain, File* f, Misty_Section* section, Misty_LineHeaderEntryFormat* entry_format) {
+    Misty_Value val = {0};
+    switch (entry_format->type) {
+        case DW_LNCT_path:
+            val = misty_read_form_val(mountain, f, section, entry_format->form);
+            Assert(val.type == MISTY_STRING);
+        break;
+        case DW_LNCT_directory_index:
+            val = misty_read_form_val(mountain, f, section, entry_format->form);
+            Assert(val.type == MISTY_UINT);
+        break;
+        default:
+            Assert(!"Line Content Type Not Handled");
+    }
+    return val;
+}
+
+Misty_LineInfoHeader misty_read_line_info_header(Misty* mountain, File* f, Misty_Section* section) {
     Misty_LineInfoHeader header = {0};
     header.unit_length = misty_read_initial_length_value(f, section, &header.type);
 
@@ -178,6 +201,8 @@ void misty_read_line_info_header(Misty* mountain, File* f, Misty_Section* sectio
 
     DwarfSectionRead_Addr(f, section, header.header_length, header.type);
 
+    u64 header_start_pos = section->pos;
+
     DwarfSectionRead_Struct(f, section, header.min_instr_length);
     DwarfSectionRead_Struct(f, section, header.max_ops_per_instr);
     DwarfSectionRead_Struct(f, section, header.default_is_stmt);
@@ -189,27 +214,172 @@ void misty_read_line_info_header(Misty* mountain, File* f, Misty_Section* sectio
     header.standard_opcode_lengths = Array(mountain->arena, u8, header.opcode_base-1);
     DwarfSectionRead_Array(f, section, header.standard_opcode_lengths);
 
-    DwarfSectionRead_Data(f, section, &header.dir_entry_format.count, 1);
-    header.dir_entry_format = Array(mountain->arena, Misty_EntryFormat, header.dir_entry_format.count);
-    Assert(header.dir_entry_format.count == 1);
+    {
+        Misty_LineHeaderEntryFormatArray dir_entry_format = {0};
+        DwarfSectionRead_Data(f, section, &dir_entry_format.count, 1);
+        dir_entry_format = Array(mountain->arena, Misty_LineHeaderEntryFormat, dir_entry_format.count);
 
-    for EachElement(entry_format, Misty_EntryFormat, header.dir_entry_format) {
-        entry_format->type = DwarfSectionRead_uleb128(f, section);
-        entry_format->form = DwarfSectionRead_uleb128(f, section);
-        Assert(entry_format->type == DW_TAG_array_type);
+        for EachElement(entry_format, Misty_LineHeaderEntryFormat, dir_entry_format) {
+            entry_format->type = DwarfSectionRead_uleb128(f, section);
+            entry_format->form = DwarfSectionRead_uleb128(f, section);
+        }
+
+        mountain->dirs.count = DwarfSectionRead_uleb128(f, section);
+        mountain->dirs = Array(mountain->arena, String, mountain->dirs.count);
+
+        for (u64 dir_idx = 0; dir_idx < mountain->dirs.count; dir_idx++) {
+            for EachElement(entry_format, Misty_LineHeaderEntryFormat, dir_entry_format) {
+                Misty_Value val = misty_read_line_content_description(mountain, f, section, entry_format);
+                mountain->dirs.data[dir_idx] = val.val.str;
+            }
+        }
     }
 
-    header.dirs.count = DwarfSectionRead_uleb128(f, section);
-    header.dirs = Array(mountain->arena, String, header.dirs.count);
+    {
+        Misty_LineHeaderEntryFormatArray file_entry_format = {0};
+        DwarfSectionRead_Data(f, section, &file_entry_format.count, 1);
+        file_entry_format = Array(mountain->arena, Misty_LineHeaderEntryFormat, file_entry_format.count);
 
-    for EachElement(entry_format, Misty_EntryFormat, header.dir_entry_format) {
-        for (u64 dir_idx = 0; dir_idx < header.dirs.count; dir_idx++) {
-            Misty_Value val = misty_read_form_val(mountain, f, section, entry_format->form);
-            Assert(val.type == MISTY_STRING);
-            header.dirs.data[dir_idx] = val.val.str;
+        for EachElement(entry_format, Misty_LineHeaderEntryFormat, file_entry_format) {
+            entry_format->type = DwarfSectionRead_uleb128(f, section);
+            entry_format->form = DwarfSectionRead_uleb128(f, section);
+        }
+
+        mountain->file_paths.count = DwarfSectionRead_uleb128(f, section);
+        mountain->file_paths = Array(mountain->arena, Misty_FilePath, mountain->file_paths.count);
+
+        for (u64 file_idx = 0; file_idx < mountain->file_paths.count; file_idx++) {
+            for EachElement(entry_format, Misty_LineHeaderEntryFormat, file_entry_format) {
+                Misty_Value val = misty_read_line_content_description(mountain, f, section, entry_format);
+                if (val.type == MISTY_STRING) {
+                    mountain->file_paths.data[file_idx].file_name = val.val.str;
+                } else if (val.type == MISTY_UINT) {
+                    mountain->file_paths.data[file_idx].dir_idx = val.val.uint;
+                } else {
+                    Assert(!"Unhandled type for mountain->file_paths");
+                }
+            }
+        }
+    }
+
+    {
+        //section->pos = header_start_pos + header.header_length;
+    }
+
+    return header;
+}
+
+typedef struct {
+    u64 addr;
+    u64 op_idx;
+    u64 file_idx;
+    u64 line;
+    u64 column;
+    u64 isa;
+    u64 discriminator;
+    b8 is_stmt;
+    b8 basic_block;
+    b8 end_sequence;
+    b8 prologue_end;
+    b8 epilogue_begin;
+} Misty_LineInfoState;
+void misty_read_line_info(Misty* mountain, File* f) {
+    Misty_Section* section = &misty_section(mountain, debug_line);
+    Misty_LineInfoHeader header = misty_read_line_info_header(mountain, f, section);
+    Misty_LineInfoState state = {
+        .addr = 0,
+        .op_idx = 0,
+        .file_idx = 1,
+        .line = 1,
+        .column = 0,
+        .isa = 0,
+        .discriminator = 0,
+        .is_stmt = header.default_is_stmt,
+        .basic_block = 0,
+        .end_sequence = 0,
+        .prologue_end = 0,
+        .epilogue_begin = 0,
+    };
+
+    for (; !state.end_sequence ;) {
+        u8 opcode = 0;
+        DwarfSectionRead_Struct(f, section, opcode);
+
+        if (opcode == 0) {
+            u8 ext_opcode_length = DwarfSectionRead_uleb128(f, section);
+            u8 ext_opcode[ext_opcode_length];
+            DwarfSectionRead_Data(f, section, &ext_opcode, ext_opcode_length);
+            switch (ext_opcode[0]) {
+                case DW_LNE_end_sequence:
+                    state.end_sequence = true;
+                break;
+                case DW_LNE_set_address:
+                    Assert(header.address_size_bytes == (u64)(ext_opcode_length-1));
+                    MemoryCopy(&state.addr, ext_opcode + 1, header.address_size_bytes);
+                    state.op_idx = 0;
+                break;
+                case DW_LNE_define_file:
+                case DW_LNE_set_discriminator:
+                case DW_LNE_lo_user:
+                case DW_LNE_hi_user:
+                case DW_LNE_NVIDIA_inlined_call:
+                case DW_LNE_NVIDIA_set_function_name:
+                default:
+                    Assert(!"Unhandled line program extended opcode");
+            }
+        } else if (opcode < header.opcode_base) {
+            DwarfLineNumberStandardOpcode standard_opcode = (DwarfLineNumberStandardOpcode)opcode;
+            switch (standard_opcode) {
+                case DW_LNS_copy:
+                    state.discriminator = 0;
+                    state.basic_block = 0;
+                    state.prologue_end = 0;
+                    state.epilogue_begin = 0;
+                break;
+                case DW_LNS_advance_pc:
+                {
+                    u64 op_adv = DwarfSectionRead_uleb128(f, section);
+                    state.addr += header.min_instr_length * ((state.op_idx + op_adv) / header.max_ops_per_instr);
+                    state.op_idx = (state.op_idx + op_adv) % header.max_ops_per_instr;
+                }
+                break;
+                case DW_LNS_advance_line:
+                    state.line += DwarfSectionRead_uleb128(f, section);
+                break;
+                case DW_LNS_set_file:
+                    state.file_idx = DwarfSectionRead_uleb128(f, section);
+                break;
+                case DW_LNS_set_column:
+                    state.column = DwarfSectionRead_uleb128(f, section);
+                break;
+                case DW_LNS_negate_stmt:
+                    state.is_stmt = !state.is_stmt;
+                break;
+                case DW_LNS_set_basic_block:
+                    state.basic_block = 1;
+                break;
+                case DW_LNS_const_add_pc:
+                case DW_LNS_fixed_advance_pc:
+                case DW_LNS_set_prologue_end:
+                case DW_LNS_set_epilogue_begin:
+                case DW_LNS_set_isa:
+                    Assert(!"Unhandled line program standard opcode");
+                break;
+                default:
+                {
+                    u8 num_ops = header.standard_opcode_lengths.data[opcode - 1];
+                    for (u8 i = 0; i < num_ops; i++) {
+                        (void)DwarfSectionRead_uleb128(f, section);
+                    }
+                }
+            }
+        } else {
+            // special opcode
+            Assert(!"Unhandled line program special opcode");
         }
     }
 }
+
 
 #undef DwarfSectionRead_Data
 #undef DwarfSectionRead_Struct

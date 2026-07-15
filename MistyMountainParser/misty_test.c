@@ -35,7 +35,7 @@ void* parallel_main(void* main_args) {
 
     LaneSync();
     if (LaneIdx() == 0) {
-        misty_read_line_info_header(mountain, f, &misty_section(mountain, debug_line));
+        misty_read_line_info(mountain, f);
     }
 }
 

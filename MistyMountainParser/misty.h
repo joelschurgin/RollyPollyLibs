@@ -107,6 +107,7 @@ typedef struct {
 typedef struct {
     u64 addr;
     u64 line;
+    u64 column;
     u64 file_idx;
 } Misty_LineInfo;
 

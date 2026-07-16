@@ -89,3 +89,5 @@ void create_parallel_entry_point(u64 num_threads, u64 num_mutexes,
 
 #define ThreadArraySplit(array_size)                                           \
     thread_array_split(LaneCount(), (array_size), LaneIdx())
+
+#define AssignLane(target_lane_idx) Assert(target_lane_idx < LaneCount()); if (LaneCount() > target_lane_idx && LaneIdx() == target_lane_idx)

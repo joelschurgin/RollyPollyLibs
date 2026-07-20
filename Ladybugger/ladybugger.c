@@ -7,14 +7,29 @@
 #include <sys/wait.h>
 #include <sys/user.h>
 #include <sys/syscall.h>
+#include <signal.h>
 
 typedef struct {
     i32 argc;
     u8** argv;
 } MainArgs;
 
+typedef struct {
+    i32 pipe_read;
+    i32 pipe_write;
+    u64 target_loop_counter_address;
+} LadybuggerCtx;
+
+LadybuggerCtx* ladybugger_ctx = 0L;
+
 #define CHILD_PROCESS 0
 pid_t launch_process_and_pause(String path) {
+    if (!ladybugger_ctx) {
+        ladybugger_ctx = push_struct(thread_ctx.shared_arena, LadybuggerCtx);
+    } else {
+        *ladybugger_ctx = (LadybuggerCtx){0};
+    }
+
     pid_t pid = fork();
 
     if (pid == CHILD_PROCESS) {
@@ -98,8 +113,38 @@ u64 remote_mmap(pid_t pid, void* addr, size_t len, int prot, int flags, int fd, 
     return allocated_mem;
 }
 
-void target_func() {
-    printf("Hooked!\n");
+u8 insert_trap(pid_t pid, u64 addr) {
+    u64 curr_instr = ptrace(PTRACE_PEEKDATA, pid, addr, 0L);
+    u64 trap = (curr_instr & ~0xff) | 0xcc;
+    ptrace(PTRACE_POKEDATA, pid, addr, trap);
+
+    return curr_instr & 0xff;
+}
+
+void restore_trap(pid_t pid, u64 addr, u8 data) {
+    u64 curr_instr = ptrace(PTRACE_PEEKDATA, pid, addr, 0L);
+    u64 prev_instr = (curr_instr & ~0xff) | data;
+    ptrace(PTRACE_POKEDATA, pid, addr, prev_instr);
+}
+
+__attribute__((noinline, section(".trampoline_code")))
+void target_func(LadybuggerCtx* ctx) {
+    const char msg[] = "Hooked!\n";
+}
+
+void insert_jmp(pid_t pid, u64 addr, u64 func_ptr) {
+    u64 curr_instr = ptrace(PTRACE_PEEKDATA, pid, addr, 0L);
+
+    struct __attribute__((packed)) {
+        u8 opcode;
+        i32 addr;
+    } jmp_instr = {
+        .opcode = 0xe9,
+        .addr = (i32)((i64)func_ptr - ((i64)addr + 5)),
+    };
+
+    MemoryCopy(&curr_instr, &jmp_instr, 5);
+    ptrace(PTRACE_POKEDATA, pid, addr, curr_instr);
 }
 
 void* parallel_main(void* main_args) {
@@ -169,19 +214,9 @@ void* parallel_main(void* main_args) {
             }
 
             u64 target_addr = base_addr + line_info.data[0].addr;
+            //u8 prev_instr = insert_trap(pid, target_addr);
 
-            i64 dist = ((i64)target_func - ((i64)target_addr + 5));
-            Assert((u64)Abs(dist) <= 0x7fffff00); // can handle a 32 bit jump
-
-            struct {
-                u8 opcode;
-                u32 addr;
-            } jmp_instr = {
-                .opcode = 0xe9,
-                .addr = dist,
-            };
-
-            u64 addr = remote_mmap(pid,
+            u64 func_ptr = remote_mmap(pid,
                                    (void*)base_addr + MB(128),
                                    PAGE_SIZE,
                                    PROT_READ | PROT_WRITE | PROT_EXEC,
@@ -189,8 +224,28 @@ void* parallel_main(void* main_args) {
                                    -1,
                                    0);
 
+            // install "function" (just an int3)
+            insert_trap(pid, func_ptr);
+
+            // install jmp instruction
+            insert_jmp(pid, target_addr, func_ptr);
+
             read(STDIN_FILENO, 0L, 1);
-            process_continue(pid);
+            i32 status = process_continue(pid);
+
+            if (WIFSTOPPED(status) && WSTOPSIG(status) == SIGTRAP) {
+                printf("[Debugger] Intercepted SIGTRAP from child!\n");
+
+                /*
+                struct user_regs_struct regs;
+                ptrace(PTRACE_GETREGS, pid, NULL, &regs);
+                regs.rip -= 1;
+                ptrace(PTRACE_SETREGS, pid, NULL, &regs);
+
+                restore_trap(pid, target_addr, prev_instr);
+                */
+                process_continue(pid);
+            }
         }
     }
     LaneSync();

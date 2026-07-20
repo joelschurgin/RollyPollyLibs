@@ -91,3 +91,20 @@ void create_parallel_entry_point(u64 num_threads, u64 num_mutexes,
     thread_array_split(LaneCount(), (array_size), LaneIdx())
 
 #define AssignLane(target_lane_idx) Assert(target_lane_idx < LaneCount()); if (LaneCount() > target_lane_idx && LaneIdx() == target_lane_idx)
+
+
+typedef struct {
+    struct timespec start;
+    struct timespec end;
+} ThreadLocalTimer;
+
+void thread_local_timer_print(ThreadLocalTimer timer, u8* fmt, ...);
+
+#define ThreadLocalTimer(...) \
+        DeclareLocal(ThreadLocalTimer _timer_ = {0}) \
+        DeferBlock({ \
+            Assert(clock_gettime(CLOCK_MONOTONIC, &_timer_.start) >= 0); \
+        }, { \
+            Assert(clock_gettime(CLOCK_MONOTONIC, &_timer_.end) >= 0); \
+            thread_local_timer_print(_timer_, ##__VA_ARGS__); \
+        })

@@ -155,3 +155,27 @@ void create_parallel_entry_point(u64 num_threads, u64 num_mutexes, void* (*paral
 
     arena_clear(arena);
 }
+
+void thread_local_timer_print(ThreadLocalTimer timer, u8* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+
+    local_persist u8* units[] = {"ns", "us", "ms", "s"};
+
+    f64 time_diff = (f64)(timer.end.tv_nsec - timer.start.tv_nsec);
+    i32 unit_idx = 0;
+    while (time_diff > 1000.0) {
+        time_diff /= 1000.0;
+        unit_idx += 1;
+    }
+
+    TempArenaBlock(LaneArena()) {
+        String msg = string_formatv(LaneArena(), fmt, args);
+        if (msg.size > 0)
+            printf("Thread %d: %f%s => %.*s\n", LaneIdx(), time_diff, units[unit_idx], msg.size, msg.str);
+        else
+            printf("Thread %d: %f%s\n", LaneIdx(), time_diff, units[unit_idx]);
+    }
+
+    va_end(args);
+}

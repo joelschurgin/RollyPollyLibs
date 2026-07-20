@@ -21,7 +21,8 @@ File* file_ptr_new_(Arena* arena, String path);
 b8 file_is_open(File* f);
 u64 file_size(File* f);
 
-void file_open(File* f, FileFlag flag);
+void file_open_(File* f, FileFlag flag, i32 other_flags);
+#define file_open(f, flag) file_open_((f), (flag), MAP_PRIVATE)
 void file_close(File* f);
 
 void file_read_bytes(File* f, u64 file_pos, void* buf, u64 num_bytes_to_read);

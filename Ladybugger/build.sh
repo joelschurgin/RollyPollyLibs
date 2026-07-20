@@ -12,7 +12,7 @@ LIB="$(realpath ../build/lib)"
 
 CC="gcc"
 LADYBUGGER_CFLAGS="$INCLUDES -std=c99 -D_POSIX_C_SOURCE=200112L -Wextra -Werror -Wimplicit-function-declaration -nostartfiles -g3 -DBUILD_DEBUG"
-LDFLAGS="-L$LIB -lbase -L$LIB -lmisty -Wl,-e,entry_point -lpthread"
+LDFLAGS="-L$LIB -lbase -L$LIB -lmisty -Wl,-e,entry_point -lpthread -lc"
 
 echo "Building ladybugger..."
 $CC ladybugger.c -o ladybugger $LADYBUGGER_CFLAGS $LDFLAGS

@@ -5,6 +5,8 @@
 
 #include <sys/ptrace.h>
 #include <sys/wait.h>
+#include <sys/user.h>
+#include <sys/syscall.h>
 
 typedef struct {
     i32 argc;
@@ -44,6 +46,60 @@ i32 process_continue(pid_t pid) {
         perror("Cannot continue process!\n");
     }
     waitpid(pid, &status, 0);
+
+    return status;
+}
+
+i32 process_single_step(pid_t pid) {
+    i32 status = 0;
+    if (ptrace(PTRACE_SINGLESTEP, pid, 0L, 0L) < 0) {
+        perror("Cannot single step process!\n");
+    }
+    waitpid(pid, &status, 0);
+
+    return status;
+}
+
+u64 remote_mmap(pid_t pid, void* addr, size_t len, int prot, int flags, int fd, off_t offset) {
+    struct user_regs_struct old_regs, new_regs;
+ 
+    Assert(ptrace(PTRACE_GETREGS, pid, NULL, &old_regs) >= 0);
+
+    u64 orig_instr = ptrace(PTRACE_PEEKDATA, pid, old_regs.rip, 0L);
+
+    u64 syscall_payload = orig_instr;
+    u8* payload_bytes = (u8*)&syscall_payload;
+    payload_bytes[0] = 0x0f;
+    payload_bytes[1] = 0x05;
+
+    Assert(ptrace(PTRACE_POKEDATA, pid, old_regs.rip, syscall_payload) >= 0);
+
+    new_regs = old_regs;
+
+    new_regs.rax = SYS_mmap;
+    new_regs.rdi = (u64)addr;
+    new_regs.rsi = len;
+    new_regs.rdx = prot;
+    new_regs.r10 = flags;
+    new_regs.r8  = fd;
+    new_regs.r9  = offset;
+
+    ptrace(PTRACE_SETREGS, pid, NULL, &new_regs);
+
+    ptrace(PTRACE_SINGLESTEP, pid, NULL, NULL);
+    waitpid(pid, NULL, 0);
+
+    ptrace(PTRACE_GETREGS, pid, NULL, &new_regs);
+    u64 allocated_mem = (u64)new_regs.rax;
+
+    Assert(ptrace(PTRACE_POKEDATA, pid, old_regs.rip, orig_instr) >= 0);
+    ptrace(PTRACE_SETREGS, pid, NULL, &old_regs);
+
+    return allocated_mem;
+}
+
+void target_func() {
+    printf("Hooked!\n");
 }
 
 void* parallel_main(void* main_args) {
@@ -54,12 +110,13 @@ void* parallel_main(void* main_args) {
         ThreadExit(NULL);
     }
 
-    File* f;
+    File* f = 0L;
     Misty* mountain = 0L;
-    Misty_SectionHeaderTableInfo section_header_table_info;
+    Misty_SectionHeaderTableInfo section_header_table_info = {0};
+    String path = {0};
     AssignLane(0) {
         Arena* arena = default_arena();
-        String path = String(argv[1]);
+        path = String(argv[1]);
         f = FilePtr(arena, path);
 
         mountain = Misty(arena);
@@ -68,20 +125,23 @@ void* parallel_main(void* main_args) {
     LaneSyncPtr(f, 0);
     LaneSyncPtr(mountain, 0);
     LaneSyncStruct(section_header_table_info, 0);
+    LaneSyncStruct(path, 0);
 
     misty_read_elf_section_headers(mountain, f, section_header_table_info);
 
     LaneSync();
     Misty_LineInfoArray line_info = {0};
     AssignLane(1) {
-        line_info = misty_read_line_info(mountain, f);
-        printf("Thread 1 done\n");
+        ThreadLocalTimer(NULL) {
+            line_info = misty_read_line_info(mountain, f);
+        }
     }
 
     pid_t pid = 0;
     AssignLane(0) {
-        String path = String(argv[1]);
-        pid = launch_process_and_pause(path);
+        ThreadLocalTimer(NULL) {
+            pid = launch_process_and_pause(path);
+        }
         printf("Thread 0 done\n");
     }
     LaneSyncStruct(pid, 0);
@@ -89,6 +149,46 @@ void* parallel_main(void* main_args) {
 
     AssignLane(0) {
         if (pid != 0) {
+            printf("child pid: %d\n", pid);
+            Arena* arena = LaneArena();
+            u8 bytes[12] = {0};
+            TempArenaBlock(arena) {
+                String proc_path = string_format(arena, "/proc/%d/maps", (i32)pid);
+
+                i32 fd = open(proc_path.str, O_RDONLY);
+                read(fd, bytes, sizeof(bytes));
+                close(fd);
+            }
+
+            u64 base_addr = 0;
+            for (u8* c = bytes; (u64)(c - bytes) < sizeof(bytes); c++) {
+                base_addr <<= 4;
+                if (*c >= '0' && *c <= '9') base_addr += (*c - '0');
+                else if (*c >= 'a' && *c <= 'f') base_addr += (*c - 'a' + 10);
+                else if (*c >= 'A' && *c <= 'Z') base_addr += (*c - 'A' + 10);
+            }
+
+            u64 target_addr = base_addr + line_info.data[0].addr;
+
+            i64 dist = ((i64)target_func - ((i64)target_addr + 5));
+            Assert((u64)Abs(dist) <= 0x7fffff00); // can handle a 32 bit jump
+
+            struct {
+                u8 opcode;
+                u32 addr;
+            } jmp_instr = {
+                .opcode = 0xe9,
+                .addr = dist,
+            };
+
+            u64 addr = remote_mmap(pid,
+                                   (void*)base_addr + MB(128),
+                                   PAGE_SIZE,
+                                   PROT_READ | PROT_WRITE | PROT_EXEC,
+                                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
+                                   -1,
+                                   0);
+
             read(STDIN_FILENO, 0L, 1);
             process_continue(pid);
         }

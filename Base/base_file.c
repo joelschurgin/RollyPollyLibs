@@ -42,12 +42,15 @@ internal inline u64 _file_page_aligned_size(u64 size) {
     return AlignPow2(size, PAGE_SIZE);
 }
 
-void file_open(File* f, FileFlag flag) {
+void file_open_(File* f, FileFlag flag, i32 other_flags) {
     f->fd = open(f->path.str, flag);
     Assert(file_is_open(f));
 
     f->size = file_size(f);
-    f->data = MemoryMap(NULL, _file_page_aligned_size(f->size), _file_flag_to_prot_flag(flag), MAP_PRIVATE, f->fd, 0);
+    f->data = MemoryMap(NULL, _file_page_aligned_size(f->size), _file_flag_to_prot_flag(flag), other_flags, f->fd, 0);
+    if (f->data == MAP_FAILED) {
+        perror("Error openning file!!");
+    }
 }
 
 void file_close(File* f) {

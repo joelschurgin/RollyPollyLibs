@@ -11,6 +11,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #define internal      static
 #define global        static
@@ -49,6 +50,7 @@ typedef void VoidProc(void);
 #define ClampTop(A,X) Min(A,X)
 #define ClampBot(X,B) Max(X,B)
 #define Clamp(A,X,B) (((X)<(A))?(A):((X)>(B))?(B):(X))
+#define Abs(X) (((X) >= 0) ? (X) : -(X))
 
 // traps
 
@@ -200,6 +202,7 @@ b32 memory_is_zero(void* ptr, u64 size);
 #define SLLStackPop(f) SLLStackPop_N(f,next)
 
 // cool for loops and array stuff
+#define DeclareLocal(var_declaration) for (var_declaration, *__run_once = (void*)1; __run_once; __run_once = NULL)
 #define DeferBlock(begin, end)        for(i32 _i_ = ((begin), 0); !_i_; _i_ += 1, (end))
 
 #define EachCharUntil(iter, string, cond) (u8* iter = (string).str; (u64)(iter - (string).str) < (string).size && !(cond); iter++)

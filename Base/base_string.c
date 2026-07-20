@@ -179,7 +179,9 @@ void string_builder_step_back(Arena* arena, String* s, u64 num_chars) {
     *s = string_chop(*s, num_chars);
 }
 
-internal String string_formatv(Arena* arena, u8* fmt, va_list args) {
+String string_formatv(Arena* arena, u8* fmt, va_list args) {
+    if (!fmt) return String("");
+
     va_list args2;
     va_copy(args2, args);
     u32 needed_bytes = vsnprintf(0, 0, fmt, args) + 1;

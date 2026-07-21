@@ -167,16 +167,20 @@ void restore_trap(pid_t pid, u64 addr, u8 data) {
     ptrace(PTRACE_POKEDATA, pid, addr, prev_instr);
 }
 
-__attribute__((naked, noinline))
+#define REMOTE_FUNC_ATTRIBS __attribute__((naked, noinline))
+#define REMOTE_FUNC_END_PTR(func_name) Glue(func_name, _end)
+#define REMOTE_FUNC_END(func_name) __attribute__((noinline)) void REMOTE_FUNC_END_PTR(func_name)(void) { __asm__ __volatile__("nop"); }
+
+REMOTE_FUNC_ATTRIBS
 void trampoline(void) {
     __asm__ __volatile__ (
         "int3\n"
+        "jump_back_placeholder:\n"
+        ".byte 0x00\n"
+        ".long 0x00000000\n"
     );
 }
-
-__attribute__((noinline)) void trampoline_end(void) {
-    __asm__ __volatile__("nop");
-}
+REMOTE_FUNC_END(trampoline);
 
 void insert_jmp(pid_t pid, u64 addr, u64 func_ptr) {
     u64 curr_instr = ptrace(PTRACE_PEEKDATA, pid, addr, 0L);
@@ -217,17 +221,34 @@ RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size)
     return func_alloc;
 }
 
-void* remote_func_alloc_push(RemoteFuncAllocator* alloc, void* func, void* func_end) {
+void* remote_func_alloc_push_(RemoteFuncAllocator* alloc, void* func, void* func_end, void* ret_addr) {
     u64 func_size = (u64)func_end - (u64)func;
     Assert(alloc->pos + func_size <= alloc->size);
 
     void* remote_func_ptr = alloc->base + alloc->pos;
     alloc->pos += func_size;
+    TempArenaBlock(LaneArena()) {
+        u8* local_func_copy = push_array(LaneArena(), u8, func_size, true);
+        MemoryCopy(local_func_copy, func, func_size);
 
-    remote_write(alloc->pid, remote_func_ptr, func, func_size);
+        /*
+        u64 placeholder_offset = func_size - 5;
+        u64 dest_addr = (u64)ret_addr + 5;
+
+        u64 child_jump_instr_addr = (u64)remote_func_ptr + placeholder_offset;
+ 
+        i32 rel_offset = (i32)(dest_addr - (child_jump_instr_addr + 5));
+        local_func_copy[placeholder_offset] = 0xe9;
+        MemoryCopy(local_func_copy + placeholder_offset + 1, &rel_offset, sizeof(rel_offset));
+        */
+
+        remote_write(alloc->pid, remote_func_ptr, local_func_copy, func_size);
+    }
  
     return remote_func_ptr;
 }
+
+#define remote_func_alloc_push(alloc, func, ret_addr) remote_func_alloc_push_((alloc), (func), REMOTE_FUNC_END_PTR(func), ret_addr);
 
 void* parallel_main(void* main_args) {
     i32 argc = ((MainArgs*)main_args)->argc;
@@ -269,7 +290,6 @@ void* parallel_main(void* main_args) {
         ThreadLocalTimer(NULL) {
             pid = launch_process_and_pause(path);
         }
-        printf("Thread 0 done\n");
     }
     LaneSyncStruct(pid, 0);
     LaneSyncStruct(line_info, 1);
@@ -297,15 +317,15 @@ void* parallel_main(void* main_args) {
 
             u64 target_addr = base_addr + line_info.data[0].addr;
 
-
             RemoteFuncAllocator func_alloc = remote_func_alloc_init(pid, base_addr + MB(128), PAGE_SIZE);
 
             // install trampoline
-            u64 remote_func_ptr = (u64)remote_func_alloc_push(&func_alloc, trampoline, trampoline_end);
+            u64 remote_func_ptr = (u64)remote_func_alloc_push(&func_alloc, trampoline, (void*)target_addr);
 
             // install jmp instruction
             insert_jmp(pid, target_addr, remote_func_ptr);
 
+            printf("Press ENTER to continue: ");
             read(STDIN_FILENO, 0L, 1);
             i32 status = process_continue(pid);
 

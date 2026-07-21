@@ -5,6 +5,7 @@
 
 #include <sys/ptrace.h>
 #include <sys/wait.h>
+#include <sys/uio.h>
 #include <sys/user.h>
 #include <sys/syscall.h>
 #include <signal.h>
@@ -113,12 +114,56 @@ u64 remote_mmap(pid_t pid, void* addr, size_t len, int prot, int flags, int fd, 
     return allocated_mem;
 }
 
-u8 insert_trap(pid_t pid, u64 addr) {
-    u64 curr_instr = ptrace(PTRACE_PEEKDATA, pid, addr, 0L);
-    u64 trap = (curr_instr & ~0xff) | 0xcc;
-    ptrace(PTRACE_POKEDATA, pid, addr, trap);
+ssize_t process_vm_readv(pid_t pid, 
+                          const struct iovec *local_iov, unsigned long liovcnt, 
+                          const struct iovec *remote_iov, unsigned long riovcnt, 
+                          unsigned long flags);
+ssize_t process_vm_writev(pid_t pid, 
+                          const struct iovec *local_iov, unsigned long liovcnt, 
+                          const struct iovec *remote_iov, unsigned long riovcnt, 
+                          unsigned long flags);
 
-    return curr_instr & 0xff;
+void remote_write(pid_t pid, void* remote_addr, void* write_buf, u64 size) {
+    struct iovec local_iov = {
+        .iov_base = write_buf,
+        .iov_len = size,
+    };
+
+    struct iovec remote_iov = {
+        .iov_base = remote_addr,
+        .iov_len = size,
+    };
+
+    process_vm_writev(pid, &local_iov, 1, &remote_iov, 1, 0);
+}
+
+void remote_read(pid_t pid, void* remote_addr, void* read_buf, u64 size) {
+    struct iovec local_iov = {
+        .iov_base = read_buf,
+        .iov_len = size,
+    };
+
+    struct iovec remote_iov = {
+        .iov_base = remote_addr,
+        .iov_len = size,
+    };
+
+    ssize_t nread = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
+    if (nread < 0) {
+        perror("remote_read failed");
+    } else if ((size_t)nread < size) {
+        printf("Partial read: requested %zu, but only read %zd bytes\n", size, nread);
+    } else {
+        printf("Success: read %zd bytes\n", nread);
+    }
+}
+
+u8 insert_trap(pid_t pid, u64 addr) {
+    u8 byte = 0;
+    remote_read(pid, (void*)addr, &byte, 1);
+    u8 int3 = 0xcc;
+    remote_write(pid, (void*)addr, &int3, 1);
+    return byte;
 }
 
 void restore_trap(pid_t pid, u64 addr, u8 data) {
@@ -127,9 +172,15 @@ void restore_trap(pid_t pid, u64 addr, u8 data) {
     ptrace(PTRACE_POKEDATA, pid, addr, prev_instr);
 }
 
-__attribute__((noinline, section(".trampoline_code")))
-void target_func(LadybuggerCtx* ctx) {
-    const char msg[] = "Hooked!\n";
+__attribute__((naked, noinline))
+void trampoline(void) {
+    __asm__ __volatile__ (
+        "int3\n"
+    );
+}
+
+__attribute__((noinline)) void trampoline_end(void) {
+    __asm__ __volatile__("nop");
 }
 
 void insert_jmp(pid_t pid, u64 addr, u64 func_ptr) {
@@ -214,7 +265,6 @@ void* parallel_main(void* main_args) {
             }
 
             u64 target_addr = base_addr + line_info.data[0].addr;
-            //u8 prev_instr = insert_trap(pid, target_addr);
 
             u64 func_ptr = remote_mmap(pid,
                                    (void*)base_addr + MB(128),
@@ -224,8 +274,11 @@ void* parallel_main(void* main_args) {
                                    -1,
                                    0);
 
-            // install "function" (just an int3)
-            insert_trap(pid, func_ptr);
+            // install trampoline
+            {
+                u64 func_size = (u64)trampoline_end - (u64)trampoline;
+                insert_trap(pid, func_ptr);
+            }
 
             // install jmp instruction
             insert_jmp(pid, target_addr, func_ptr);

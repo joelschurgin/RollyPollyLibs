@@ -76,7 +76,7 @@ i32 process_single_step(pid_t pid) {
     return status;
 }
 
-u64 remote_mmap(pid_t pid, void* addr, size_t len, int prot, int flags, int fd, off_t offset) {
+void* remote_mmap(pid_t pid, void* addr, size_t len, int prot, int flags, int fd, off_t offset) {
     struct user_regs_struct old_regs, new_regs;
  
     Assert(ptrace(PTRACE_GETREGS, pid, NULL, &old_regs) >= 0);
@@ -106,7 +106,7 @@ u64 remote_mmap(pid_t pid, void* addr, size_t len, int prot, int flags, int fd, 
     waitpid(pid, NULL, 0);
 
     ptrace(PTRACE_GETREGS, pid, NULL, &new_regs);
-    u64 allocated_mem = (u64)new_regs.rax;
+    void* allocated_mem = (void*)new_regs.rax;
 
     Assert(ptrace(PTRACE_POKEDATA, pid, old_regs.rip, orig_instr) >= 0);
     ptrace(PTRACE_SETREGS, pid, NULL, &old_regs);
@@ -134,7 +134,8 @@ void remote_write(pid_t pid, void* remote_addr, void* write_buf, u64 size) {
         .iov_len = size,
     };
 
-    process_vm_writev(pid, &local_iov, 1, &remote_iov, 1, 0);
+    ssize_t num_bytes = process_vm_writev(pid, &local_iov, 1, &remote_iov, 1, 0);
+    Assert(num_bytes == (ssize_t)size);
 }
 
 void remote_read(pid_t pid, void* remote_addr, void* read_buf, u64 size) {
@@ -148,14 +149,8 @@ void remote_read(pid_t pid, void* remote_addr, void* read_buf, u64 size) {
         .iov_len = size,
     };
 
-    ssize_t nread = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
-    if (nread < 0) {
-        perror("remote_read failed");
-    } else if ((size_t)nread < size) {
-        printf("Partial read: requested %zu, but only read %zd bytes\n", size, nread);
-    } else {
-        printf("Success: read %zd bytes\n", nread);
-    }
+    ssize_t num_bytes = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
+    Assert(num_bytes == (ssize_t)size);
 }
 
 u8 insert_trap(pid_t pid, u64 addr) {
@@ -196,6 +191,42 @@ void insert_jmp(pid_t pid, u64 addr, u64 func_ptr) {
 
     MemoryCopy(&curr_instr, &jmp_instr, 5);
     ptrace(PTRACE_POKEDATA, pid, addr, curr_instr);
+}
+
+typedef struct {
+    void* base;
+    u64 pos;
+    u64 size;
+    pid_t pid;
+} RemoteFuncAllocator;
+
+RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size) {
+    RemoteFuncAllocator func_alloc = {0};
+
+    func_alloc.base = remote_mmap(pid,
+                                   (void*)target_addr,
+                                   size,
+                                   PROT_READ | PROT_WRITE | PROT_EXEC,
+                                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
+                                   -1,
+                                   0);
+    func_alloc.pos = 0;
+    func_alloc.size = size;
+    func_alloc.pid = pid;
+
+    return func_alloc;
+}
+
+void* remote_func_alloc_push(RemoteFuncAllocator* alloc, void* func, void* func_end) {
+    u64 func_size = (u64)func_end - (u64)func;
+    Assert(alloc->pos + func_size <= alloc->size);
+
+    void* remote_func_ptr = alloc->base + alloc->pos;
+    alloc->pos += func_size;
+
+    remote_write(alloc->pid, remote_func_ptr, func, func_size);
+ 
+    return remote_func_ptr;
 }
 
 void* parallel_main(void* main_args) {
@@ -266,22 +297,14 @@ void* parallel_main(void* main_args) {
 
             u64 target_addr = base_addr + line_info.data[0].addr;
 
-            u64 func_ptr = remote_mmap(pid,
-                                   (void*)base_addr + MB(128),
-                                   PAGE_SIZE,
-                                   PROT_READ | PROT_WRITE | PROT_EXEC,
-                                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
-                                   -1,
-                                   0);
+
+            RemoteFuncAllocator func_alloc = remote_func_alloc_init(pid, base_addr + MB(128), PAGE_SIZE);
 
             // install trampoline
-            {
-                u64 func_size = (u64)trampoline_end - (u64)trampoline;
-                insert_trap(pid, func_ptr);
-            }
+            u64 remote_func_ptr = (u64)remote_func_alloc_push(&func_alloc, trampoline, trampoline_end);
 
             // install jmp instruction
-            insert_jmp(pid, target_addr, func_ptr);
+            insert_jmp(pid, target_addr, remote_func_ptr);
 
             read(STDIN_FILENO, 0L, 1);
             i32 status = process_continue(pid);

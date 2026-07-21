@@ -1,10 +1,13 @@
 .PHONY: all base misty test clean
 
 #all: base misty moonfruit graphics gooey_tui test
-all: base misty ladybugger
+all: base misty ladybugger disasm
 
 base:
 	./Base/build.sh
+
+disasm:
+	./Disasm/build.sh
 
 misty:
 	./MistyMountainParser/build.sh

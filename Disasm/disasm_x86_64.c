@@ -8,13 +8,13 @@ typedef struct {
     u32 count;
 } Disasm_Prefix;
 
-internal Disasm_Prefix _disasm_decode_prefix(u8** instr_ptr) {
+internal Disasm_Prefix _disasm_decode_prefix(u8** instr_len) {
     Disasm_Prefix prefix = {0};
-    u8* orig_instr_ptr = *instr_ptr;
+    u8* orig_instr_len = *instr_len;
 
     u8 i = 0;
     for (; i < 15; i++) {
-        u8 byte = *instr_ptr[0];
+        u8 byte = *instr_len[0];
         switch (byte) {
             case 0x66:
             case 0x67:
@@ -23,18 +23,18 @@ internal Disasm_Prefix _disasm_decode_prefix(u8** instr_ptr) {
             case 0xf3:
             case 0x9b:
                 prefix.value = byte;
-                *instr_ptr += 1;
+                *instr_len += 1;
             break;
             case 0xf0:
                 prefix.lock = 1;
-                *instr_ptr += 1;
+                *instr_len += 1;
             break;
             default:
                 if ((byte & 0xf0) == 0x40) {
                     prefix.rex = byte;
-                    *instr_ptr += 1;
+                    *instr_len += 1;
                 } else {
-                    prefix.count = (u32)(*instr_ptr - orig_instr_ptr);
+                    prefix.count = (u32)(*instr_len - orig_instr_len);
                     return prefix;
                 }
         }
@@ -42,7 +42,7 @@ internal Disasm_Prefix _disasm_decode_prefix(u8** instr_ptr) {
 
     Assert(i < 15);
 
-    prefix.count = (u32)(*instr_ptr - orig_instr_ptr);
+    prefix.count = (u32)(*instr_len - orig_instr_len);
     return prefix;
 }
 
@@ -76,7 +76,7 @@ internal u64 _disasm_decode_mod_rm(u8* instr) {
     return instr_len;
 }
 
-internal Disasm_Opcode _disasm_decode_fpu_mnemonic(Disasm_Prefix prefix, u8* instr) {
+internal Disasm_Opcode _disasm_decode_fpu_mnemonic(Disasm_Prefix prefix, u8* instr, u64* instr_len) {
     u8 mod = (instr[1] & 0b11000000) >> 6;
     u8 reg = (instr[1] & 0b00111000) >> 3;
 
@@ -175,10 +175,11 @@ internal Disasm_Opcode _disasm_decode_fpu_mnemonic(Disasm_Prefix prefix, u8* ins
         break;
     }
 
-    return DISASM_INVALID;
+    *instr_len = 1;
+	return DISASM_INVALID;
 }
 
-internal Disasm_Opcode _disasm_group1_mneumonic(u8 reg) {
+internal Disasm_Opcode _disasm_group1_mnemonic(u8 reg, u64* instr_len) {
     switch (reg) {
         case 0: return DISASM_ADD;
         case 1: return DISASM_OR;
@@ -189,10 +190,11 @@ internal Disasm_Opcode _disasm_group1_mneumonic(u8 reg) {
         case 6: return DISASM_XOR;
         case 7: return DISASM_CMP;
     }
-    return DISASM_INVALID;
+    *instr_len = 1;
+	return DISASM_INVALID;
 }
 
-internal Disasm_Opcode _disasm_group2_mneumonic(u8 reg) {
+internal Disasm_Opcode _disasm_group2_mnemonic(u8 reg, u64* instr_len) {
     switch (reg) {
         case 0: return DISASM_ROL;
         case 1: return DISASM_ROR;
@@ -200,10 +202,11 @@ internal Disasm_Opcode _disasm_group2_mneumonic(u8 reg) {
         case 5: return DISASM_SHR;
         case 7: return DISASM_SAR;
     }
-    return DISASM_INVALID;
+    *instr_len = 1;
+	return DISASM_INVALID;
 }
 
-internal Disasm_Opcode _disasm_group3_mneumonic(u8 reg) {
+internal Disasm_Opcode _disasm_group3_mnemonic(u8 reg, u64* instr_len) {
     switch (reg) {
         case 0: return DISASM_TEST;
         case 3: return DISASM_NOT;
@@ -213,7 +216,8 @@ internal Disasm_Opcode _disasm_group3_mneumonic(u8 reg) {
         case 7: return DISASM_DIV;
         case 8: return DISASM_IDIV;
     }
-    return DISASM_INVALID;
+    *instr_len = 1;
+	return DISASM_INVALID;
 }
 
 Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
@@ -238,7 +242,8 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             case 6:
                 if (*instr == 0x0F) Assert(!"Two byte opcode");
             case 7:
-                return DISASM_INVALID;
+                *instr_len = 1;
+	            return DISASM_INVALID;
         }
 
         switch (type) {
@@ -252,7 +257,8 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             case 0x38: return DISASM_CMP;
         }
 
-        return DISASM_INVALID;
+        *instr_len = 1;
+	    return DISASM_INVALID;
     }
 
     switch (*instr) {
@@ -280,7 +286,8 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         case 0x61:
         case 0x62:
         case 0x63:
-            return DISASM_INVALID;
+            *instr_len = 1;
+	        return DISASM_INVALID;
         case 0x68:
             *instr_len += 5;
             return DISASM_PUSH;
@@ -366,11 +373,12 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             *instr_len += _disasm_decode_mod_rm(instr);
 
             u8 reg = (instr[1] & 0b00111000) >> 3;
-            return _disasm_group1_mneumonic(reg);
+            return _disasm_group1_mnemonic(reg, instr_len);
         }
         break;
         case 0x82:
-            return DISASM_INVALID;
+            *instr_len = 1;
+	        return DISASM_INVALID;
         case 0x84:
         case 0x85:
             *instr_len += 1 + _disasm_decode_mod_rm(instr);
@@ -388,11 +396,17 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             *instr_len += 1 + _disasm_decode_mod_rm(instr);
             return DISASM_MOV;
         case 0x8d:
-            if (((instr[1] & 0b11000000) >> 6) == 3) return DISASM_INVALID;
+            if (((instr[1] & 0b11000000) >> 6) == 3) {
+                *instr_len = 1;
+	            return DISASM_INVALID;
+            }
             *instr_len += 1 + _disasm_decode_mod_rm(instr);
             return DISASM_LEA;
         case 0x8f:
-             if (((instr[1] & 0b11000000) >> 6) == 3) return DISASM_INVALID;
+            if (((instr[1] & 0b11000000) >> 6) == 3) {
+                *instr_len = 1;
+	            return DISASM_INVALID;
+            }
             *instr_len += 1 + _disasm_decode_mod_rm(instr);
             return DISASM_POP;
         case 0x90:
@@ -418,7 +432,8 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             else if (prefix.value == 0x66) return DISASM_CWD;
             return DISASM_CDQ;
         case 0x9a:
-            return DISASM_INVALID;
+            *instr_len = 1;
+	        return DISASM_INVALID;
         case 0x9b:
             *instr_len += 1;
             return DISASM_FWAIT;
@@ -505,7 +520,7 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             *instr_len += 2 + _disasm_decode_mod_rm(instr);
 
             u8 reg = (instr[1] & 0b00111000) >> 3;
-            return _disasm_group2_mneumonic(reg);
+            return _disasm_group2_mnemonic(reg, instr_len);
         }
         case 0xc2:
             *instr_len += 3;
@@ -515,13 +530,20 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             return DISASM_RET;
         case 0xc4:
         case 0xc5:
-            return DISASM_INVALID;
+            *instr_len = 1;
+	        return DISASM_INVALID;
         case 0xc6:
-            if (((instr[1] & 0b00111000) >> 3) != 0) return DISASM_INVALID;
+            if (((instr[1] & 0b00111000) >> 3) != 0) {
+                *instr_len = 1;
+	            return DISASM_INVALID;
+            }
             *instr_len += 2 + _disasm_decode_mod_rm(instr);
             return DISASM_MOV;
         case 0xc7:
-            if (((instr[1] & 0b00111000) >> 3) != 0) return DISASM_INVALID;
+            if (((instr[1] & 0b00111000) >> 3) != 0) {
+                *instr_len = 1;
+	            return DISASM_INVALID;
+            }
             *instr_len += 1 + (prefix.value == 0x66 ? 2 : 4) + _disasm_decode_mod_rm(instr);
             return DISASM_MOV;
         case 0xc8:
@@ -543,7 +565,8 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             *instr_len += 2;
             return DISASM_INT;
         case 0xce:
-            return DISASM_INVALID;
+            *instr_len = 1;
+	        return DISASM_INVALID;
         case 0xcf:
             *instr_len += 1;
             if (prefix.rex & 0x08) return DISASM_IRETQ;
@@ -557,12 +580,13 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             *instr_len += 1 + _disasm_decode_mod_rm(instr);
 
             u8 reg = (instr[1] & 0b00111000) >> 3;
-            return _disasm_group2_mneumonic(reg);
+            return _disasm_group2_mnemonic(reg, instr_len);
         }
         case 0xd4:
         case 0xd5:
         case 0xd6:
-            return DISASM_INVALID;
+            *instr_len = 1;
+	        return DISASM_INVALID;
         case 0xd7:
             *instr_len += 1;
             return DISASM_XLAT;
@@ -575,7 +599,7 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         case 0xde:
         case 0xdf:
             *instr_len += 1 + _disasm_decode_mod_rm(instr);
-            return _disasm_decode_fpu_mnemonic(prefix, instr);
+            return _disasm_decode_fpu_mnemonic(prefix, instr, instr_len);
         case 0xe0:
             *instr_len += 2;
             return DISASM_LOOPNE;
@@ -603,7 +627,8 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             *instr_len += 1 + ((prefix.value == 0x66) ? 2 : 4);
             return DISASM_JMP;
         case 0xea:
-            return DISASM_INVALID;
+            *instr_len = 1;
+	        return DISASM_INVALID;
         case 0xeb:
             *instr_len += 2;
             return DISASM_JMP;
@@ -619,7 +644,8 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         case 0xf1:
         case 0xf2:
         case 0xf3:
-            return DISASM_INVALID;
+            *instr_len = 1;
+	        return DISASM_INVALID;
         case 0xf4:
             *instr_len += 1;
             return DISASM_HLT;
@@ -630,7 +656,7 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         {
             u8 reg = (instr[1] & 0b00111000) >> 3;
             *instr_len += 1 + _disasm_decode_mod_rm(instr + 1) + (reg == 0);
-            return _disasm_group3_mneumonic(reg);
+            return _disasm_group3_mnemonic(reg, instr_len);
         }
         case 0xf7:
         {
@@ -640,12 +666,12 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             if (reg == 0) imm_size = prefix.value == 0x66 ? 2 : 4;
 
             *instr_len += 1 + _disasm_decode_mod_rm(instr + 1) + imm_size;
-            return _disasm_group3_mneumonic(reg);
-
+            return _disasm_group3_mnemonic(reg, instr_len);
         }
     }
 
-    return DISASM_INVALID;
+    *instr_len = 1;
+	return DISASM_INVALID;
 }
 
 u8* disasm_opcode_stringify(Disasm_Opcode opcode) {

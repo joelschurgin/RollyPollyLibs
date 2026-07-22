@@ -1,0 +1,255 @@
+0:      00 00                   add    BYTE PTR [rax],al
+2:      01 00                   add    DWORD PTR [rax],eax
+4:      02 00                   add    al,BYTE PTR [rax]
+6:      03 00                   add    eax,DWORD PTR [rax]
+8:      04 00                   add    al,0x0
+a:      05 00 00 00 00          add    eax,0x0
+f:      06                      (bad)
+10:     07                      (bad)
+11:     08 00                   or     BYTE PTR [rax],al
+13:     09 00                   or     DWORD PTR [rax],eax
+15:     0a 00                   or     al,BYTE PTR [rax]
+17:     0b 00                   or     eax,DWORD PTR [rax]
+19:     0c 00                   or     al,0x0
+1b:     0d 00 00 00 00          or     eax,0x0
+20:     0e                      (bad)
+21:     0f 05                   syscall
+23:     10 00                   adc    BYTE PTR [rax],al
+25:     11 00                   adc    DWORD PTR [rax],eax
+27:     12 00                   adc    al,BYTE PTR [rax]
+29:     13 00                   adc    eax,DWORD PTR [rax]
+2b:     14 00                   adc    al,0x0
+2d:     15 00 00 00 00          adc    eax,0x0
+32:     16                      (bad)
+33:     17                      (bad)
+34:     18 00                   sbb    BYTE PTR [rax],al
+36:     19 00                   sbb    DWORD PTR [rax],eax
+38:     1a 00                   sbb    al,BYTE PTR [rax]
+3a:     1b 00                   sbb    eax,DWORD PTR [rax]
+3c:     1c 00                   sbb    al,0x0
+3e:     1d 00 00 00 00          sbb    eax,0x0
+43:     1e                      (bad)
+44:     1f                      (bad)
+45:     20 00                   and    BYTE PTR [rax],al
+47:     21 00                   and    DWORD PTR [rax],eax
+49:     22 00                   and    al,BYTE PTR [rax]
+4b:     23 00                   and    eax,DWORD PTR [rax]
+4d:     24 00                   and    al,0x0
+4f:     25 00 00 00 00          and    eax,0x0
+54:     26 90                   es nop
+56:     27                      (bad)
+57:     28 00                   sub    BYTE PTR [rax],al
+59:     29 00                   sub    DWORD PTR [rax],eax
+5b:     2a 00                   sub    al,BYTE PTR [rax]
+5d:     2b 00                   sub    eax,DWORD PTR [rax]
+5f:     2c 00                   sub    al,0x0
+61:     2d 00 00 00 00          sub    eax,0x0
+66:     2e 90                   cs nop
+68:     2f                      (bad)
+69:     30 00                   xor    BYTE PTR [rax],al
+6b:     31 00                   xor    DWORD PTR [rax],eax
+6d:     32 00                   xor    al,BYTE PTR [rax]
+6f:     33 00                   xor    eax,DWORD PTR [rax]
+71:     34 00                   xor    al,0x0
+73:     35 00 00 00 00          xor    eax,0x0
+78:     36 90                   ss nop
+7a:     37                      (bad)
+7b:     38 00                   cmp    BYTE PTR [rax],al
+7d:     39 00                   cmp    DWORD PTR [rax],eax
+7f:     3a 00                   cmp    al,BYTE PTR [rax]
+81:     3b 00                   cmp    eax,DWORD PTR [rax]
+83:     3c 00                   cmp    al,0x0
+85:     3d 00 00 00 00          cmp    eax,0x0
+8a:     3e 90                   ds nop
+8c:     3f                      (bad)
+8d:     40 90                   rex nop
+8f:     41 90                   xchg   r8d,eax
+91:     42 90                   rex.X nop
+93:     43 90                   rex.XB xchg r8d,eax
+95:     44 90                   rex.R nop
+97:     45 90                   rex.RB xchg r8d,eax
+99:     46 90                   rex.RX nop
+9b:     47 90                   rex.RXB xchg r8d,eax
+9d:     48 90                   rex.W nop
+9f:     49 90                   xchg   r8,rax
+a1:     4a 90                   rex.WX nop
+a3:     4b 90                   rex.WXB xchg r8,rax
+a5:     4c 90                   rex.WR nop
+a7:     4d 90                   rex.WRB xchg r8,rax
+a9:     4e 90                   rex.WRX nop
+ab:     4f 90                   rex.WRXB xchg r8,rax
+ad:     50                      push   rax
+ae:     51                      push   rcx
+af:     52                      push   rdx
+b0:     53                      push   rbx
+b1:     54                      push   rsp
+b2:     55                      push   rbp
+b3:     56                      push   rsi
+b4:     57                      push   rdi
+b5:     58                      pop    rax
+b6:     59                      pop    rcx
+b7:     5a                      pop    rdx
+b8:     5b                      pop    rbx
+b9:     5c                      pop    rsp
+ba:     5d                      pop    rbp
+bb:     5e                      pop    rsi
+bc:     5f                      pop    rdi
+bd:     60                      (bad)
+be:     61                      (bad)
+bf:     62 63 00 64 90          (bad)
+c4:     65 90                   gs nop
+c6:     66 90                   xchg   ax,ax
+c8:     67 90                   addr32 nop
+ca:     68 00 00 00 00          push   0x0
+cf:     69 00 00 00 00 00       imul   eax,DWORD PTR [rax],0x0
+d5:     6a 00                   push   0x0
+d7:     6b 00 00                imul   eax,DWORD PTR [rax],0x0
+da:     6c                      ins    BYTE PTR es:[rdi],dx
+db:     6d                      ins    DWORD PTR es:[rdi],dx
+dc:     6e                      outs   dx,BYTE PTR ds:[rsi]
+dd:     6f                      outs   dx,DWORD PTR ds:[rsi]
+de:     70 00                   jo     0xe0
+e0:     71 00                   jno    0xe2
+e2:     72 00                   jb     0xe4
+e4:     73 00                   jae    0xe6
+e6:     74 00                   je     0xe8
+e8:     75 00                   jne    0xea
+ea:     76 00                   jbe    0xec
+ec:     77 00                   ja     0xee
+ee:     78 00                   js     0xf0
+f0:     79 00                   jns    0xf2
+f2:     7a 00                   jp     0xf4
+f4:     7b 00                   jnp    0xf6
+f6:     7c 00                   jl     0xf8
+f8:     7d 00                   jge    0xfa
+fa:     7e 00                   jle    0xfc
+fc:     7f 00                   jg     0xfe
+fe:     80 00 00                add    BYTE PTR [rax],0x0
+101:    81 00 00 00 00 00       add    DWORD PTR [rax],0x0
+107:    82                      (bad)
+108:    83 00 00                add    DWORD PTR [rax],0x0
+10b:    84 00                   test   BYTE PTR [rax],al
+10d:    85 00                   test   DWORD PTR [rax],eax
+10f:    86 00                   xchg   BYTE PTR [rax],al
+111:    87 00                   xchg   DWORD PTR [rax],eax
+113:    88 00                   mov    BYTE PTR [rax],al
+115:    89 00                   mov    DWORD PTR [rax],eax
+117:    8a 00                   mov    al,BYTE PTR [rax]
+119:    8b 00                   mov    eax,DWORD PTR [rax]
+11b:    8c 00                   mov    WORD PTR [rax],es
+11d:    8d 00                   lea    eax,[rax]
+11f:    8e 00                   mov    es,WORD PTR [rax]
+121:    8f 00                   pop    QWORD PTR [rax]
+123:    90                      nop
+124:    91                      xchg   ecx,eax
+125:    92                      xchg   edx,eax
+126:    93                      xchg   ebx,eax
+127:    94                      xchg   esp,eax
+128:    95                      xchg   ebp,eax
+129:    96                      xchg   esi,eax
+12a:    97                      xchg   edi,eax
+12b:    98                      cwde
+12c:    99                      cdq
+12d:    9a                      (bad)
+12e:    9b                      fwait
+12f:    9c                      pushf
+130:    9d                      popf
+131:    9e                      sahf
+132:    9f                      lahf
+133:    a0 00 00 00 00 00 00    movabs al,ds:0x0
+13a:    00 00 
+13c:    a1 00 00 00 00 00 00    movabs eax,ds:0x0
+143:    00 00 
+145:    a2 00 00 00 00 00 00    movabs ds:0x0,al
+14c:    00 00 
+14e:    a3 00 00 00 00 00 00    movabs ds:0x0,eax
+155:    00 00 
+157:    a4                      movs   BYTE PTR es:[rdi],BYTE PTR ds:[rsi]
+158:    a5                      movs   DWORD PTR es:[rdi],DWORD PTR ds:[rsi]
+159:    a6                      cmps   BYTE PTR ds:[rsi],BYTE PTR es:[rdi]
+15a:    a7                      cmps   DWORD PTR ds:[rsi],DWORD PTR es:[rdi]
+15b:    a8 00                   test   al,0x0
+15d:    a9 00 00 00 00          test   eax,0x0
+162:    aa                      stos   BYTE PTR es:[rdi],al
+163:    ab                      stos   DWORD PTR es:[rdi],eax
+164:    ac                      lods   al,BYTE PTR ds:[rsi]
+165:    ad                      lods   eax,DWORD PTR ds:[rsi]
+166:    ae                      scas   al,BYTE PTR es:[rdi]
+167:    af                      scas   eax,DWORD PTR es:[rdi]
+168:    b0 00                   mov    al,0x0
+16a:    b1 00                   mov    cl,0x0
+16c:    b2 00                   mov    dl,0x0
+16e:    b3 00                   mov    bl,0x0
+170:    b4 00                   mov    ah,0x0
+172:    b5 00                   mov    ch,0x0
+174:    b6 00                   mov    dh,0x0
+176:    b7 00                   mov    bh,0x0
+178:    b8 00 00 00 00          mov    eax,0x0
+17d:    b9 00 00 00 00          mov    ecx,0x0
+182:    ba 00 00 00 00          mov    edx,0x0
+187:    bb 00 00 00 00          mov    ebx,0x0
+18c:    bc 00 00 00 00          mov    esp,0x0
+191:    bd 00 00 00 00          mov    ebp,0x0
+196:    be 00 00 00 00          mov    esi,0x0
+19b:    bf 00 00 00 00          mov    edi,0x0
+1a0:    c0 00 00                rol    BYTE PTR [rax],0x0
+1a3:    c1 00 00                rol    DWORD PTR [rax],0x0
+1a6:    c2 00 00                ret    0x0
+1a9:    c3                      ret
+1aa:    c4 c5 c6 00             (bad)
+1ae:    00 c7                   add    bh,al
+1b0:    00 00                   add    BYTE PTR [rax],al
+1b2:    00 00                   add    BYTE PTR [rax],al
+1b4:    00 c8                   add    al,cl
+1b6:    00 00                   add    BYTE PTR [rax],al
+1b8:    00 c9                   add    cl,cl
+1ba:    ca cb cc                retf   0xcccb
+1bd:    cd 00                   int    0x0
+1bf:    ce                      (bad)
+1c0:    cf                      iret
+1c1:    d0 00                   rol    BYTE PTR [rax],1
+1c3:    d1 00                   rol    DWORD PTR [rax],1
+1c5:    d2 00                   rol    BYTE PTR [rax],cl
+1c7:    d3 00                   rol    DWORD PTR [rax],cl
+1c9:    d4                      (bad)
+1ca:    d5 d6 d7 d8             {rex2 0xd6} pmovmskb r27d,mm0
+1ce:    00 d9                   add    cl,bl
+1d0:    00 da                   add    dl,bl
+1d2:    00 db                   add    bl,bl
+1d4:    00 dc                   add    ah,bl
+1d6:    00 dd                   add    ch,bl
+1d8:    00 de                   add    dh,bl
+1da:    00 df                   add    bh,bl
+1dc:    00 e0                   add    al,ah
+1de:    00 e1                   add    cl,ah
+1e0:    00 e2                   add    dl,ah
+1e2:    00 e3                   add    bl,ah
+1e4:    00 e4                   add    ah,ah
+1e6:    00 e5                   add    ch,ah
+1e8:    00 e6                   add    dh,ah
+1ea:    00 e7                   add    bh,ah
+1ec:    00 e8                   add    al,ch
+1ee:    00 00                   add    BYTE PTR [rax],al
+1f0:    00 00                   add    BYTE PTR [rax],al
+1f2:    e9 00 00 00 00          jmp    0x1f7
+1f7:    ea                      (bad)
+1f8:    eb 00                   jmp    0x1fa
+1fa:    ec                      in     al,dx
+1fb:    ed                      in     eax,dx
+1fc:    ee                      out    dx,al
+1fd:    ef                      out    dx,eax
+1fe:    f0 90                   lock nop
+200:    f1                      int1
+201:    f2 90                   repnz nop
+203:    f3 90                   pause
+205:    f4                      hlt
+206:    f5                      cmc
+207:    f6 00 f7                test   BYTE PTR [rax],0xf7
+20a:    00 f8                   add    al,bh
+20c:    f9                      stc
+20d:    fa                      cli
+20e:    fb                      sti
+20f:    fc                      cld
+210:    fd                      std
+211:    fe 00                   inc    BYTE PTR [rax]
+213:    ff 00                   inc    DWORD PTR [rax]

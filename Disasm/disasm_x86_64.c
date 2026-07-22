@@ -218,9 +218,9 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         case 0x83:
         {
             if (*instr == 0x81) {
-                *instr_len += prefix.has_66 ? 4 : 6; 
+                *instr_len += prefix.has_66 ? 4 : 6;
             } else {
-                *instr_len += 3;
+                *instr_len += 2;
             }
 
             *instr_len += _disasm_decode_mod_rm(instr);

@@ -99,6 +99,18 @@ String string_chop_before_whitespace(String s) {
     return string_prefix(s, amt);
 }
 
+String string_to_lower(Arena* arena, String s) {
+    String s_cpy = string_copy(arena, s);
+    for EachChar(c, s_cpy) *c = char_to_lower(*c);
+    return s_cpy;
+}
+
+String string_to_upper(Arena* arena, String s) {
+    String s_cpy = string_copy(arena, s);
+    for EachChar(c, s_cpy) *c = char_to_upper(*c);
+    return s_cpy;
+}
+
 b32 string_equal(String a, String b) {
     if (a.size != b.size) return false;
 

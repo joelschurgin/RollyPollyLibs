@@ -248,6 +248,7 @@ typedef enum {
     DISASM_FBLD,
     DISASM_FBSTP,
     DISASM_FCHS,
+    DISASM_FCLEX,
     DISASM_FCMOVB,
     DISASM_FCMOVBE,
     DISASM_FCMOVE,
@@ -280,6 +281,7 @@ typedef enum {
     DISASM_FILD,
     DISASM_FIMUL,
     DISASM_FINCSTP,
+    DISASM_FINIT,
     DISASM_FIST,
     DISASM_FISTP,
     DISASM_FISTTP,
@@ -310,14 +312,18 @@ typedef enum {
     DISASM_FPTAN,
     DISASM_FRNDINT,
     DISASM_FRSTOR,
+    DISASM_FSAVE,
     DISASM_FSCALE,
     DISASM_FSETPM287_NOP,
     DISASM_FSIN,
     DISASM_FSINCOS,
     DISASM_FSQRT,
     DISASM_FST,
+    DISASM_FSTCW,
+    DISASM_FSTENV,
     DISASM_FSTP,
     DISASM_FSTPNCE,
+    DISASM_FSTSW,
     DISASM_FSUB,
     DISASM_FSUBP,
     DISASM_FSUBR,
@@ -1897,5 +1903,6 @@ typedef enum {
 
 Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len);
 u8*           disasm_opcode_stringify(Disasm_Opcode opcode);
+String        disasm_opcode_format(Arena* arena, Disasm_Opcode opcode);
 
 #endif

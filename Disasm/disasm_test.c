@@ -38,15 +38,15 @@ i32 main(i32 argc, u8 **argv) {
     Arena* arena = default_arena();
 
     String dir = curr_dir(String(argv[0]));
-    //String test_path = string_format(arena, "%.*s/dwarf_tests/test64_dwarf5", dir.size, dir.str);
-    String test_path = string_format(arena, "%.*s/misty_test", dir.size, dir.str);
+    String test_path = string_format(arena, "%.*s/dwarf_tests/test64_dwarf5", dir.size, dir.str);
+    //String test_path = string_format(arena, "%.*s/misty_test", dir.size, dir.str);
 
     FileBlock(arena, test_path, FILE_READ_ONLY, f) {
         u64 instr_len = 0;
-        instr_len = test_decoder_at_addr(arena, f, 0x5f55);
+        instr_len = test_decoder_at_addr(arena, f, 0x119b);
     }
 
-    u8 instr[] = {0x48, 0xD3, 0xF8};
+    u8 instr[] = {0xE2, 0xFA};
     test_decoder_bytes(arena, instr);
 
     return 0;

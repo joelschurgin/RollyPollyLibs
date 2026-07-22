@@ -1,12 +1,7 @@
 #include "disasm_x86_64.h"
 
 typedef struct {
-    b8 has_66;
-    b8 has_67;
-    b8 has_f2;
-    b8 has_f3;
-    b8 has_9b;
-    u8 prefix;
+    u8 value;
     u8 segment;
     u8 rex;
     u32 count;
@@ -21,33 +16,12 @@ internal Disasm_Prefix _disasm_decode_prefix(u8** instr_ptr) {
         u8 byte = *instr_ptr[0];
         switch (byte) {
             case 0x66:
-                prefix.has_66 = 1;
-                prefix.prefix = byte;
-                *instr_ptr += 1;
-            break;
             case 0x67:
-                prefix.has_67 = 1;
-                prefix.prefix = byte;
-                *instr_ptr += 1;
-            break;
             case 0x64:
-            case 0x65:
-                prefix.segment = byte;
-                *instr_ptr += 1;
-            break;
             case 0xf2:
-                prefix.has_f2 = 1;
-                prefix.prefix = byte;
-                *instr_ptr += 1;
-            break;
             case 0xf3:
-                prefix.has_f3 = 1;
-                prefix.prefix = byte;
-                *instr_ptr += 1;
-            break;
             case 0x9b:
-                prefix.has_9b = 1;
-                prefix.prefix = byte;
+                prefix.value = byte;
                 *instr_ptr += 1;
             break;
             default:
@@ -119,8 +93,8 @@ internal Disasm_Opcode _disasm_decode_fpu_mnemonic(Disasm_Prefix prefix, u8* ins
                 case 1: return DISASM_FXCH;
                 case 2: return (mod != 3) ? DISASM_FST : DISASM_FNOP;
                 case 3: return DISASM_FSTP;
-                case 6: return ((prefix.prefix == 0x9b) ? DISASM_FSTENV : DISASM_FNSTENV);
-                case 7: return ((prefix.prefix == 0x9b) ? DISASM_FSTCW : DISASM_FNSTCW);
+                case 6: return ((prefix.value == 0x9b) ? DISASM_FSTENV : DISASM_FNSTENV);
+                case 7: return ((prefix.value == 0x9b) ? DISASM_FSTCW : DISASM_FNSTCW);
             }
         break;
         case 0xda:
@@ -141,8 +115,8 @@ internal Disasm_Opcode _disasm_decode_fpu_mnemonic(Disasm_Prefix prefix, u8* ins
                 case 1: return (mod != 3) ? DISASM_FISTTP : DISASM_FCMOVNE;
                 case 2: return (mod != 3) ? DISASM_FIST : DISASM_FCMOVNBE;
                 case 3: return (mod != 3) ? DISASM_FISTP : DISASM_FCMOVNU;
-                case 4: return (mod != 3) ? DISASM_INVALID : ((prefix.prefix == 0x9b) ? DISASM_FCLEX : DISASM_FNCLEX);
-                case 5: return (mod != 3) ? DISASM_FLD : ((prefix.prefix == 0x9b) ? DISASM_FINIT : DISASM_FNINIT);
+                case 4: return (mod != 3) ? DISASM_INVALID : ((prefix.value == 0x9b) ? DISASM_FCLEX : DISASM_FNCLEX);
+                case 5: return (mod != 3) ? DISASM_FLD : ((prefix.value == 0x9b) ? DISASM_FINIT : DISASM_FNINIT);
                 case 7: return (mod != 3) ? DISASM_FSTP : DISASM_INVALID;
             }
         break;
@@ -166,8 +140,8 @@ internal Disasm_Opcode _disasm_decode_fpu_mnemonic(Disasm_Prefix prefix, u8* ins
                 case 3: return (mod != 3) ? DISASM_FSTP : DISASM_FCOMP;
                 case 4: return (mod != 3) ? DISASM_FRSTOR : DISASM_FUCOM;
                 case 5: return (mod != 3) ? DISASM_INVALID : DISASM_FUCOMP;
-                case 6: return (mod != 3) ? ((prefix.prefix == 0x9b) ? DISASM_FSAVE : DISASM_FNSAVE) : DISASM_INVALID;
-                case 7: return (mod != 3) ? ((prefix.prefix == 0x9b) ? DISASM_FSTSW : DISASM_FNSTSW) : DISASM_INVALID;
+                case 6: return (mod != 3) ? ((prefix.value == 0x9b) ? DISASM_FSAVE : DISASM_FNSAVE) : DISASM_INVALID;
+                case 7: return (mod != 3) ? ((prefix.value == 0x9b) ? DISASM_FSTSW : DISASM_FNSTSW) : DISASM_INVALID;
             }
         break;
         case 0xde:
@@ -341,7 +315,7 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         case 0x83:
         {
             if (*instr == 0x81) {
-                *instr_len += prefix.has_66 ? 3 : 5;
+                *instr_len += prefix.value == 0x66 ? 3 : 5;
             } else {
                 *instr_len += 2;
             }
@@ -389,7 +363,7 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             return DISASM_POP;
         case 0x90:
             *instr_len += 1;
-            return prefix.has_f3 ? DISASM_PAUSE : DISASM_NOP;
+            return prefix.value == 0xf3 ? DISASM_PAUSE : DISASM_NOP;
         case 0x91:
         case 0x92:
         case 0x93:
@@ -402,12 +376,12 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         case 0x98:
             *instr_len += 1;
             if (prefix.rex & 0x08) return DISASM_CDQE;
-            else if (prefix.has_66) return DISASM_CBW;
+            else if (prefix.value == 0x66) return DISASM_CBW;
             return DISASM_CWDE;
         case 0x99:
             *instr_len += 1;
             if (prefix.rex & 0x08) return DISASM_CQO;
-            else if (prefix.has_66) return DISASM_CWD;
+            else if (prefix.value == 0x66) return DISASM_CWD;
             return DISASM_CDQ;
         case 0x9a:
             return DISASM_INVALID;
@@ -416,10 +390,10 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             return DISASM_FWAIT;
         case 0x9c:
             *instr_len += 1;
-            return (prefix.has_66) ? DISASM_PUSHF : DISASM_PUSHFQ;
+            return (prefix.value == 0x66) ? DISASM_PUSHF : DISASM_PUSHFQ;
         case 0x9d:
             *instr_len += 1;
-            return (prefix.has_66) ? DISASM_POPF : DISASM_POPFQ;
+            return (prefix.value == 0x66) ? DISASM_POPF : DISASM_POPFQ;
         case 0x9E:
             *instr_len += 1;
             return DISASM_SAHF;
@@ -430,44 +404,44 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         case 0xa1:
         case 0xa2:
         case 0xa3:
-            *instr_len += 1 + (prefix.has_67 ? 4 : 8);
+            *instr_len += 1 + (prefix.value == 0x67 ? 4 : 8);
             return DISASM_MOV;
         case 0xa4:
             *instr_len += 1;
             return DISASM_MOVSB;
         case 0xa5:
             *instr_len += 1;
-            return (prefix.has_66) ? DISASM_MOVSW : DISASM_MOVSQ;
+            return (prefix.value == 0x66) ? DISASM_MOVSW : DISASM_MOVSQ;
         case 0xa6:
             *instr_len += 1;
             return DISASM_CMPSB;
         case 0xa7:
             *instr_len += 1;
-            return (prefix.has_66) ? DISASM_CMPSW : DISASM_CMPSQ;
+            return (prefix.value == 0x66) ? DISASM_CMPSW : DISASM_CMPSQ;
         case 0xa8:
             *instr_len += 2;
             return DISASM_TEST;
         case 0xa9:
-            *instr_len += 1 + (prefix.has_66 ? 2 : 4);
+            *instr_len += 1 + (prefix.value == 0x66 ? 2 : 4);
             return DISASM_TEST;
         case 0xaa:
             *instr_len += 1;
             return DISASM_STOSB;
         case 0xab:
             *instr_len += 1;
-            return (prefix.has_66) ? DISASM_STOSW : DISASM_STOSQ;
+            return (prefix.value == 0x66) ? DISASM_STOSW : DISASM_STOSQ;
         case 0xac:
             *instr_len += 1;
             return DISASM_LODSB;
         case 0xad:
             *instr_len += 1;
-            return (prefix.has_66) ? DISASM_LODSW : DISASM_LODSQ;
+            return (prefix.value == 0x66) ? DISASM_LODSW : DISASM_LODSQ;
         case 0xae:
             *instr_len += 1;
             return DISASM_SCASB;
         case 0xaf:
             *instr_len += 1;
-            return (prefix.has_66) ? DISASM_SCASW : DISASM_SCASQ;
+            return (prefix.value == 0x66) ? DISASM_SCASW : DISASM_SCASQ;
         case 0xb0:
         case 0xb1:
         case 0xb2:
@@ -488,7 +462,7 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         case 0xbf:
             *instr_len += 1;
             if (prefix.rex & 0x08) *instr_len += 8;
-            else if (prefix.has_66) *instr_len += 2;
+            else if (prefix.value == 0x66) *instr_len += 2;
             else *instr_len += 4;
             return DISASM_MOV;
         case 0xc0:
@@ -521,7 +495,7 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
             return DISASM_MOV;
         case 0xc7:
             if (((instr[1] & 0b00111000) >> 3) != 0) return DISASM_INVALID;
-            *instr_len += 1 + (prefix.has_66 ? 2 : 4) + _disasm_decode_mod_rm(instr);
+            *instr_len += 1 + (prefix.value == 0x66 ? 2 : 4) + _disasm_decode_mod_rm(instr);
             return DISASM_MOV;
         case 0xc8:
             *instr_len += 4;
@@ -546,7 +520,7 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         case 0xcf:
             *instr_len += 1;
             if (prefix.rex & 0x08) return DISASM_IRETQ;
-            else if (prefix.has_66) return DISASM_IRET;
+            else if (prefix.value == 0x66) return DISASM_IRET;
             return DISASM_IRETD;
         case 0xd0:
         case 0xd1:
@@ -582,6 +556,18 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         case 0xdf:
             *instr_len += 1 + _disasm_decode_mod_rm(instr);
             return _disasm_decode_fpu_mnemonic(prefix, instr);
+        case 0xe0:
+            *instr_len += 2;
+            return DISASM_LOOPNE;
+        case 0xe1:
+            *instr_len += 2;
+            return DISASM_LOOPE;
+        case 0xe2:
+            *instr_len += 2;
+            return DISASM_LOOP;
+        case 0xe3:
+            *instr_len += 2;
+            return (prefix.value == 0x67) ? DISASM_JECXZ : DISASM_JRCXZ;
     }
 
     return DISASM_INVALID;

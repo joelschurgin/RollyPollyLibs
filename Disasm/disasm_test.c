@@ -44,9 +44,10 @@ i32 main(i32 argc, u8 **argv) {
     FileBlock(arena, test_path, FILE_READ_ONLY, f) {
         u64 instr_len = 0;
         instr_len = test_decoder_at_addr(arena, f, 0x119b);
+        instr_len = test_decoder_at_addr(arena, f, 0x10f4);
     }
 
-    u8 instr[] = {0xE2, 0xFA};
+    u8 instr[] = {0xF7, 0xC0, 0x11, 0x22, 0x33, 0x44};
     test_decoder_bytes(arena, instr);
 
     return 0;

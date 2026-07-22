@@ -2,6 +2,7 @@
 
 typedef struct {
     u8 value;
+    b8 lock;
     u8 segment;
     u8 rex;
     u32 count;
@@ -22,6 +23,10 @@ internal Disasm_Prefix _disasm_decode_prefix(u8** instr_ptr) {
             case 0xf3:
             case 0x9b:
                 prefix.value = byte;
+                *instr_ptr += 1;
+            break;
+            case 0xf0:
+                prefix.lock = 1;
                 *instr_ptr += 1;
             break;
             default:
@@ -170,6 +175,44 @@ internal Disasm_Opcode _disasm_decode_fpu_mnemonic(Disasm_Prefix prefix, u8* ins
         break;
     }
 
+    return DISASM_INVALID;
+}
+
+internal Disasm_Opcode _disasm_group1_mneumonic(u8 reg) {
+    switch (reg) {
+        case 0: return DISASM_ADD;
+        case 1: return DISASM_OR;
+        case 2: return DISASM_ADC;
+        case 3: return DISASM_SBB;
+        case 4: return DISASM_AND;
+        case 5: return DISASM_SUB;
+        case 6: return DISASM_XOR;
+        case 7: return DISASM_CMP;
+    }
+    return DISASM_INVALID;
+}
+
+internal Disasm_Opcode _disasm_group2_mneumonic(u8 reg) {
+    switch (reg) {
+        case 0: return DISASM_ROL;
+        case 1: return DISASM_ROR;
+        case 4: return DISASM_SHL;
+        case 5: return DISASM_SHR;
+        case 7: return DISASM_SAR;
+    }
+    return DISASM_INVALID;
+}
+
+internal Disasm_Opcode _disasm_group3_mneumonic(u8 reg) {
+    switch (reg) {
+        case 0: return DISASM_TEST;
+        case 3: return DISASM_NOT;
+        case 4: return DISASM_NEG;
+        case 5: return DISASM_MUL;
+        case 6: return DISASM_IMUL;
+        case 7: return DISASM_DIV;
+        case 8: return DISASM_IDIV;
+    }
     return DISASM_INVALID;
 }
 
@@ -322,17 +365,8 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
 
             *instr_len += _disasm_decode_mod_rm(instr);
 
-            u8 instr_type = (instr[1] & 0b00111000) >> 3;
-            switch (instr_type) {
-                case 0: return DISASM_ADD;
-                case 1: return DISASM_OR;
-                case 2: return DISASM_ADC;
-                case 3: return DISASM_SBB;
-                case 4: return DISASM_AND;
-                case 5: return DISASM_SUB;
-                case 6: return DISASM_XOR;
-                case 7: return DISASM_CMP;
-            }
+            u8 reg = (instr[1] & 0b00111000) >> 3;
+            return _disasm_group1_mneumonic(reg);
         }
         break;
         case 0x82:
@@ -470,15 +504,8 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         {
             *instr_len += 2 + _disasm_decode_mod_rm(instr);
 
-            u8 shift_type = (instr[1] & 0b00111000) >> 3;
-            switch (shift_type) {
-                case 0: return DISASM_ROL;
-                case 1: return DISASM_ROR;
-                case 4: return DISASM_SHL;
-                case 5: return DISASM_SHR;
-                case 7: return DISASM_SAR;
-            }
-            return DISASM_INVALID;
+            u8 reg = (instr[1] & 0b00111000) >> 3;
+            return _disasm_group2_mneumonic(reg);
         }
         case 0xc2:
             *instr_len += 3;
@@ -529,15 +556,8 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         {
             *instr_len += 1 + _disasm_decode_mod_rm(instr);
 
-            u8 shift_type = (instr[1] & 0b00111000) >> 3;
-            switch (shift_type) {
-                case 0: return DISASM_ROL;
-                case 1: return DISASM_ROR;
-                case 4: return DISASM_SHL;
-                case 5: return DISASM_SHR;
-                case 7: return DISASM_SAR;
-            }
-            return DISASM_INVALID;
+            u8 reg = (instr[1] & 0b00111000) >> 3;
+            return _disasm_group2_mneumonic(reg);
         }
         case 0xd4:
         case 0xd5:
@@ -568,6 +588,61 @@ Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len) {
         case 0xe3:
             *instr_len += 2;
             return (prefix.value == 0x67) ? DISASM_JECXZ : DISASM_JRCXZ;
+        case 0xe4:
+        case 0xe5:
+            *instr_len += 2;
+            return DISASM_IN;
+        case 0xe6:
+        case 0xe7:
+            *instr_len += 2;
+            return DISASM_OUT;
+        case 0xe8:
+            *instr_len += 1 + ((prefix.value == 0x66) ? 2 : 4);
+            return DISASM_CALL;
+        case 0xe9:
+            *instr_len += 1 + ((prefix.value == 0x66) ? 2 : 4);
+            return DISASM_JMP;
+        case 0xea:
+            return DISASM_INVALID;
+        case 0xeb:
+            *instr_len += 2;
+            return DISASM_JMP;
+        case 0xec:
+        case 0xed:
+            *instr_len += 1;
+            return DISASM_IN;
+        case 0xee:
+        case 0xef:
+            *instr_len += 1;
+            return DISASM_OUT;
+        case 0xf0:
+        case 0xf1:
+        case 0xf2:
+        case 0xf3:
+            return DISASM_INVALID;
+        case 0xf4:
+            *instr_len += 1;
+            return DISASM_HLT;
+        case 0xf5:
+            *instr_len += 1;
+            return DISASM_CMC;
+        case 0xf6:
+        {
+            u8 reg = (instr[1] & 0b00111000) >> 3;
+            *instr_len += 1 + _disasm_decode_mod_rm(instr + 1) + (reg == 0);
+            return _disasm_group3_mneumonic(reg);
+        }
+        case 0xf7:
+        {
+            u8 reg = (instr[1] & 0b00111000) >> 3;
+
+            u32 imm_size = 0;
+            if (reg == 0) imm_size = prefix.value == 0x66 ? 2 : 4;
+
+            *instr_len += 1 + _disasm_decode_mod_rm(instr + 1) + imm_size;
+            return _disasm_group3_mneumonic(reg);
+
+        }
     }
 
     return DISASM_INVALID;

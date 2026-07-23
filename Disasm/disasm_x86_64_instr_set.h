@@ -1899,4 +1899,6 @@ typedef enum {
     DISASM_MAX_VALUE = DISASM_XTEST,
 } Disasm_Opcode;
 
+u8* disasm_opcode_stringify(Disasm_Opcode opcode);
+
 #endif

@@ -17,8 +17,13 @@ $CC -c disasm.c -o disasm.o $DISASM_CFLAGS
 ar rcs libdisasm.a disasm.o 
 echo -e "=> \033[32mBUILD COMPLETE: libdisasm.a\033[0m"
 
+echo "Building disasm_test_create..."
+$CC disasm_test_create.c -o disasm_test_create $TEST_CFLAGS $LDFLAGS
+echo -e "=> \033[32mBUILD COMPLETE: disasm_test_create\033[0m"
+
 echo "Building disasm_test..."
 $CC disasm_test.c -L. -ldisasm -o disasm_test $TEST_CFLAGS $LDFLAGS
+echo -e "=> \033[32mBUILD COMPLETE: disasm_test\033[0m"
 
 mkdir -p ../build/lib
 rm disasm.o 
@@ -27,4 +32,7 @@ mv libdisasm.a ../build/lib/libdisasm.a
 mkdir -p ../build/tests
 mv disasm_test ../build/tests/disasm_test
 
-echo -e "=> \033[32mBUILD COMPLETE: disasm_test\033[0m"
+mkdir -p ../build/dev_tools
+mkdir -p ../build/dev_tools/disasm
+mv disasm_test_create ../build/dev_tools/disasm_test_create
+

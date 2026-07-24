@@ -3,6 +3,11 @@
 #include "disasm_x86_64_instr_set.c"
 #include "disasm_x86_64_reg.c"
 
+#define RexB(rex) (((rex) & 0x01) << 3)
+#define RexX(rex) (((rex) & 0x02) << 2)
+#define RexR(rex) (((rex) & 0x04) << 1)
+#define RexW(rex)  ((rex) & 0x08)
+
 typedef struct {
     u8 value;
     b8 lock;
@@ -49,6 +54,29 @@ internal Disasm_Prefix _disasm_decode_prefix(u8** instr_len) {
     return prefix;
 }
 
+internal inline u8 _disasm_operand_16_32_64_size(Disasm_Prefix prefix) {
+    u8 size_bytes = 4;
+    if ((prefix.rex & 0x08) == 0x08) size_bytes = 8;
+    else if (prefix.value == 0x66) size_bytes = 2;
+    return size_bytes;
+}
+
+internal inline u8 _disasm_operand_16_32_size(Disasm_Prefix prefix) {
+    u8 size_bytes = 4;
+    if (prefix.value == 0x66) size_bytes = 2;
+    return size_bytes;
+}
+
+internal inline u8 _disasm_operand_64_16_size(Disasm_Prefix prefix) {
+    u8 size_bytes = 8;
+    if (prefix.value == 0x66) size_bytes = 2;
+    return size_bytes;
+}
+
+internal inline u8 _disasm_operand_8_size(Disasm_Prefix prefix) {
+    return 1;
+}
+
 internal Disasm_Reg _disasm_decode_reg(u8 reg_idx, u8 size_bytes, u8 rex) {
     switch (size_bytes) {
         case 1:
@@ -67,6 +95,7 @@ internal Disasm_Reg _disasm_decode_reg(u8 reg_idx, u8 size_bytes, u8 rex) {
 
     return DISASM_REG_NONE;
 }
+
 
 internal Disasm_Operand _disasm_decode_rm(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read, u8 size_bytes) {
     u8 rex = prefix.rex;
@@ -131,6 +160,15 @@ internal Disasm_Operand _disasm_decode_rm(u8* rm_byte, Disasm_Prefix prefix, u8*
     return operand;
 }
 
+internal inline Disasm_Operand _disasm_decode_rm8(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    return _disasm_decode_rm(rm_byte, prefix, num_bytes_read, 1);
+}
+
+internal inline Disasm_Operand _disasm_decode_rm16_32_64(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
+    return _disasm_decode_rm(rm_byte, prefix, num_bytes_read, size_bytes);
+}
+
 internal Disasm_Operand _disasm_decode_r(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read, u8 size_bytes) {
     Disasm_Operand operand = {0};
 
@@ -139,13 +177,22 @@ internal Disasm_Operand _disasm_decode_r(u8* rm_byte, Disasm_Prefix prefix, u8* 
 
     u8 rex = prefix.rex;
     u8 reg = (*rm_byte & 0b00111000) >> 3;
-    u8 rex_r = (rex & 0x04) << 1;
-    operand.reg = _disasm_decode_reg(reg | rex_r, operand.size_bytes, rex);
+    operand.reg = _disasm_decode_reg(reg | RexR(rex), operand.size_bytes, rex);
 
     *num_bytes_read += 1;
 
     return operand;
 }
+
+internal inline Disasm_Operand _disasm_decode_r8(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    return _disasm_decode_r(rm_byte, prefix, num_bytes_read, 1);
+}
+
+internal inline Disasm_Operand _disasm_decode_r16_32_64(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
+    return _disasm_decode_r(rm_byte, prefix, num_bytes_read, size_bytes);
+}
+
 
 internal Disasm_Operand _disasm_specific_reg(Disasm_Reg reg) {
     Disasm_Operand operand = {0};
@@ -270,27 +317,9 @@ internal inline Disasm_Operand _disasm_decode_imm8(u8* byte, u8 target_size, u8*
     return _disasm_decode_imm(byte, sizeof(i8), target_size, instr_len);
 }
 
-internal inline Disasm_Operand _disasm_decode_imm16(u8* byte, u8 target_size, u8* instr_len) {
-    return _disasm_decode_imm(byte, sizeof(i16), target_size, instr_len);
-}
-
-internal inline Disasm_Operand _disasm_decode_imm32(u8* byte, u8 target_size, u8* instr_len) {
-    return _disasm_decode_imm(byte, sizeof(i32), target_size, instr_len);
-}
-
-internal inline Disasm_Operand _disasm_decode_imm64(u8* byte, u8 target_size, u8* instr_len) {
-    return _disasm_decode_imm(byte, sizeof(i64), target_size, instr_len);
-}
-
-internal inline u8 _disasm_operand_16_32_64_size(Disasm_Prefix prefix) {
-    u8 size_bytes = 4;
-    if ((prefix.rex & 0x08) == 0x08) size_bytes = 8;
-    else if (prefix.value == 0x66) size_bytes = 2;
-    return size_bytes;
-}
-
-internal inline u8 _disasm_operand_8_size(Disasm_Prefix prefix) {
-    return 1;
+internal inline Disasm_Operand _disasm_decode_imm16_32(u8* byte, Disasm_Prefix prefix, u8 target_size, u8* instr_len) {
+    u8 size_bytes = _disasm_operand_16_32_size(prefix);
+    return _disasm_decode_imm(byte, Min(4, size_bytes), target_size, instr_len);
 }
 
 Disasm_Instr disasm_decode(u8* instr_ptr) {
@@ -299,76 +328,74 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
 
     Disasm_Prefix prefix = _disasm_decode_prefix(&instr_ptr);
 
-    switch (*instr_ptr) {
-        case 0x00:
-            {
-                instr.opcode = DISASM_ADD;
-                instr.num_operands = 2;
-                instr.instr_len = prefix.count;
+    if (*instr_ptr <= 0x3f) {
+        u8 op_combo = (*instr_ptr) & 7;
+        u8 op_type = (*instr_ptr) & ~7;
 
-                u8 size_bytes = _disasm_operand_8_size(prefix);
-                instr.operand[0] = _disasm_decode_rm(instr_ptr + 1, prefix, &instr.instr_len, size_bytes);
-                instr.operand[1] = _disasm_decode_r(instr_ptr + 1, prefix, &instr.instr_len, size_bytes);
-            }
+        switch (op_type) {
+            case 0x00: instr.opcode = DISASM_ADD; break;
+            case 0x08: instr.opcode = DISASM_OR; break;
+            case 0x10: instr.opcode = DISASM_ADC; break;
+            case 0x18: instr.opcode = DISASM_SBB; break;
+            case 0x20: instr.opcode = DISASM_AND; break;
+            case 0x28: instr.opcode = DISASM_SUB; break;
+            case 0x30: instr.opcode = DISASM_XOR; break;
+            case 0x38: instr.opcode = DISASM_CMP; break;
+        }
+
+        switch (op_combo) {
+        case 0x00:
+            instr.instr_len = prefix.count;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_rm8(instr_ptr + 1, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_r8(instr_ptr + 1, prefix, &instr.instr_len);
             return instr;
         case 0x01:
-            {
-                instr.opcode = DISASM_ADD;
-                instr.num_operands = 2;
-                instr.instr_len = prefix.count;
-
-                u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
-                instr.operand[0] = _disasm_decode_rm(instr_ptr + 1, prefix, &instr.instr_len, size_bytes);
-                instr.operand[1] = _disasm_decode_r(instr_ptr + 1, prefix, &instr.instr_len, size_bytes);
-            }
+            instr.instr_len = prefix.count;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_rm16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
             return instr;
         case 0x02:
-            {
-                instr.opcode = DISASM_ADD;
-                instr.num_operands = 2;
-                instr.instr_len = prefix.count;
-
-                u8 size_bytes = _disasm_operand_8_size(prefix);
-                instr.operand[0] = _disasm_decode_r(instr_ptr + 1, prefix, &instr.instr_len, size_bytes);
-                instr.operand[1] = _disasm_decode_rm(instr_ptr + 1, prefix, &instr.instr_len, size_bytes);
-            }
+            instr.instr_len = prefix.count;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_rm8(instr_ptr + 1, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_r8(instr_ptr + 1, prefix, &instr.instr_len);
             return instr;
         case 0x03:
-            {
-                instr.opcode = DISASM_ADD;
-                instr.num_operands = 2;
-                instr.instr_len = prefix.count;
-
-                u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
-                instr.operand[0] = _disasm_decode_r(instr_ptr + 1, prefix, &instr.instr_len, size_bytes);
-                instr.operand[1] = _disasm_decode_rm(instr_ptr + 1, prefix, &instr.instr_len, size_bytes);
-            }
+            instr.instr_len = prefix.count;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_rm16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
             return instr;
         case 0x04:
-            {
-                instr.opcode = DISASM_ADD;
-                instr.num_operands = 2;
-                instr.instr_len = 1 + prefix.count;
-
-                instr.operand[0] = _disasm_specific_reg(DISASM_REG_AL);
-                instr.operand[1] = _disasm_decode_imm8(instr_ptr + 1, 1, &instr.instr_len);
-            }
+            instr.num_operands = 2;
+            instr.instr_len = 1 + prefix.count;
+            instr.operand[0] = _disasm_specific_reg(DISASM_REG_AL);
+            instr.operand[1] = _disasm_decode_imm8(instr_ptr + 1, instr.operand[0].size_bytes, &instr.instr_len);
             return instr;
         case 0x05:
-            {
-                instr.opcode = DISASM_ADD;
-                instr.num_operands = 2;
-                instr.instr_len = 1 + prefix.count;
-
-                instr.operand[0] = _disasm_specific_reg(DISASM_REG_RAX);
-
-                u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
-                instr.operand[1] = _disasm_decode_imm(instr_ptr + 1, Min(4, size_bytes), size_bytes, &instr.instr_len);
-            }
+            instr.num_operands = 2;
+            instr.instr_len = 1 + prefix.count;
+            instr.operand[0] = _disasm_specific_reg(DISASM_REG_RAX);
+            instr.operand[1] = _disasm_decode_imm16_32(instr_ptr + 1, prefix, instr.operand[0].size_bytes, &instr.instr_len);
             return instr;
-
+        }
     }
 
+    if (*instr_ptr >= 0x50 && *instr_ptr <= 0x5f) {
+        instr.opcode = (*instr_ptr < 0x58) ? DISASM_PUSH : DISASM_POP;
+        instr.num_operands = 1;
+        instr.instr_len = 1 + prefix.count;
+
+        instr.operand[0].type = DISASM_OP_TYPE_REG;
+        instr.operand[0].size_bytes = _disasm_operand_64_16_size(prefix);
+
+        u8 reg = *instr_ptr & 0b111;
+        instr.operand[0].reg = _disasm_decode_reg(reg | RexB(prefix.rex), instr.operand[0].size_bytes, prefix.rex);
+        return instr;
+    }
+ 
     return instr;
 }
 
@@ -1083,3 +1110,10 @@ String disasm_operand_format(Arena* arena, Disasm_Operand operand) {
             return String("");
     }
 }
+
+
+#undef RexB
+#undef RexX
+#undef RexR
+#undef RexW
+

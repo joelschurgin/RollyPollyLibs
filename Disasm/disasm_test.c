@@ -55,9 +55,7 @@ i32 main(i32 argc, u8 **argv) {
     Arena* arena = default_arena();
 
     String dir = curr_dir(String(argv[0]));
-    //String test_path = string_format(arena, "%.*s/dwarf_tests/test64_dwarf5", dir.size, dir.str);
-    //String test_path = string_format(arena, "%.*s/../../Disasm/test_bytes.bin", dir.size, dir.str);
-    String test_path = string_format(arena, "%.*s/../dev_tools/disasm/test_05", dir.size, dir.str);
+    String test_path = string_format(arena, "%.*s/../dev_tools/disasm/test_50_to_5f", dir.size, dir.str);
 
     FileRead(arena, test_path, f) {
         u64 addr = 0x0;

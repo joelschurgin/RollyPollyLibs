@@ -40,7 +40,7 @@ String file_read_cstring(Arena* arena, File* f, u64 file_pos, u64* num_bytes_rea
     for (File* file_ptr_name = FilePtr((arena), (path)); file_ptr_name; ) \
     DeferBlock({ file_open(file_ptr_name, (flag)); }, { file_close(file_ptr_name); file_ptr_name = NULL; })
 
-#define FileRead(arena, path, file_ptr_name) FileBlock(arena, path, FILE_READ_ONLY)
+#define FileRead(arena, path, file_ptr_name) FileBlock(arena, path, FILE_READ_ONLY, file_ptr_name)
 
 // does not clear file
 #define FileModify(arena, path, file_ptr_name) \

@@ -191,6 +191,38 @@ void string_builder_step_back(Arena* arena, String* s, u64 num_chars) {
     *s = string_chop(*s, num_chars);
 }
 
+void string_builder_append_char(Arena* arena, String* s, u8 c) {
+    (void)push_struct(arena, u8);
+    s->str[s->size++] = c;
+}
+
+void string_builder_append_int(Arena* arena, String* s, i64 num, u8 base) {
+    Assert(base > 1 && base <= 16);
+
+    (void)push_struct(arena, u8);
+
+    if (num < 0) {
+        string_builder_append_char(arena, s, '-');
+        num = Abs(num);
+    }
+
+    u8* c_begin = s->str + s->size;
+
+    do {
+        u8 digit = (u8)(num % base);
+        num /= base;
+        if (digit <= 9) string_builder_append_char(arena, s, '0' + digit);
+        else string_builder_append_char(arena, s, 'a' + digit - 10);
+    } while (num > 0);
+
+    u8* c_end = s->str + s->size - 1;
+    for (; c_end - c_begin > 0; c_begin++, c_end--) {
+        u8 temp = *c_begin;
+        *c_begin = *c_end;
+        *c_end = temp;
+    }
+}
+
 String string_formatv(Arena* arena, u8* fmt, va_list args) {
     if (!fmt) return String("");
 

@@ -67,6 +67,8 @@ String string_copy(Arena* arena, String s);
 #define StringBuilderBlock(arena, string) DeferBlock({ (string).str = (u8*)((arena)->pos + (arena)->base); (string).size = 0; }, { if ((string).size == 0) (string).str = NULL; })
 void string_builder_append(Arena* arena, String* s, String string_to_append);
 void string_builder_step_back(Arena* arena, String* s, u64 num_chars);
+void string_builder_append_char(Arena* arena, String* s, u8 c);
+void string_builder_append_int(Arena* arena, String* s, i64 num, u8 base);
 
 String string_formatv(Arena* arena, u8* fmt, va_list args);
 String string_format(Arena* arena, u8* fmt, ...);

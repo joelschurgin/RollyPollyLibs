@@ -354,6 +354,19 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
                 instr.operand[1] = _disasm_decode_imm8(instr_ptr + 1, 1, &instr.instr_len);
             }
             return instr;
+        case 0x05:
+            {
+                instr.opcode = DISASM_ADD;
+                instr.num_operands = 2;
+                instr.instr_len = 1 + prefix.count;
+
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_RAX);
+
+                u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
+                instr.operand[1] = _disasm_decode_imm(instr_ptr + 1, Min(4, size_bytes), size_bytes, &instr.instr_len);
+            }
+            return instr;
+
     }
 
     return instr;

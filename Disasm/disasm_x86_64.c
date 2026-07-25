@@ -769,9 +769,82 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             instr.instr_len = 1;
             instr.num_operands = 2;
             instr.operand[0] = _disasm_decode_rm8(ModRMByte, prefix, &instr.instr_len);
-            instr.operand[1] = _disasm_decode_imm8(ModRMByte, sizeof(i8), &instr.instr_len);
+            instr.operand[1] = _disasm_decode_imm8(InstrNext, sizeof(i8), &instr.instr_len);
             instr.instr_len += prefix.count;
             return instr;
+        case 0x81:
+            instr.opcode = _disasm_group1_mnemonic(ModRMByte);
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_rm16_32_64(ModRMByte, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_imm16_32(InstrNext, prefix, instr.operand[0].size_bytes, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x83:
+            instr.opcode = _disasm_group1_mnemonic(ModRMByte);
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_rm16_32_64(ModRMByte, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_imm8(InstrNext, instr.operand[0].size_bytes, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x84:
+        case 0x85:
+            instr.opcode = DISASM_TEST;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            if ((*instr_ptr & 1) == 0) {
+                instr.operand[0] = _disasm_decode_rm8(ModRMByte, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_decode_r8(ModRMByte, prefix);
+            } else {
+                instr.operand[0] = _disasm_decode_rm16_32_64(ModRMByte, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_decode_r16_32_64(ModRMByte, prefix);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x86:
+        case 0x87:
+            instr.opcode = DISASM_XCHG;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            if ((*instr_ptr & 1) == 0) {
+                instr.operand[0] = _disasm_decode_rm8(ModRMByte, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_decode_r8(ModRMByte, prefix);
+            } else {
+                instr.operand[0] = _disasm_decode_rm16_32_64(ModRMByte, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_decode_r16_32_64(ModRMByte, prefix);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x88:
+        case 0x89:
+            instr.opcode = DISASM_MOV;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            if ((*instr_ptr & 1) == 0) {
+                instr.operand[0] = _disasm_decode_rm8(ModRMByte, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_decode_r8(ModRMByte, prefix);
+            } else {
+                instr.operand[0] = _disasm_decode_rm16_32_64(ModRMByte, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_decode_r16_32_64(ModRMByte, prefix);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x8a:
+        case 0x8b:
+            instr.opcode = DISASM_MOV;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            if ((*instr_ptr & 1) == 0) {
+                instr.operand[0] = _disasm_decode_r8(ModRMByte, prefix);
+                instr.operand[1] = _disasm_decode_rm8(ModRMByte, prefix, &instr.instr_len);
+            } else {
+                instr.operand[0] = _disasm_decode_r16_32_64(ModRMByte, prefix);
+                instr.operand[1] = _disasm_decode_rm16_32_64(ModRMByte, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+
     }
  
     return instr;
@@ -794,18 +867,10 @@ internal String _disasm_mem_format(Arena* arena, Disasm_Operand operand, Disasm_
     String str;
     StringBuilderBlock(arena, str) {
         switch(operand.size_bytes) {
-            case 1:
-                string_builder_append(arena, &str, String("byte ptr "));
-            break;
-            case 2:
-                string_builder_append(arena, &str, String("word ptr "));
-            break;
-            case 4:
-                string_builder_append(arena, &str, String("dword ptr "));
-            break;
-            case 8:
-                string_builder_append(arena, &str, String("qword ptr "));
-            break;
+            case 1: string_builder_append(arena, &str, String("byte ptr ")); break;
+            case 2: string_builder_append(arena, &str, String("word ptr ")); break;
+            case 4: string_builder_append(arena, &str, String("dword ptr ")); break;
+            case 8: string_builder_append(arena, &str, String("qword ptr ")); break;
         }
 
         if (opcode == DISASM_INSB || opcode == DISASM_INSW || opcode == DISASM_INSD) {
@@ -871,16 +936,11 @@ internal String _disasm_rel_format(Arena* arena, Disasm_Operand operand, u8 inst
 String disasm_operand_format(Arena* arena, Disasm_Instr instr, u8 operand_idx) {
     Disasm_Operand operand = instr.operand[operand_idx];
     switch (operand.type) {
-        case DISASM_OP_TYPE_REG:
-            return _disasm_reg_format(arena, operand.reg);
-        case DISASM_OP_TYPE_IMM:
-            return _disasm_imm_format(arena, operand);
-        case DISASM_OP_TYPE_MEM:
-            return _disasm_mem_format(arena, operand, instr.opcode);
-        case DISASM_OP_TYPE_REL:
-            return _disasm_rel_format(arena, operand, instr.instr_len);
-        default:
-            return String("");
+        case DISASM_OP_TYPE_REG: return _disasm_reg_format(arena, operand.reg);
+        case DISASM_OP_TYPE_IMM: return _disasm_imm_format(arena, operand);
+        case DISASM_OP_TYPE_MEM: return _disasm_mem_format(arena, operand, instr.opcode);
+        case DISASM_OP_TYPE_REL: return _disasm_rel_format(arena, operand, instr.instr_len);
+        default:                 return String("");
     }
 }
 

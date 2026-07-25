@@ -10,6 +10,7 @@ typedef enum {
     DISASM_OP_TYPE_REG,
     DISASM_OP_TYPE_MEM,
     DISASM_OP_TYPE_IMM,
+    DISASM_OP_TYPE_REL,
 } Disasm_OperandType;
 
 typedef struct {
@@ -18,6 +19,7 @@ typedef struct {
     union {
         Disasm_Reg reg;
         i64 imm;
+        i64 rel;
         struct {
             Disasm_Reg base_reg;
             u8 idx_reg;
@@ -38,9 +40,7 @@ typedef struct {
 
 Disasm_Instr  disasm_decode(u8* instr_ptr);
 
-Disasm_Opcode disasm_decode_opcode_and_length_64(u8* instr, u64* instr_len);
-
 String        disasm_opcode_format(Arena* arena, Disasm_Opcode opcode);
-String        disasm_operand_format(Arena* arena, Disasm_Operand operand);
+String        disasm_operand_format(Arena* arena, Disasm_Instr instr, u8 operand_idx);
 
 #endif

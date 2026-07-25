@@ -10,21 +10,6 @@ String curr_dir(String path) {
     return path;
 }
 
-u64 decode_length_at_addr(Arena* arena, File* f, u64 addr) {
-    u64 instr_len = 0;
-    u8* instr = (u8*)f->data + addr;
-
-    Disasm_Opcode opcode = disasm_decode_opcode_and_length_64(instr, &instr_len);
-    String mnemonic = opcode == DISASM_INVALID ? String("(bad)") : disasm_opcode_format(arena, opcode);
-
-    printf("    \033[95m%0.8lx\033[0m:       ", addr);
-    for (u64 i = 0; i < instr_len; i++) {
-        printf("%0.2x ", instr[i]);
-    }
-    printf("\033[50G\033[32m%.*s\033[0m\n", mnemonic.size, mnemonic.str);
-    return instr_len;
-}
-
 u64 decode(Arena* arena, u8* instr_ptr) {
     Disasm_Instr instr = disasm_decode(instr_ptr);
 
@@ -35,7 +20,7 @@ u64 decode(Arena* arena, u8* instr_ptr) {
     printf("\033[50G\033[32m%.*s\033[0m   ", mnemonic.size, mnemonic.str);
 
     for (u8 op_idx = 0; op_idx < instr.num_operands; op_idx++) {
-        String operand = disasm_operand_format(arena, instr.operand[op_idx]);
+        String operand = disasm_operand_format(arena, instr, op_idx);
         printf("\033[94m%.*s\033[0m", operand.size, operand.str);
         if (op_idx != instr.num_operands - 1) printf(", ");
     }
@@ -55,7 +40,7 @@ i32 main(i32 argc, u8 **argv) {
     Arena* arena = default_arena();
 
     String dir = curr_dir(String(argv[0]));
-    String test_path = string_format(arena, "%.*s/../dev_tools/disasm/test_6c", dir.size, dir.str);
+    String test_path = string_format(arena, "%.*s/../dev_tools/disasm/test_70_to_7f", dir.size, dir.str);
 
     FileRead(arena, test_path, f) {
         u64 addr = 0x0;

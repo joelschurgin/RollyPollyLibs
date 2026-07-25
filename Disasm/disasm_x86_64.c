@@ -64,6 +64,152 @@ internal Disasm_Prefix _disasm_decode_prefix(u8** instr_len) {
     return prefix;
 }
 
+
+
+internal Disasm_Opcode _disasm_decode_fpu_mnemonic(Disasm_Prefix prefix, u8* instr, u64* instr_len) {
+    u8 mod = (instr[1] & 0b11000000) >> 6;
+    u8 reg = (instr[1] & 0b00111000) >> 3;
+
+    switch (*instr) {
+        case 0xd8:
+            switch (reg) {
+                case 0: return DISASM_FADD;
+                case 1: return DISASM_FMUL;
+                case 3: return DISASM_FCOMP;
+                case 4: return DISASM_FSUB;
+                case 5: return DISASM_FSUBR;
+                case 6: return DISASM_FDIV;
+                case 7: return DISASM_FDIVR;
+            }
+        break;
+        case 0xd9:
+            switch (reg) {
+                case 0: return DISASM_FLD;
+                case 1: return DISASM_FXCH;
+                case 2: return (mod != 3) ? DISASM_FST : DISASM_FNOP;
+                case 3: return DISASM_FSTP;
+                case 6: return ((prefix.value == 0x9b) ? DISASM_FSTENV : DISASM_FNSTENV);
+                case 7: return ((prefix.value == 0x9b) ? DISASM_FSTCW : DISASM_FNSTCW);
+            }
+        break;
+        case 0xda:
+            switch (reg) {
+                case 0: return (mod != 3) ? DISASM_FIADD : DISASM_FCMOVB;
+                case 1: return (mod != 3) ? DISASM_FIMUL : DISASM_FCMOVE;
+                case 2: return (mod != 3) ? DISASM_FICOM : DISASM_FCMOVBE;
+                case 3: return (mod != 3) ? DISASM_FICOMP : DISASM_FCMOVU;
+                case 4: return (mod != 3) ? DISASM_FISUB : DISASM_INVALID;
+                case 5: return (mod != 3) ? DISASM_FISUBR : DISASM_FUCOMPP;
+                case 6: return (mod != 3) ? DISASM_FIDIV : DISASM_INVALID;
+                case 7: return (mod != 3) ? DISASM_FIDIVR : DISASM_INVALID;
+            }
+        break;
+        case 0xdb:
+            switch (reg) {
+                case 0: return (mod != 3) ? DISASM_FILD : DISASM_FCMOVNB;
+                case 1: return (mod != 3) ? DISASM_FISTTP : DISASM_FCMOVNE;
+                case 2: return (mod != 3) ? DISASM_FIST : DISASM_FCMOVNBE;
+                case 3: return (mod != 3) ? DISASM_FISTP : DISASM_FCMOVNU;
+                case 4: return (mod != 3) ? DISASM_INVALID : ((prefix.value == 0x9b) ? DISASM_FCLEX : DISASM_FNCLEX);
+                case 5: return (mod != 3) ? DISASM_FLD : ((prefix.value == 0x9b) ? DISASM_FINIT : DISASM_FNINIT);
+                case 7: return (mod != 3) ? DISASM_FSTP : DISASM_INVALID;
+            }
+        break;
+        case 0xdc:
+            switch (reg) {
+                case 0: return DISASM_FADD;
+                case 1: return DISASM_FMUL;
+                case 2: return DISASM_FCOM;
+                case 3: return DISASM_FCOMP;
+                case 4: return DISASM_FSUB;
+                case 5: return DISASM_FSUBR;
+                case 6: return DISASM_FDIV;
+                case 7: return DISASM_FDIVR;
+            }
+        break;
+        case 0xdd:
+            switch (reg) {
+                case 0: return (mod != 3) ? DISASM_FLD : DISASM_FFREE;
+                case 1: return (mod != 3) ? DISASM_FISTTP : DISASM_INVALID;
+                case 2: return (mod != 3) ? DISASM_FST : DISASM_FCOM;
+                case 3: return (mod != 3) ? DISASM_FSTP : DISASM_FCOMP;
+                case 4: return (mod != 3) ? DISASM_FRSTOR : DISASM_FUCOM;
+                case 5: return (mod != 3) ? DISASM_INVALID : DISASM_FUCOMP;
+                case 6: return (mod != 3) ? ((prefix.value == 0x9b) ? DISASM_FSAVE : DISASM_FNSAVE) : DISASM_INVALID;
+                case 7: return (mod != 3) ? ((prefix.value == 0x9b) ? DISASM_FSTSW : DISASM_FNSTSW) : DISASM_INVALID;
+            }
+        break;
+        case 0xde:
+            switch (reg) {
+                case 0: return (mod != 3) ? DISASM_FIADD : DISASM_FADDP;
+                case 1: return (mod != 3) ? DISASM_FIMUL : DISASM_FMULP;
+                case 2: return (mod != 3) ? DISASM_FICOM : DISASM_INVALID;
+                case 3: return (mod != 3) ? DISASM_FICOMP : DISASM_FCOMPP;
+                case 4: return (mod != 3) ? DISASM_FISUB : DISASM_FSUBRP;
+                case 5: return (mod != 3) ? DISASM_FISUBR : DISASM_FSUBP;
+                case 6: return (mod != 3) ? DISASM_FIDIV : DISASM_FDIVRP;
+                case 7: return (mod != 3) ? DISASM_FIDIVR : DISASM_FDIVP;
+            }
+        break;
+        case 0xdf:
+            switch (reg) {
+                case 0: return (mod != 3) ? DISASM_FILD : DISASM_INVALID;
+                case 1: return (mod != 3) ? DISASM_FISTTP : DISASM_INVALID;
+                case 2: return (mod != 3) ? DISASM_FIST : DISASM_INVALID;
+                case 3: return (mod != 3) ? DISASM_FISTP : DISASM_INVALID;
+                case 4: return (mod != 3) ? DISASM_FBSTP : DISASM_FNSTSW;
+                case 5: return (mod != 3) ? DISASM_FILD : DISASM_FUCOMIP;
+                case 6: return (mod != 3) ? DISASM_FISTP : DISASM_FCOMIP;
+                case 7: return (mod != 3) ? DISASM_FISTP : DISASM_INVALID;
+            }
+        break;
+    }
+
+    *instr_len = 1;
+	return DISASM_INVALID;
+}
+
+internal Disasm_Opcode _disasm_group1_mnemonic(u8* byte) {
+    u8 reg = (*byte & 0b00111000) >> 3;
+    switch (reg) {
+        case 0: return DISASM_ADD;
+        case 1: return DISASM_OR;
+        case 2: return DISASM_ADC;
+        case 3: return DISASM_SBB;
+        case 4: return DISASM_AND;
+        case 5: return DISASM_SUB;
+        case 6: return DISASM_XOR;
+        case 7: return DISASM_CMP;
+    }
+	return DISASM_INVALID;
+}
+
+internal Disasm_Opcode _disasm_group2_mnemonic(u8* byte) {
+    u8 reg = (*byte & 0b00111000) >> 3;
+    switch (reg) {
+        case 0: return DISASM_ROL;
+        case 1: return DISASM_ROR;
+        case 4: return DISASM_SHL;
+        case 5: return DISASM_SHR;
+        case 7: return DISASM_SAR;
+    }
+	return DISASM_INVALID;
+}
+
+internal Disasm_Opcode _disasm_group3_mnemonic(u8* byte) {
+    u8 reg = (*byte & 0b00111000) >> 3;
+    switch (reg) {
+        case 0: return DISASM_TEST;
+        case 3: return DISASM_NOT;
+        case 4: return DISASM_NEG;
+        case 5: return DISASM_MUL;
+        case 6: return DISASM_IMUL;
+        case 7: return DISASM_DIV;
+        case 8: return DISASM_IDIV;
+    }
+	return DISASM_INVALID;
+}
+
 internal inline u8 _disasm_operand_16_32_64_size(Disasm_Prefix prefix) {
     u8 size_bytes = 4;
     if ((prefix.rex & 0x08) == 0x08) size_bytes = 8;
@@ -218,6 +364,7 @@ internal Disasm_Operand _disasm_specific_reg(Disasm_Reg reg) {
     operand.type = DISASM_OP_TYPE_REG;
 
     switch (reg) {
+        case DISASM_REG_AL:   case DISASM_REG_CL:   case DISASM_REG_DL:   case DISASM_REG_BL:
         case DISASM_REG_AH:   case DISASM_REG_CH:   case DISASM_REG_DH:   case DISASM_REG_BH:
         case DISASM_REG_SPL:  case DISASM_REG_BPL:  case DISASM_REG_SIL:  case DISASM_REG_DIL:
         case DISASM_REG_R8B:  case DISASM_REG_R9B:  case DISASM_REG_R10B: case DISASM_REG_R11B:
@@ -319,6 +466,8 @@ internal inline Disasm_Operand _disasm_decode_rel8(u8* byte, u8* instr_len) {
 }
 
 Disasm_Instr disasm_decode(u8* instr_ptr) {
+#define InstrNext (instr_ptr + instr.instr_len)
+#define ModRMByte (instr_ptr + 1)
     Disasm_Instr instr = {0};
     instr.instr = instr_ptr;
 
@@ -341,40 +490,46 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
 
         switch (op_combo) {
         case 0x00:
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 2;
-            instr.operand[0] = _disasm_decode_rm8(instr_ptr + 1, prefix, &instr.instr_len);
-            instr.operand[1] = _disasm_decode_r8(instr_ptr + 1, prefix);
+            instr.operand[0] = _disasm_decode_rm8(ModRMByte, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_r8(ModRMByte, prefix);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x01:
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 2;
-            instr.operand[0] = _disasm_decode_rm16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
-            instr.operand[1] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix);
+            instr.operand[0] = _disasm_decode_rm16_32_64(ModRMByte, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_r16_32_64(ModRMByte, prefix);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x02:
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 2;
-            instr.operand[0] = _disasm_decode_rm8(instr_ptr + 1, prefix, &instr.instr_len);
-            instr.operand[1] = _disasm_decode_r8(instr_ptr + 1, prefix);
+            instr.operand[0] = _disasm_decode_rm8(ModRMByte, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_r8(ModRMByte, prefix);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x03:
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 2;
-            instr.operand[0] = _disasm_decode_rm16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
-            instr.operand[1] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix);
+            instr.operand[0] = _disasm_decode_rm16_32_64(ModRMByte, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_r16_32_64(ModRMByte, prefix);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x04:
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 2;
             instr.operand[0] = _disasm_specific_reg(DISASM_REG_AL);
-            instr.operand[1] = _disasm_decode_imm8(instr_ptr + 1, instr.operand[0].size_bytes, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_imm8(InstrNext, instr.operand[0].size_bytes, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x05:
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 2;
             instr.operand[0] = _disasm_specific_reg(DISASM_REG_RAX);
-            instr.operand[1] = _disasm_decode_imm16_32(instr_ptr + 1, prefix, instr.operand[0].size_bytes, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_imm16_32(InstrNext, prefix, instr.operand[0].size_bytes, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         }
     }
@@ -397,14 +552,15 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             instr.opcode = DISASM_MOVSXD;
             instr.instr_len = 1 + prefix.count;
             instr.num_operands = 2;
-            instr.operand[0] = _disasm_decode_r32_64(instr_ptr + 1, prefix);
-            instr.operand[1] = _disasm_decode_rm32(instr_ptr + 1, prefix, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_r32_64(ModRMByte, prefix);
+            instr.operand[1] = _disasm_decode_rm32(ModRMByte, prefix, &instr.instr_len);
             return instr;
         case 0x68:
             instr.opcode = DISASM_PUSH;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_imm16_32(instr_ptr + 1, prefix, sizeof(i64), &instr.instr_len);
+            instr.operand[0] = _disasm_decode_imm16_32(InstrNext, prefix, sizeof(i64), &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x69:
             {
@@ -412,26 +568,28 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
                 instr.instr_len = 1 + prefix.count;
                 instr.num_operands = 3;
                 u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
-                instr.operand[0] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix);
-                instr.operand[1] = _disasm_decode_rm16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
+                instr.operand[0] = _disasm_decode_r16_32_64(ModRMByte, prefix);
+                instr.operand[1] = _disasm_decode_rm16_32_64(ModRMByte, prefix, &instr.instr_len);
                 instr.operand[2] = _disasm_decode_imm(instr_ptr + instr.instr_len - prefix.count, Min(4, size_bytes), size_bytes, &instr.instr_len);
             }
             return instr;
         case 0x6a:
             instr.opcode = DISASM_PUSH;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_imm8(instr_ptr + 1, sizeof(i64), &instr.instr_len);
+            instr.operand[0] = _disasm_decode_imm8(InstrNext, sizeof(i64), &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x6b:
             {
                 instr.opcode = DISASM_IMUL;
-                instr.instr_len = 1 + prefix.count;
+                instr.instr_len = 1;
                 instr.num_operands = 3;
                 u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
-                instr.operand[0] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix);
-                instr.operand[1] = _disasm_decode_rm16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
-                instr.operand[2] = _disasm_decode_imm8(instr_ptr + instr.instr_len - prefix.count, size_bytes, &instr.instr_len);
+                instr.operand[0] = _disasm_decode_r16_32_64(ModRMByte, prefix);
+                instr.operand[1] = _disasm_decode_rm16_32_64(ModRMByte, prefix, &instr.instr_len);
+                instr.operand[2] = _disasm_decode_imm8(InstrNext, size_bytes, &instr.instr_len);
+                instr.instr_len += prefix.count;
             }
             return instr;
         case 0x6c:
@@ -496,277 +654,130 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             return instr;
         case 0x70:
             instr.opcode = DISASM_JO;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x71:
             instr.opcode = DISASM_JNO;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x72:
             instr.opcode = DISASM_JB;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x73:
             instr.opcode = DISASM_JNB;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x74:
             instr.opcode = DISASM_JZ;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x75:
             instr.opcode = DISASM_JNZ;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x76:
             instr.opcode = DISASM_JBE;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x77:
             instr.opcode = DISASM_JNBE;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x78:
             instr.opcode = DISASM_JS;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x79:
             instr.opcode = DISASM_JNS;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x7a:
             instr.opcode = DISASM_JP;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x7b:
             instr.opcode = DISASM_JNP;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x7c:
             instr.opcode = DISASM_JL;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x7d:
             instr.opcode = DISASM_JNL;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x7e:
             instr.opcode = DISASM_JLE;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
         case 0x7f:
             instr.opcode = DISASM_JNLE;
-            instr.instr_len = 1 + prefix.count;
+            instr.instr_len = 1;
             instr.num_operands = 1;
-            instr.operand[0] = _disasm_decode_rel8(instr_ptr + 1, &instr.instr_len);
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x80:
+            instr.opcode = _disasm_group1_mnemonic(ModRMByte);
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_rm8(ModRMByte, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_imm8(ModRMByte, sizeof(i8), &instr.instr_len);
+            instr.instr_len += prefix.count;
             return instr;
     }
  
     return instr;
-}
 
-internal u64 _disasm_decode_mod_rm_length(u8* instr) {
-    u8 mod = (instr[1] & 0b11000000) >> 6;
-    u8 rm  = (instr[1] & 0b00000111);
-
-    u64 instr_len = 1;
-
-    switch (mod) {
-        case 0:
-            if (rm == 5) instr_len += 4;
-        break;
-        case 1:
-            instr_len += 1;
-        break;
-        case 2:
-            instr_len += 4;
-        break;
-        case 3:
-        break;
-    }
-
-    if (rm == 4 && mod != 3) {
-        instr_len += 1;
-        if (mod == 0 && ((instr[2] & 0b111) == 5)) {
-            instr_len += 4;
-        }
-    }
-
-    return instr_len;
-}
-
-internal Disasm_Opcode _disasm_decode_fpu_mnemonic(Disasm_Prefix prefix, u8* instr, u64* instr_len) {
-    u8 mod = (instr[1] & 0b11000000) >> 6;
-    u8 reg = (instr[1] & 0b00111000) >> 3;
-
-    switch (*instr) {
-        case 0xd8:
-            switch (reg) {
-                case 0: return DISASM_FADD;
-                case 1: return DISASM_FMUL;
-                case 3: return DISASM_FCOMP;
-                case 4: return DISASM_FSUB;
-                case 5: return DISASM_FSUBR;
-                case 6: return DISASM_FDIV;
-                case 7: return DISASM_FDIVR;
-            }
-        break;
-        case 0xd9:
-            switch (reg) {
-                case 0: return DISASM_FLD;
-                case 1: return DISASM_FXCH;
-                case 2: return (mod != 3) ? DISASM_FST : DISASM_FNOP;
-                case 3: return DISASM_FSTP;
-                case 6: return ((prefix.value == 0x9b) ? DISASM_FSTENV : DISASM_FNSTENV);
-                case 7: return ((prefix.value == 0x9b) ? DISASM_FSTCW : DISASM_FNSTCW);
-            }
-        break;
-        case 0xda:
-            switch (reg) {
-                case 0: return (mod != 3) ? DISASM_FIADD : DISASM_FCMOVB;
-                case 1: return (mod != 3) ? DISASM_FIMUL : DISASM_FCMOVE;
-                case 2: return (mod != 3) ? DISASM_FICOM : DISASM_FCMOVBE;
-                case 3: return (mod != 3) ? DISASM_FICOMP : DISASM_FCMOVU;
-                case 4: return (mod != 3) ? DISASM_FISUB : DISASM_INVALID;
-                case 5: return (mod != 3) ? DISASM_FISUBR : DISASM_FUCOMPP;
-                case 6: return (mod != 3) ? DISASM_FIDIV : DISASM_INVALID;
-                case 7: return (mod != 3) ? DISASM_FIDIVR : DISASM_INVALID;
-            }
-        break;
-        case 0xdb:
-            switch (reg) {
-                case 0: return (mod != 3) ? DISASM_FILD : DISASM_FCMOVNB;
-                case 1: return (mod != 3) ? DISASM_FISTTP : DISASM_FCMOVNE;
-                case 2: return (mod != 3) ? DISASM_FIST : DISASM_FCMOVNBE;
-                case 3: return (mod != 3) ? DISASM_FISTP : DISASM_FCMOVNU;
-                case 4: return (mod != 3) ? DISASM_INVALID : ((prefix.value == 0x9b) ? DISASM_FCLEX : DISASM_FNCLEX);
-                case 5: return (mod != 3) ? DISASM_FLD : ((prefix.value == 0x9b) ? DISASM_FINIT : DISASM_FNINIT);
-                case 7: return (mod != 3) ? DISASM_FSTP : DISASM_INVALID;
-            }
-        break;
-        case 0xdc:
-            switch (reg) {
-                case 0: return DISASM_FADD;
-                case 1: return DISASM_FMUL;
-                case 2: return DISASM_FCOM;
-                case 3: return DISASM_FCOMP;
-                case 4: return DISASM_FSUB;
-                case 5: return DISASM_FSUBR;
-                case 6: return DISASM_FDIV;
-                case 7: return DISASM_FDIVR;
-            }
-        break;
-        case 0xdd:
-            switch (reg) {
-                case 0: return (mod != 3) ? DISASM_FLD : DISASM_FFREE;
-                case 1: return (mod != 3) ? DISASM_FISTTP : DISASM_INVALID;
-                case 2: return (mod != 3) ? DISASM_FST : DISASM_FCOM;
-                case 3: return (mod != 3) ? DISASM_FSTP : DISASM_FCOMP;
-                case 4: return (mod != 3) ? DISASM_FRSTOR : DISASM_FUCOM;
-                case 5: return (mod != 3) ? DISASM_INVALID : DISASM_FUCOMP;
-                case 6: return (mod != 3) ? ((prefix.value == 0x9b) ? DISASM_FSAVE : DISASM_FNSAVE) : DISASM_INVALID;
-                case 7: return (mod != 3) ? ((prefix.value == 0x9b) ? DISASM_FSTSW : DISASM_FNSTSW) : DISASM_INVALID;
-            }
-        break;
-        case 0xde:
-            switch (reg) {
-                case 0: return (mod != 3) ? DISASM_FIADD : DISASM_FADDP;
-                case 1: return (mod != 3) ? DISASM_FIMUL : DISASM_FMULP;
-                case 2: return (mod != 3) ? DISASM_FICOM : DISASM_INVALID;
-                case 3: return (mod != 3) ? DISASM_FICOMP : DISASM_FCOMPP;
-                case 4: return (mod != 3) ? DISASM_FISUB : DISASM_FSUBRP;
-                case 5: return (mod != 3) ? DISASM_FISUBR : DISASM_FSUBP;
-                case 6: return (mod != 3) ? DISASM_FIDIV : DISASM_FDIVRP;
-                case 7: return (mod != 3) ? DISASM_FIDIVR : DISASM_FDIVP;
-            }
-        break;
-        case 0xdf:
-            switch (reg) {
-                case 0: return (mod != 3) ? DISASM_FILD : DISASM_INVALID;
-                case 1: return (mod != 3) ? DISASM_FISTTP : DISASM_INVALID;
-                case 2: return (mod != 3) ? DISASM_FIST : DISASM_INVALID;
-                case 3: return (mod != 3) ? DISASM_FISTP : DISASM_INVALID;
-                case 4: return (mod != 3) ? DISASM_FBSTP : DISASM_FNSTSW;
-                case 5: return (mod != 3) ? DISASM_FILD : DISASM_FUCOMIP;
-                case 6: return (mod != 3) ? DISASM_FISTP : DISASM_FCOMIP;
-                case 7: return (mod != 3) ? DISASM_FISTP : DISASM_INVALID;
-            }
-        break;
-    }
-
-    *instr_len = 1;
-	return DISASM_INVALID;
-}
-
-internal Disasm_Opcode _disasm_group1_mnemonic(u8 reg, u64* instr_len) {
-    switch (reg) {
-        case 0: return DISASM_ADD;
-        case 1: return DISASM_OR;
-        case 2: return DISASM_ADC;
-        case 3: return DISASM_SBB;
-        case 4: return DISASM_AND;
-        case 5: return DISASM_SUB;
-        case 6: return DISASM_XOR;
-        case 7: return DISASM_CMP;
-    }
-    *instr_len = 1;
-	return DISASM_INVALID;
-}
-
-internal Disasm_Opcode _disasm_group2_mnemonic(u8 reg, u64* instr_len) {
-    switch (reg) {
-        case 0: return DISASM_ROL;
-        case 1: return DISASM_ROR;
-        case 4: return DISASM_SHL;
-        case 5: return DISASM_SHR;
-        case 7: return DISASM_SAR;
-    }
-    *instr_len = 1;
-	return DISASM_INVALID;
-}
-
-internal Disasm_Opcode _disasm_group3_mnemonic(u8 reg, u64* instr_len) {
-    switch (reg) {
-        case 0: return DISASM_TEST;
-        case 3: return DISASM_NOT;
-        case 4: return DISASM_NEG;
-        case 5: return DISASM_MUL;
-        case 6: return DISASM_IMUL;
-        case 7: return DISASM_DIV;
-        case 8: return DISASM_IDIV;
-    }
-    *instr_len = 1;
-	return DISASM_INVALID;
+#undef InstrNext
+#undef ModRMByte
 }
 
 String disasm_opcode_format(Arena* arena, Disasm_Opcode opcode) {
@@ -784,10 +795,10 @@ internal String _disasm_mem_format(Arena* arena, Disasm_Operand operand, Disasm_
     StringBuilderBlock(arena, str) {
         switch(operand.size_bytes) {
             case 1:
-                string_builder_append(arena, &str, String(" byte ptr "));
+                string_builder_append(arena, &str, String("byte ptr "));
             break;
             case 2:
-                string_builder_append(arena, &str, String(" word ptr "));
+                string_builder_append(arena, &str, String("word ptr "));
             break;
             case 4:
                 string_builder_append(arena, &str, String("dword ptr "));

@@ -261,6 +261,17 @@ i32 main(i32 argc, u8 **argv) {
         };
         test_write_bytes(arena, curr_dir, String("test_70_to_7f"), instr, sizeof(instr));
     }
+    {
+        u8 instr[] = {
+            0x80, 0xF9, 0x0A,
+            0x80, 0x03, 0x05,
+            0x80, 0x65, 0x10, 0xFE,
+            0x41, 0x80, 0xEE, 0x01,
+            0x80, 0x34, 0x24, 0xAA,
+        };
+        test_write_bytes(arena, curr_dir, String("test_80"), instr, sizeof(instr));
+    }
+
 
     return 0;
 }

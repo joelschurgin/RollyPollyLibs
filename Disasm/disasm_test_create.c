@@ -182,6 +182,39 @@ i32 main(i32 argc, u8 **argv) {
         };
         test_write_bytes(arena, curr_dir, String("test_50_to_5f"), instr, sizeof(instr));
     }
+    {
+        u8 instr[] = {
+            0x63, 0xc1,
+            0x48, 0x63, 0xC1,
+            0x4c, 0x63, 0x00,
+        };
+        test_write_bytes(arena, curr_dir, String("test_63"), instr, sizeof(instr));
+    }
+    {
+        u8 instr[] = {
+            0x68, 0x44, 0x33, 0x22, 0x11,
+            0x68, 0xFB, 0xFF, 0xFF, 0xFF,
+            0x66, 0x68, 0x34, 0x12,
+        };
+        test_write_bytes(arena, curr_dir, String("test_68"), instr, sizeof(instr));
+    }
+    {
+        u8 instr[] = {
+            0x69, 0xC1, 0x34, 0x12, 0x00, 0x00,
+            0x66, 0x69, 0xC1, 0x34, 0x12,
+            0x48, 0x69, 0xC1, 0xFB, 0xFF, 0xFF, 0xFF,
+            0x66, 0x69, 0x04, 0xff, 0x88, 0x02,
+        };
+        test_write_bytes(arena, curr_dir, String("test_69"), instr, sizeof(instr));
+    }
+    {
+        u8 instr[] = {
+            0x6B, 0xC1, 0x10,
+            0x48, 0x6B, 0xC1, 0xFB,
+            0x66, 0x6B, 0x04, 0x88, 0x02,
+        };
+        test_write_bytes(arena, curr_dir, String("test_6b"), instr, sizeof(instr));
+    }
 
     return 0;
 }

@@ -24,9 +24,11 @@ internal Disasm_Prefix _disasm_decode_prefix(u8** instr_len) {
     for (; i < 15; i++) {
         u8 byte = *instr_len[0];
         switch (byte) {
+            case 0x64:
+            case 0x65:
+                Assert(!"Unhandled case");
             case 0x66:
             case 0x67:
-            case 0x64:
             case 0xf2:
             case 0xf3:
             case 0x9b:
@@ -73,9 +75,10 @@ internal inline u8 _disasm_operand_64_16_size(Disasm_Prefix prefix) {
     return size_bytes;
 }
 
-internal inline u8 _disasm_operand_8_size(Disasm_Prefix prefix) {
-    return 1;
+internal inline u8 _disasm_operand_32_64_size(Disasm_Prefix prefix) {
+    return (RexW(prefix.rex) == 0x08) ? 8 : 4;
 }
+
 
 internal Disasm_Reg _disasm_decode_reg(u8 reg_idx, u8 size_bytes, u8 rex) {
     switch (size_bytes) {
@@ -161,7 +164,11 @@ internal Disasm_Operand _disasm_decode_rm(u8* rm_byte, Disasm_Prefix prefix, u8*
 }
 
 internal inline Disasm_Operand _disasm_decode_rm8(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
-    return _disasm_decode_rm(rm_byte, prefix, num_bytes_read, 1);
+    return _disasm_decode_rm(rm_byte, prefix, num_bytes_read, sizeof(u8));
+}
+
+internal inline Disasm_Operand _disasm_decode_rm32(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    return _disasm_decode_rm(rm_byte, prefix, num_bytes_read, sizeof(u32));
 }
 
 internal inline Disasm_Operand _disasm_decode_rm16_32_64(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
@@ -169,7 +176,7 @@ internal inline Disasm_Operand _disasm_decode_rm16_32_64(u8* rm_byte, Disasm_Pre
     return _disasm_decode_rm(rm_byte, prefix, num_bytes_read, size_bytes);
 }
 
-internal Disasm_Operand _disasm_decode_r(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read, u8 size_bytes) {
+internal Disasm_Operand _disasm_decode_r(u8* rm_byte, Disasm_Prefix prefix, u8 size_bytes) {
     Disasm_Operand operand = {0};
 
     operand.type = DISASM_OP_TYPE_REG;
@@ -179,18 +186,21 @@ internal Disasm_Operand _disasm_decode_r(u8* rm_byte, Disasm_Prefix prefix, u8* 
     u8 reg = (*rm_byte & 0b00111000) >> 3;
     operand.reg = _disasm_decode_reg(reg | RexR(rex), operand.size_bytes, rex);
 
-    *num_bytes_read += 1;
-
     return operand;
 }
 
-internal inline Disasm_Operand _disasm_decode_r8(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
-    return _disasm_decode_r(rm_byte, prefix, num_bytes_read, 1);
+internal inline Disasm_Operand _disasm_decode_r8(u8* rm_byte, Disasm_Prefix prefix) {
+    return _disasm_decode_r(rm_byte, prefix, 1);
 }
 
-internal inline Disasm_Operand _disasm_decode_r16_32_64(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+internal inline Disasm_Operand _disasm_decode_r32_64(u8* rm_byte, Disasm_Prefix prefix) {
+    u8 size_bytes = _disasm_operand_32_64_size(prefix);
+    return _disasm_decode_r(rm_byte, prefix, size_bytes);
+}
+
+internal inline Disasm_Operand _disasm_decode_r16_32_64(u8* rm_byte, Disasm_Prefix prefix) {
     u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
-    return _disasm_decode_r(rm_byte, prefix, num_bytes_read, size_bytes);
+    return _disasm_decode_r(rm_byte, prefix, size_bytes);
 }
 
 
@@ -200,80 +210,28 @@ internal Disasm_Operand _disasm_specific_reg(Disasm_Reg reg) {
     operand.type = DISASM_OP_TYPE_REG;
 
     switch (reg) {
-        case DISASM_REG_AL:
-        case DISASM_REG_CL:
-        case DISASM_REG_DL:
-        case DISASM_REG_BL:
-        case DISASM_REG_AH:
-        case DISASM_REG_CH:
-        case DISASM_REG_DH:
-        case DISASM_REG_BH:
-        case DISASM_REG_SPL:
-        case DISASM_REG_BPL:
-        case DISASM_REG_SIL:
-        case DISASM_REG_DIL:
-        case DISASM_REG_R8B:
-        case DISASM_REG_R9B:
-        case DISASM_REG_R10B:
-        case DISASM_REG_R11B:
-        case DISASM_REG_R12B:
-        case DISASM_REG_R13B:
-        case DISASM_REG_R14B:
-        case DISASM_REG_R15B:
+        case DISASM_REG_AH:   case DISASM_REG_CH:   case DISASM_REG_DH:   case DISASM_REG_BH:
+        case DISASM_REG_SPL:  case DISASM_REG_BPL:  case DISASM_REG_SIL:  case DISASM_REG_DIL:
+        case DISASM_REG_R8B:  case DISASM_REG_R9B:  case DISASM_REG_R10B: case DISASM_REG_R11B:
+        case DISASM_REG_R12B: case DISASM_REG_R13B: case DISASM_REG_R14B: case DISASM_REG_R15B:
             operand.size_bytes = 1;
         break;
-        case DISASM_REG_AX:
-        case DISASM_REG_CX:
-        case DISASM_REG_DX:
-        case DISASM_REG_BX:
-        case DISASM_REG_SP:
-        case DISASM_REG_BP:
-        case DISASM_REG_SI:
-        case DISASM_REG_DI:
-        case DISASM_REG_R8W:
-        case DISASM_REG_R9W:
-        case DISASM_REG_R10W:
-        case DISASM_REG_R11W:
-        case DISASM_REG_R12W:
-        case DISASM_REG_R13W:
-        case DISASM_REG_R14W:
-        case DISASM_REG_R15W:
+        case DISASM_REG_AX:   case DISASM_REG_CX:   case DISASM_REG_DX:   case DISASM_REG_BX:
+        case DISASM_REG_SP:   case DISASM_REG_BP:   case DISASM_REG_SI:   case DISASM_REG_DI:
+        case DISASM_REG_R8W:  case DISASM_REG_R9W:  case DISASM_REG_R10W: case DISASM_REG_R11W:
+        case DISASM_REG_R12W: case DISASM_REG_R13W: case DISASM_REG_R14W: case DISASM_REG_R15W:
             operand.size_bytes = 2;
         break;
-        case DISASM_REG_EAX:
-        case DISASM_REG_ECX:
-        case DISASM_REG_EDX:
-        case DISASM_REG_EBX:
-        case DISASM_REG_ESP:
-        case DISASM_REG_EBP:
-        case DISASM_REG_ESI:
-        case DISASM_REG_EDI:
-        case DISASM_REG_R8D:
-        case DISASM_REG_R9D:
-        case DISASM_REG_R10D:
-        case DISASM_REG_R11D:
-        case DISASM_REG_R12D:
-        case DISASM_REG_R13D:
-        case DISASM_REG_R14D:
-        case DISASM_REG_R15D:
+        case DISASM_REG_EAX:  case DISASM_REG_ECX:  case DISASM_REG_EDX:  case DISASM_REG_EBX:
+        case DISASM_REG_ESP:  case DISASM_REG_EBP:  case DISASM_REG_ESI:  case DISASM_REG_EDI:
+        case DISASM_REG_R8D:  case DISASM_REG_R9D:  case DISASM_REG_R10D: case DISASM_REG_R11D:
+        case DISASM_REG_R12D: case DISASM_REG_R13D: case DISASM_REG_R14D: case DISASM_REG_R15D:
             operand.size_bytes = 4;
         break;
-        case DISASM_REG_RAX:
-        case DISASM_REG_RCX:
-        case DISASM_REG_RDX:
-        case DISASM_REG_RBX:
-        case DISASM_REG_RSP:
-        case DISASM_REG_RBP:
-        case DISASM_REG_RSI:
-        case DISASM_REG_RDI:
-        case DISASM_REG_R8:
-        case DISASM_REG_R9:
-        case DISASM_REG_R10:
-        case DISASM_REG_R11:
-        case DISASM_REG_R12:
-        case DISASM_REG_R13:
-        case DISASM_REG_R14:
-        case DISASM_REG_R15:
+        case DISASM_REG_RAX: case DISASM_REG_RCX: case DISASM_REG_RDX: case DISASM_REG_RBX:
+        case DISASM_REG_RSP: case DISASM_REG_RBP: case DISASM_REG_RSI: case DISASM_REG_RDI:
+        case DISASM_REG_R8:  case DISASM_REG_R9:  case DISASM_REG_R10: case DISASM_REG_R11:
+        case DISASM_REG_R12: case DISASM_REG_R13: case DISASM_REG_R14: case DISASM_REG_R15:
             operand.size_bytes = 8;
         break;
         default:
@@ -345,38 +303,38 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
 
         switch (op_combo) {
         case 0x00:
-            instr.instr_len = prefix.count;
+            instr.instr_len = 1 + prefix.count;
             instr.num_operands = 2;
             instr.operand[0] = _disasm_decode_rm8(instr_ptr + 1, prefix, &instr.instr_len);
-            instr.operand[1] = _disasm_decode_r8(instr_ptr + 1, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_r8(instr_ptr + 1, prefix);
             return instr;
         case 0x01:
-            instr.instr_len = prefix.count;
+            instr.instr_len = 1 + prefix.count;
             instr.num_operands = 2;
             instr.operand[0] = _disasm_decode_rm16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
-            instr.operand[1] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix);
             return instr;
         case 0x02:
-            instr.instr_len = prefix.count;
+            instr.instr_len = 1 + prefix.count;
             instr.num_operands = 2;
             instr.operand[0] = _disasm_decode_rm8(instr_ptr + 1, prefix, &instr.instr_len);
-            instr.operand[1] = _disasm_decode_r8(instr_ptr + 1, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_r8(instr_ptr + 1, prefix);
             return instr;
         case 0x03:
-            instr.instr_len = prefix.count;
+            instr.instr_len = 1 + prefix.count;
             instr.num_operands = 2;
             instr.operand[0] = _disasm_decode_rm16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
-            instr.operand[1] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix);
             return instr;
         case 0x04:
-            instr.num_operands = 2;
             instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 2;
             instr.operand[0] = _disasm_specific_reg(DISASM_REG_AL);
             instr.operand[1] = _disasm_decode_imm8(instr_ptr + 1, instr.operand[0].size_bytes, &instr.instr_len);
             return instr;
         case 0x05:
-            instr.num_operands = 2;
             instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 2;
             instr.operand[0] = _disasm_specific_reg(DISASM_REG_RAX);
             instr.operand[1] = _disasm_decode_imm16_32(instr_ptr + 1, prefix, instr.operand[0].size_bytes, &instr.instr_len);
             return instr;
@@ -394,6 +352,52 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
         u8 reg = *instr_ptr & 0b111;
         instr.operand[0].reg = _disasm_decode_reg(reg | RexB(prefix.rex), instr.operand[0].size_bytes, prefix.rex);
         return instr;
+    }
+
+    switch (*instr_ptr) {
+        case 0x63:
+            instr.opcode = DISASM_MOVSXD;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_r32_64(instr_ptr + 1, prefix);
+            instr.operand[1] = _disasm_decode_rm32(instr_ptr + 1, prefix, &instr.instr_len);
+            return instr;
+        case 0x68:
+            instr.opcode = DISASM_PUSH;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 1;
+            instr.operand[0] = _disasm_decode_imm16_32(instr_ptr + 1, prefix, sizeof(i64), &instr.instr_len);
+            return instr;
+        case 0x69:
+            {
+                instr.opcode = DISASM_IMUL;
+                instr.instr_len = 1 + prefix.count;
+                instr.num_operands = 3;
+                u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
+                instr.operand[0] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix);
+                instr.operand[1] = _disasm_decode_rm16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
+                // TODO: BUGGGGGGG
+                instr.operand[2] = _disasm_decode_imm(instr_ptr + instr.instr_len - prefix.count, Min(4, size_bytes), size_bytes, &instr.instr_len);
+            }
+            return instr;
+        case 0x6a:
+            instr.opcode = DISASM_PUSH;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 1;
+            instr.operand[0] = _disasm_decode_imm8(instr_ptr + 1, sizeof(i64), &instr.instr_len);
+            return instr;
+        case 0x6b:
+            {
+                instr.opcode = DISASM_IMUL;
+                instr.instr_len = 1 + prefix.count;
+                instr.num_operands = 3;
+                u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
+                instr.operand[0] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix);
+                instr.operand[1] = _disasm_decode_rm16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
+                // TODO: BUGGGGGGG
+                instr.operand[2] = _disasm_decode_imm8(instr_ptr + instr.instr_len - prefix.count, size_bytes, &instr.instr_len);
+            }
+            return instr;
     }
  
     return instr;

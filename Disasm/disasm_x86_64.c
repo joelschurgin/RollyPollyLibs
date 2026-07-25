@@ -376,7 +376,6 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
                 u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
                 instr.operand[0] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix);
                 instr.operand[1] = _disasm_decode_rm16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
-                // TODO: BUGGGGGGG
                 instr.operand[2] = _disasm_decode_imm(instr_ptr + instr.instr_len - prefix.count, Min(4, size_bytes), size_bytes, &instr.instr_len);
             }
             return instr;
@@ -394,7 +393,6 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
                 u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
                 instr.operand[0] = _disasm_decode_r16_32_64(instr_ptr + 1, prefix);
                 instr.operand[1] = _disasm_decode_rm16_32_64(instr_ptr + 1, prefix, &instr.instr_len);
-                // TODO: BUGGGGGGG
                 instr.operand[2] = _disasm_decode_imm8(instr_ptr + instr.instr_len - prefix.count, size_bytes, &instr.instr_len);
             }
             return instr;

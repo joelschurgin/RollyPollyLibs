@@ -365,6 +365,10 @@ internal inline Disasm_Operand _disasm_decode_rm8(u8* rm_byte, Disasm_Prefix pre
     return _disasm_decode_rm(rm_byte, prefix, num_bytes_read, sizeof(u8));
 }
 
+internal inline Disasm_Operand _disasm_decode_rm16(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    return _disasm_decode_rm(rm_byte, prefix, num_bytes_read, sizeof(u16));
+}
+
 internal inline Disasm_Operand _disasm_decode_rm32(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
     return _disasm_decode_rm(rm_byte, prefix, num_bytes_read, sizeof(u32));
 }
@@ -391,7 +395,7 @@ internal inline Disasm_Operand _disasm_decode_m16_r16_32_64(u8* rm_byte, Disasm_
     return _disasm_decode_m16(rm_byte, prefix, num_bytes_read);
 }
 
-internal Disasm_Operand _disasm_segment_reg(u8* rm_byte, Disasm_Prefix prefix) {
+internal Disasm_Operand _disasm_Sreg(u8* rm_byte, Disasm_Prefix prefix) {
     Disasm_Operand operand = {0};
 
     u8 reg = (*rm_byte & 0b00111000) >> 3;
@@ -895,7 +899,7 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             instr.instr_len = 1;
             instr.num_operands = 2;
             instr.operand[0] = _disasm_decode_m16_r16_32_64(ModRMByte, prefix, &instr.instr_len);
-            instr.operand[1] = _disasm_segment_reg(ModRMByte, prefix);
+            instr.operand[1] = _disasm_Sreg(ModRMByte, prefix);
             instr.instr_len += prefix.count;
             return instr;
         case 0x8d:
@@ -905,6 +909,15 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             instr.operand[0] = _disasm_decode_r16_32_64(ModRMByte, prefix);
             instr.operand[1] = _disasm_decode_m64(ModRMByte, prefix, &instr.instr_len);
             instr.instr_len += prefix.count;
+            return instr;
+        case 0x8e:
+            instr.opcode = DISASM_MOV;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_Sreg(ModRMByte, prefix);
+            instr.operand[1] = _disasm_decode_rm16(ModRMByte, prefix, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
     }
  
     return instr;

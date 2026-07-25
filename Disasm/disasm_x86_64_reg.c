@@ -70,6 +70,12 @@ u8* disasm_reg_stringify(Disasm_Reg reg) {
         case DISASM_REG_R14: return Stringify(DISASM_REG_R14);
         case DISASM_REG_R15: return Stringify(DISASM_REG_R15);
         case DISASM_REG_RIP: return Stringify(DISASM_REG_RIP);
+        case DISASM_REG_ES: return Stringify(DISASM_REG_ES);
+        case DISASM_REG_CS: return Stringify(DISASM_REG_CS);
+        case DISASM_REG_SS: return Stringify(DISASM_REG_SS);
+        case DISASM_REG_DS: return Stringify(DISASM_REG_DS);
+        case DISASM_REG_FS: return Stringify(DISASM_REG_FS);
+        case DISASM_REG_GS: return Stringify(DISASM_REG_GS);
     }
 
     return "";

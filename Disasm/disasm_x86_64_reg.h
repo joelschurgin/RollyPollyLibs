@@ -23,7 +23,10 @@ typedef enum {
     DISASM_REG_R8,  DISASM_REG_R9,  DISASM_REG_R10, DISASM_REG_R11, DISASM_REG_R12, DISASM_REG_R13, DISASM_REG_R14, DISASM_REG_R15,
 
     // --- Special ---
-    DISASM_REG_RIP
+    DISASM_REG_RIP,
+
+    // --- Segment ---
+    DISASM_REG_ES, DISASM_REG_CS, DISASM_REG_SS, DISASM_REG_DS, DISASM_REG_FS, DISASM_REG_GS,
 } Disasm_Reg;
 
 u8* disasm_reg_stringify(Disasm_Reg reg);

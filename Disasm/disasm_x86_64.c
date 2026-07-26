@@ -13,46 +13,49 @@ typedef struct {
     b8 has_op_override;
     b8 has_addr_override;
     b8 lock;
+    b8 repeat;
     u8 segment;
     u8 rex;
     u32 count;
 } Disasm_Prefix;
 
-internal Disasm_Prefix _disasm_decode_prefix(u8** instr_len) {
+internal Disasm_Prefix _disasm_decode_prefix(u8** instr_ptr) {
     Disasm_Prefix prefix = {0};
-    u8* orig_instr_len = *instr_len;
+    u8* orig_instr_ptr = *instr_ptr;
 
     u8 i = 0;
-    for (; i < 15; i++) {
-        u8 byte = *instr_len[0];
+    for (; i <= 15; i++) {
+        u8 byte = *instr_ptr[0];
         switch (byte) {
             case 0x64:
             case 0x65:
                 Assert(!"Unhandled case");
             case 0x66:
                 prefix.has_op_override = 1;
-                *instr_len += 1;
+                *instr_ptr += 1;
             break;
             case 0x67:
                 prefix.has_addr_override = 1;
-                *instr_len += 1;
+                *instr_ptr += 1;
             break;
-            case 0xf2:
             case 0xf3:
-            case 0x9b:
-                prefix.value = byte;
-                *instr_len += 1;
+                prefix.repeat = 1;
+                *instr_ptr += 1;
             break;
             case 0xf0:
                 prefix.lock = 1;
-                *instr_len += 1;
+                *instr_ptr += 1;
+            break;
+            case 0xf2:
+                prefix.value = byte;
+                *instr_ptr += 1;
             break;
             default:
                 if ((byte & 0xf0) == 0x40) {
                     prefix.rex = byte;
-                    *instr_len += 1;
+                    *instr_ptr += 1;
                 } else {
-                    prefix.count = (u32)(*instr_len - orig_instr_len);
+                    prefix.count = (u32)(*instr_ptr - orig_instr_ptr);
                     return prefix;
                 }
         }
@@ -60,7 +63,7 @@ internal Disasm_Prefix _disasm_decode_prefix(u8** instr_len) {
 
     Assert(i < 15);
 
-    prefix.count = (u32)(*instr_len - orig_instr_len);
+    prefix.count = (u32)(*instr_ptr - orig_instr_ptr);
     return prefix;
 }
 
@@ -223,7 +226,7 @@ internal inline u8 _disasm_operand_16_32_size(Disasm_Prefix prefix) {
     return size_bytes;
 }
 
-internal inline u8 _disasm_operand_64_16_size(Disasm_Prefix prefix) {
+internal inline u8 _disasm_operand_16_64_size(Disasm_Prefix prefix) {
     u8 size_bytes = 8;
     if (prefix.has_op_override) size_bytes = 2;
     return size_bytes;
@@ -371,6 +374,11 @@ internal inline Disasm_Operand _disasm_decode_rm16(u8* rm_byte, Disasm_Prefix pr
 
 internal inline Disasm_Operand _disasm_decode_rm32(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
     return _disasm_decode_rm(rm_byte, prefix, num_bytes_read, sizeof(u32));
+}
+
+internal inline Disasm_Operand _disasm_decode_rm16_64(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    u8 size_bytes = _disasm_operand_16_64_size(prefix);
+    return _disasm_decode_rm(rm_byte, prefix, num_bytes_read, size_bytes);
 }
 
 internal inline Disasm_Operand _disasm_decode_rm16_32_64(u8* rm_byte, Disasm_Prefix prefix, u8* num_bytes_read) {
@@ -590,7 +598,7 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
         instr.instr_len = 1 + prefix.count;
 
         instr.operand[0].type = DISASM_OP_TYPE_REG;
-        instr.operand[0].size_bytes = _disasm_operand_64_16_size(prefix);
+        instr.operand[0].size_bytes = _disasm_operand_16_64_size(prefix);
 
         u8 reg = *instr_ptr & 0b111;
         instr.operand[0].reg = _disasm_decode_reg(reg | RexB(prefix.rex), instr.operand[0].size_bytes, prefix.rex);
@@ -917,6 +925,87 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             instr.operand[0] = _disasm_Sreg(ModRMByte, prefix);
             instr.operand[1] = _disasm_decode_rm16(ModRMByte, prefix, &instr.instr_len);
             instr.instr_len += prefix.count;
+            return instr;
+        case 0x8f:
+            instr.opcode = DISASM_POP;
+            instr.instr_len = 1;
+            instr.num_operands = 1;
+            instr.operand[0] = _disasm_decode_rm16_64(ModRMByte, prefix, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x90:
+            instr.opcode = (prefix.repeat) ? DISASM_PAUSE : DISASM_NOP;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0x91: case 0x92: case 0x93: case 0x94:
+        case 0x95: case 0x96: case 0x97:
+            instr.opcode = DISASM_XCHG;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+
+            instr.operand[0].type = DISASM_OP_TYPE_REG;
+            instr.operand[0].size_bytes = _disasm_operand_16_32_64_size(prefix);
+            instr.operand[0].reg = _disasm_decode_reg((*instr_ptr & 7) | RexB(prefix.rex), instr.operand[0].size_bytes, prefix.rex);
+
+            switch (instr.operand[0].size_bytes) {
+                case 2:
+                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_AX);
+                break;
+                case 4:
+                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_EAX);
+                break;
+                case 8:
+                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_RAX);
+                break;
+            }
+
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x98:
+            instr.instr_len = 1;
+            instr.num_operands = 0;
+            switch (_disasm_operand_16_32_64_size(prefix)) {
+                case 2: instr.opcode = DISASM_CBW; break;
+                case 4: instr.opcode = DISASM_CWDE; break;
+                case 8: instr.opcode = DISASM_CDQE; break;
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x99:
+            instr.instr_len = 1;
+            instr.num_operands = 0;
+            switch (_disasm_operand_16_32_64_size(prefix)) {
+                case 2: instr.opcode = DISASM_CWD; break;
+                case 4: instr.opcode = DISASM_CDQ; break;
+                case 8: instr.opcode = DISASM_CQO; break;
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x9b:
+            instr.opcode = DISASM_FWAIT;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0x9c:
+            instr.opcode = (prefix.has_op_override) ? DISASM_PUSHF : DISASM_PUSHFQ;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0x9d:
+            instr.opcode = (prefix.has_op_override) ? DISASM_POPF : DISASM_POPFQ;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0x9e:
+            instr.opcode = DISASM_SAHF;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0x9f:
+            instr.opcode = DISASM_LAHF;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
             return instr;
     }
  

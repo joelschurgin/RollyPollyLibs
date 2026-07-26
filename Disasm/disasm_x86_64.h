@@ -13,6 +13,16 @@ typedef enum {
     DISASM_OP_TYPE_REL,
 } Disasm_OperandType;
 
+typedef enum {
+    DISASM_SEG_NONE = 0x00,
+    DISASM_SEG_ES   = 0x26,
+    DISASM_SEG_CS   = 0x2E,
+    DISASM_SEG_SS   = 0x36,
+    DISASM_SEG_DS   = 0x3E,
+    DISASM_SEG_FS   = 0x64,
+    DISASM_SEG_GS   = 0x65,
+} Disasm_Segment;
+
 typedef struct {
     Disasm_OperandType type;
     u8 size_bytes;
@@ -24,7 +34,8 @@ typedef struct {
             Disasm_Reg base_reg;
             u8 idx_reg;
             u8 scale;
-            i32 displacement;
+            i64 displacement;
+            Disasm_Segment segment;
         } mem;
     };
 } Disasm_Operand;

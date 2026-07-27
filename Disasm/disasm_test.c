@@ -17,7 +17,7 @@ u64 decode(Arena* arena, u8* instr_ptr) {
     for (u64 i = 0; i < instr.instr_len; i++) {
         printf("%0.2x ", instr.instr[i]);
     }
-    printf("\033[50G\033[32m%.*s\033[0m   ", mnemonic.size, mnemonic.str);
+    printf("\033[50G\033[32m%.*s\033[0m   \033[62G", mnemonic.size, mnemonic.str);
 
     for (u8 op_idx = 0; op_idx < instr.num_operands; op_idx++) {
         String operand = disasm_operand_format(arena, instr, op_idx);
@@ -40,7 +40,7 @@ i32 main(i32 argc, u8 **argv) {
     Arena* arena = default_arena();
 
     String dir = curr_dir(String(argv[0]));
-    String test_path = string_format(arena, "%.*s/../dev_tools/disasm/test_c6_to_c7", dir.size, dir.str);
+    String test_path = string_format(arena, "%.*s/../dev_tools/disasm/test_ca_to_cf", dir.size, dir.str);
 
     FileRead(arena, test_path, f) {
         u64 addr = 0x0;

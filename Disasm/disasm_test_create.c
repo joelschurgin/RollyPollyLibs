@@ -497,6 +497,29 @@ i32 main(i32 argc, u8 **argv) {
         };
         test_write_bytes(arena, curr_dir, String("test_c6_to_c7"), instr, sizeof(instr));
     }
+    {
+        u8 instr[] = {
+            0xC8, 0x00, 0x00, 0x00,
+            0xC8, 0x10, 0x00, 0x00,
+            0xC8, 0x20, 0x00, 0x01,
+            0x66, 0xC8, 0x08, 0x00, 0x00,
+            0xC9,
+        };
+        test_write_bytes(arena, curr_dir, String("test_c8_to_c9"), instr, sizeof(instr));
+    }
+    {
+        u8 instr[] = {
+            0xCA, 0x08, 0x00,
+            0xCB,
+            0xCC,
+            0xCD, 0x20,
+            0xCE,
+            0xCF,
+            0x66, 0xCF,
+            0x48, 0xCF,
+        };
+        test_write_bytes(arena, curr_dir, String("test_ca_to_cf"), instr, sizeof(instr));
+    }
 
     return 0;
 }

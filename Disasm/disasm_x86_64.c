@@ -1357,7 +1357,52 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             instr.operand[1] = _disasm_decode_imm16_32(InstrNext, prefix, instr.operand[0].size_bytes, &instr.instr_len);
             instr.instr_len += prefix.count;
             return instr;
-
+        case 0xc8:
+            instr.opcode = prefix.op_override ? DISASM_ENTERW : DISASM_ENTER;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_imm16(InstrNext, prefix, sizeof(u16), &instr.instr_len);
+            instr.operand[1] = _disasm_decode_imm8(InstrNext, sizeof(u8), &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xc9:
+            instr.opcode = DISASM_LEAVE;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0xca:
+            instr.opcode = DISASM_RETF;
+            instr.instr_len = 1;
+            instr.num_operands = 1;
+            instr.operand[0] = _disasm_decode_imm16(InstrNext, prefix, sizeof(u16), &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xcb:
+            instr.opcode = DISASM_RETF;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0xcc:
+            instr.opcode = DISASM_INT3;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0xcd:
+            instr.opcode = DISASM_INT;
+            instr.instr_len = 1;
+            instr.num_operands = 1;
+            instr.operand[0] = _disasm_decode_imm8(InstrNext, sizeof(u8), &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xcf:
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            switch (_disasm_operand_16_32_64_size(prefix)) {
+                case 2: instr.opcode = DISASM_IRETW; break;
+                case 4: instr.opcode = DISASM_IRET; break;
+                case 8: instr.opcode = DISASM_IRETQ; break;
+            }
+            return instr;
     }
  
     return instr;

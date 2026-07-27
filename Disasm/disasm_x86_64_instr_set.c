@@ -233,6 +233,7 @@ u8* disasm_opcode_stringify(Disasm_Opcode opcode) {
         case DISASM_ENQCMD: return Stringify(DISASM_ENQCMD);
         case DISASM_ENQCMDS: return Stringify(DISASM_ENQCMDS);
         case DISASM_ENTER: return Stringify(DISASM_ENTER);
+        case DISASM_ENTERW: return Stringify(DISASM_ENTERW);
         case DISASM_ERETS: return Stringify(DISASM_ERETS);
         case DISASM_ERETU: return Stringify(DISASM_ERETU);
         case DISASM_EXTRACTPS: return Stringify(DISASM_EXTRACTPS);
@@ -374,8 +375,8 @@ u8* disasm_opcode_stringify(Disasm_Opcode opcode) {
         case DISASM_INVPCID: return Stringify(DISASM_INVPCID);
         case DISASM_INVVPID: return Stringify(DISASM_INVVPID);
         case DISASM_IRET: return Stringify(DISASM_IRET);
-        case DISASM_IRETD: return Stringify(DISASM_IRETD);
         case DISASM_IRETQ: return Stringify(DISASM_IRETQ);
+        case DISASM_IRETW: return Stringify(DISASM_IRETW);
         case DISASM_JB: return Stringify(DISASM_JB);
         case DISASM_JBE: return Stringify(DISASM_JBE);
         case DISASM_JCXZ: return Stringify(DISASM_JCXZ);

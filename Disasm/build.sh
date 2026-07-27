@@ -36,3 +36,5 @@ mkdir -p ../build/dev_tools
 mkdir -p ../build/dev_tools/disasm
 mv disasm_test_create ../build/dev_tools/disasm_test_create
 
+../build/dev_tools/disasm_test_create
+

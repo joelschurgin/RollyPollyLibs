@@ -1263,7 +1263,7 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             return instr;
         case 0xb0: case 0xb1: case 0xb2: case 0xb3:
         case 0xb4: case 0xb5: case 0xb6: case 0xb7:
-            instr.opcode = DISASM_XCHG;
+            instr.opcode = DISASM_MOV;
             instr.instr_len = 1;
             instr.num_operands = 2;
 

@@ -397,6 +397,7 @@ i32 main(i32 argc, u8 **argv) {
     }
     {
         u8 instr[] = {
+            0xA4,
             0x2E, 0xA4,
             0x36, 0xA4,
             0x3E, 0xA4,
@@ -404,8 +405,19 @@ i32 main(i32 argc, u8 **argv) {
             0x64, 0xA4,
             0x65, 0xA4,
             0x65, 0x67, 0xA4,
+
+            0x66, 0xA5,
+            0x48, 0xA5,
+            0x65, 0x67, 0x48, 0xA5,
+
+            0xA6,
+            0x65, 0x67, 0xA6,
+
+            0xA7,
+            0x66, 0xA7,
+            0x48, 0xA7,
         };
-        test_write_bytes(arena, curr_dir, String("test_a4"), instr, sizeof(instr));
+        test_write_bytes(arena, curr_dir, String("test_a4_to_a7"), instr, sizeof(instr));
     }
 
     return 0;

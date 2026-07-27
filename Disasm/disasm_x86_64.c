@@ -32,6 +32,7 @@ internal Disasm_Prefix _disasm_decode_prefix(u8** instr_ptr) {
             case 0x64: case 0x65:
                 prefix.segment = (Disasm_Segment)byte;
                 *instr_ptr += 1;
+            break;
             case 0x66:
                 prefix.op_override = 1;
                 *instr_ptr += 1;
@@ -240,6 +241,33 @@ internal inline u8 _disasm_operand_8_16_size(Disasm_Prefix prefix) {
     return (prefix.op_override) ? 2 : 4;
 }
 
+internal Disasm_Operand _disasm_decode_string_src(Disasm_Prefix prefix, u8 size_bytes) {
+    Disasm_Operand operand = {0};
+
+    operand.type = DISASM_OP_TYPE_MEM;
+    operand.size_bytes = size_bytes;
+    operand.mem.base_reg = (prefix.addr_override) ? DISASM_REG_ESI : DISASM_REG_RSI;
+    operand.mem.idx_reg = DISASM_REG_NONE;
+    operand.mem.scale = 0;
+    operand.mem.displacement = 0;
+    operand.mem.segment = prefix.segment ? prefix.segment : DISASM_SEG_DS;
+
+    return operand;
+}
+
+internal Disasm_Operand _disasm_decode_string_dest(Disasm_Prefix prefix, u8 size_bytes) {
+    Disasm_Operand operand = {0};
+
+    operand.type = DISASM_OP_TYPE_MEM;
+    operand.size_bytes = size_bytes;
+    operand.mem.base_reg = (prefix.addr_override) ? DISASM_REG_EDI : DISASM_REG_RDI;
+    operand.mem.idx_reg = DISASM_REG_NONE;
+    operand.mem.scale = 0;
+    operand.mem.displacement = 0;
+    operand.mem.segment = DISASM_SEG_ES;
+
+    return operand;
+}
 
 internal Disasm_Reg _disasm_decode_reg(u8 reg_idx, u8 size_bytes, u8 rex) {
     switch (size_bytes) {
@@ -1069,24 +1097,50 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
         case 0xa4:
             instr.opcode = DISASM_MOVSB;
             instr.num_operands = 2;
-
-            instr.operand[0].type = DISASM_OP_TYPE_MEM;
-            instr.operand[0].size_bytes = 1; 
-            instr.operand[0].mem.base_reg = (prefix.addr_override) ? DISASM_REG_EDI : DISASM_REG_RDI;
-            instr.operand[0].mem.idx_reg = DISASM_REG_NONE;
-            instr.operand[0].mem.scale = 0;
-            instr.operand[0].mem.displacement = 0;
-            instr.operand[0].mem.segment = prefix.segment;
-
-            instr.operand[1].type = DISASM_OP_TYPE_MEM;
-            instr.operand[1].size_bytes = 1;
-            instr.operand[1].mem.base_reg = (prefix.addr_override) ? DISASM_REG_ESI : DISASM_REG_RSI;
-            instr.operand[1].mem.idx_reg = DISASM_REG_NONE;
-            instr.operand[1].mem.scale = 0;
-            instr.operand[1].mem.displacement = 0;
-            instr.operand[1].mem.segment = prefix.segment;
-
+            instr.operand[0] = _disasm_decode_string_dest(prefix, 1);
+            instr.operand[1] = _disasm_decode_string_src(prefix, 1);
             instr.instr_len = prefix.count + 1;
+            return instr;
+        case 0xa5:
+            {
+                instr.num_operands = 2;
+
+                u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
+                switch (size_bytes) {
+                    case 2: instr.opcode = DISASM_MOVSW; break;
+                    case 4: instr.opcode = DISASM_MOVSD; break;
+                    case 8: instr.opcode = DISASM_MOVSQ; break;
+                }
+
+                instr.operand[0] = _disasm_decode_string_dest(prefix, size_bytes);
+                instr.operand[1] = _disasm_decode_string_src(prefix, size_bytes);
+
+                instr.instr_len = prefix.count + 1;
+            }
+            return instr;
+        case 0xa6:
+            instr.opcode = DISASM_CMPSB;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_string_src(prefix, 1);
+            instr.operand[1] = _disasm_decode_string_dest(prefix, 1);
+            instr.instr_len = prefix.count + 1;
+            return instr;
+        case 0xa7:
+            {
+                instr.num_operands = 2;
+
+                u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
+                switch (size_bytes) {
+                    case 2: instr.opcode = DISASM_CMPSW; break;
+                    case 4: instr.opcode = DISASM_CMPSD; break;
+                    case 8: instr.opcode = DISASM_CMPSQ; break;
+                }
+
+                instr.operand[0] = _disasm_decode_string_src(prefix, size_bytes);
+                instr.operand[1] = _disasm_decode_string_dest(prefix, size_bytes);
+
+                instr.instr_len = prefix.count + 1;
+            }
             return instr;
     }
  
@@ -1127,10 +1181,10 @@ internal String _disasm_mem_format(Arena* arena, Disasm_Operand operand, Disasm_
     String str;
     StringBuilderBlock(arena, str) {
         switch(operand.size_bytes) {
-            case 1: string_builder_append(arena, &str, String("byte ptr ")); break;
-            case 2: string_builder_append(arena, &str, String("word ptr ")); break;
-            case 4: string_builder_append(arena, &str, String("dword ptr ")); break;
-            case 8: string_builder_append(arena, &str, String("qword ptr ")); break;
+            case 1: string_builder_append(arena, &str, String("b_ptr ")); break;
+            case 2: string_builder_append(arena, &str, String("w_ptr ")); break;
+            case 4: string_builder_append(arena, &str, String("d_ptr ")); break;
+            case 8: string_builder_append(arena, &str, String("q_ptr ")); break;
         }
 
         if (operand.mem.segment != DISASM_SEG_NONE) {
@@ -1138,13 +1192,6 @@ internal String _disasm_mem_format(Arena* arena, Disasm_Operand operand, Disasm_
             string_builder_append_char(arena, &str, ':');
         }
 
-        /*
-        if (opcode == DISASM_INSB || opcode == DISASM_INSW || opcode == DISASM_INSD) {
-            string_builder_append(arena, &str, String("es:"));
-        } else if (opcode == DISASM_OUTSB || opcode == DISASM_OUTSW || opcode == DISASM_OUTSD) {
-            string_builder_append(arena, &str, String("ds:"));
-        }
-        */
         string_builder_append_char(arena, &str, '[');
 
         b8 empty_brackets = 1;

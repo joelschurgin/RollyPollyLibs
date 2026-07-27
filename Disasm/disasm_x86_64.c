@@ -1268,20 +1268,10 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             instr.num_operands = 2;
 
             instr.operand[0].type = DISASM_OP_TYPE_REG;
-            instr.operand[0].size_bytes = _disasm_operand_16_32_64_size(prefix);
+            instr.operand[0].size_bytes = 1;
             instr.operand[0].reg = _disasm_decode_reg((*instr_ptr & 7) | RexB(prefix.rex), instr.operand[0].size_bytes, prefix.rex);
 
-            switch (instr.operand[0].size_bytes) {
-                case 2:
-                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_AX);
-                break;
-                case 4:
-                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_EAX);
-                break;
-                case 8:
-                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_RAX);
-                break;
-            }
+            instr.operand[1] = _disasm_decode_imm8(InstrNext, 1, &instr.instr_len);
 
             instr.instr_len += prefix.count;
             return instr;

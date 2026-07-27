@@ -193,8 +193,11 @@ internal Disasm_Opcode _disasm_group2_mnemonic(u8* byte) {
     switch (reg) {
         case 0: return DISASM_ROL;
         case 1: return DISASM_ROR;
+        case 2: return DISASM_RCL;
+        case 3: return DISASM_RCR;
         case 4: return DISASM_SHL;
         case 5: return DISASM_SHR;
+        case 6: return DISASM_SHL;
         case 7: return DISASM_SAR;
     }
 	return DISASM_INVALID;
@@ -324,6 +327,7 @@ internal Disasm_Operand _disasm_decode_m(u8* byte, Disasm_Prefix prefix, u8* num
     u8 rm  = (*byte & 0b00000111);
  
     *num_bytes_read += 1;
+    byte += 1;
 
     operand.type = DISASM_OP_TYPE_MEM;
     operand.size_bytes = size_bytes;
@@ -331,13 +335,14 @@ internal Disasm_Operand _disasm_decode_m(u8* byte, Disasm_Prefix prefix, u8* num
 
     u8 reg_size = prefix.addr_override ? sizeof(u32) : sizeof(u64);
     if (rm == 4) {
-        u8 sib = byte[1];
+        u8 sib = *byte;
 
         u8 scale_shift = (sib & 0b11000000) >> 6;
         u8 idx_reg     = (sib & 0b00111000) >> 3;
         u8 base        = (sib & 0b00000111);
 
         *num_bytes_read += 1;
+        byte += 1;
 
         if (idx_reg != 4) {
             operand.mem.idx_reg = _disasm_decode_reg(idx_reg | RexX(prefix.rex), reg_size, rex);
@@ -345,25 +350,29 @@ internal Disasm_Operand _disasm_decode_m(u8* byte, Disasm_Prefix prefix, u8* num
         }
 
         if (base == 5 && mod == 0) {
-            MemoryCopy(&operand.mem.displacement, &byte[2], 4);
+            MemoryCopy(&operand.mem.displacement, byte, 4);
             *num_bytes_read += 4;
+            byte += 4;
         } else {
             operand.mem.base_reg = _disasm_decode_reg(base | RexB(prefix.rex), reg_size, rex);
         }
     } else if (mod == 0 && rm == 5) {
         operand.mem.base_reg = DISASM_REG_RIP;
-        MemoryCopy(&operand.mem.displacement, &byte[1], 4);
+        MemoryCopy(&operand.mem.displacement, byte, 4);
         *num_bytes_read += 4;
+        byte += 4;
     } else {
         operand.mem.base_reg = _disasm_decode_reg(rm | RexB(prefix.rex), reg_size, rex);
     }
 
     if (mod == 1) {
-        operand.mem.displacement = (i64)(i8)byte[2];
+        operand.mem.displacement = (i64)*(i8*)byte;
         *num_bytes_read += 1;
+        byte += 1;
     } else if (mod == 2) {
-        MemoryCopy(&operand.mem.displacement, &byte[1], 4);
+        MemoryCopy(&operand.mem.displacement, byte, 4);
         *num_bytes_read += 4;
+        byte += 4;
     }
 
     return operand;
@@ -537,6 +546,10 @@ internal Disasm_Operand _disasm_decode_imm(u8* byte, u8 size_bytes, u8 target_si
 
 internal inline Disasm_Operand _disasm_decode_imm8(u8* byte, u8 target_size, u8* instr_len) {
     return _disasm_decode_imm(byte, sizeof(i8), target_size, instr_len);
+}
+
+internal inline Disasm_Operand _disasm_decode_imm16(u8* byte, Disasm_Prefix prefix, u8 target_size, u8* instr_len) {
+    return _disasm_decode_imm(byte, sizeof(u16), target_size, instr_len);
 }
 
 internal inline Disasm_Operand _disasm_decode_imm16_32(u8* byte, Disasm_Prefix prefix, u8 target_size, u8* instr_len) {
@@ -1293,6 +1306,34 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             instr.operand[1] = _disasm_decode_imm16_32_64(InstrNext, prefix, instr.operand[0].size_bytes, &instr.instr_len);
 
             instr.instr_len += prefix.count;
+            return instr;
+        case 0xc0:
+            instr.opcode = _disasm_group2_mnemonic(ModRMByte);
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_rm8(ModRMByte, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_imm8(InstrNext, sizeof(i8), &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xc1:
+            instr.opcode = _disasm_group2_mnemonic(ModRMByte);
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_rm16_32_64(ModRMByte, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_imm8(InstrNext, instr.operand[0].size_bytes, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xc2:
+            instr.opcode = DISASM_RET;
+            instr.instr_len = 1;
+            instr.num_operands = 1;
+            instr.operand[0] = _disasm_decode_imm16(InstrNext, prefix, sizeof(u16), &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xc3:
+            instr.opcode = DISASM_RET;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
             return instr;
     }
  

@@ -544,6 +544,11 @@ internal inline Disasm_Operand _disasm_decode_imm16_32(u8* byte, Disasm_Prefix p
     return _disasm_decode_imm(byte, Min(4, size_bytes), target_size, instr_len);
 }
 
+internal inline Disasm_Operand _disasm_decode_imm16_32_64(u8* byte, Disasm_Prefix prefix, u8 target_size, u8* instr_len) {
+    u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
+    return _disasm_decode_imm(byte, size_bytes, target_size, instr_len);
+}
+
 internal Disasm_Operand _disasm_decode_rel(u8* byte, u8 size_bytes, u8* instr_len) {
     Disasm_Operand operand = {0};
  
@@ -1275,7 +1280,20 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
 
             instr.instr_len += prefix.count;
             return instr;
+        case 0xb8: case 0xb9: case 0xba: case 0xbb:
+        case 0xbc: case 0xbd: case 0xbe: case 0xbf:
+            instr.opcode = DISASM_MOV;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
 
+            instr.operand[0].type = DISASM_OP_TYPE_REG;
+            instr.operand[0].size_bytes = _disasm_operand_16_32_64_size(prefix);
+            instr.operand[0].reg = _disasm_decode_reg((*instr_ptr & 7) | RexB(prefix.rex), instr.operand[0].size_bytes, prefix.rex);
+
+            instr.operand[1] = _disasm_decode_imm16_32_64(InstrNext, prefix, instr.operand[0].size_bytes, &instr.instr_len);
+
+            instr.instr_len += prefix.count;
+            return instr;
     }
  
     return instr;

@@ -520,6 +520,21 @@ i32 main(i32 argc, u8 **argv) {
         };
         test_write_bytes(arena, curr_dir, String("test_ca_to_cf"), instr, sizeof(instr));
     }
+    {
+        u8 instr[] = {
+            0xD0, 0xF9,
+            0xD1, 0xE0,
+            0x66, 0xD1, 0xC2,
+            0x48, 0xD1, 0xF8,
+            0x48, 0xD1, 0xF0,
+            0xD2, 0xF9,
+            0xD3, 0xE0,
+            0x66, 0xD3, 0xC2,
+            0x48, 0xD3, 0xF8,
+            0x48, 0xD3, 0xF0,
+        };
+        test_write_bytes(arena, curr_dir, String("test_d0_to_d3"), instr, sizeof(instr));
+    }
 
     return 0;
 }

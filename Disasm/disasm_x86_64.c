@@ -1403,6 +1403,47 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
                 case 8: instr.opcode = DISASM_IRETQ; break;
             }
             return instr;
+        case 0xd0:
+            instr.opcode = _disasm_group2_mnemonic(ModRMBytePtr);
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_rm8(ModRMBytePtr, prefix, &instr.instr_len);
+
+            instr.operand[1].type = DISASM_OP_TYPE_IMM;
+            instr.operand[1].size_bytes = 1;
+            instr.operand[1].imm = 1;
+
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xd1:
+            instr.opcode = _disasm_group2_mnemonic(ModRMBytePtr);
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_rm16_32_64(ModRMBytePtr, prefix, &instr.instr_len);
+
+            instr.operand[1].type = DISASM_OP_TYPE_IMM;
+            instr.operand[1].size_bytes = instr.operand[0].size_bytes;
+            instr.operand[1].imm = 1;
+
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xd2:
+            instr.opcode = _disasm_group2_mnemonic(ModRMBytePtr);
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_rm8(ModRMBytePtr, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_specific_reg(DISASM_REG_CL);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xd3:
+            instr.opcode = _disasm_group2_mnemonic(ModRMBytePtr);
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_rm16_32_64(ModRMBytePtr, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_specific_reg(DISASM_REG_CL);
+            instr.instr_len += prefix.count;
+            return instr;
+
     }
  
     return instr;

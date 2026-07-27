@@ -1228,7 +1228,39 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
                 instr.instr_len = prefix.count + 1;
             }
             return instr;
+        case 0xae:
+            instr.opcode = DISASM_SCASB;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_specific_reg(DISASM_REG_AL);
+            instr.operand[1] = _disasm_decode_string_dest(prefix, 1);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xaf:
+            {
+                instr.num_operands = 2;
 
+                u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
+
+                switch (size_bytes) {
+                    case 2:
+                        instr.opcode = DISASM_SCASW;
+                        instr.operand[0] = _disasm_specific_reg(DISASM_REG_AX);
+                    break;
+                    case 4:
+                        instr.opcode = DISASM_SCASD;
+                        instr.operand[0] = _disasm_specific_reg(DISASM_REG_EAX);
+                    break;
+                    case 8:
+                        instr.opcode = DISASM_SCASQ;
+                        instr.operand[0] = _disasm_specific_reg(DISASM_REG_RAX);
+                    break;
+                };
+
+                instr.operand[1] = _disasm_decode_string_dest(prefix, size_bytes);
+                instr.instr_len = prefix.count + 1;
+            }
+            return instr;
     }
  
     return instr;

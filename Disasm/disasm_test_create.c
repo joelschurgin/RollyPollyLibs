@@ -442,8 +442,15 @@ i32 main(i32 argc, u8 **argv) {
             0xAD,
             0x66, 0xAD,
             0x65, 0x67, 0x48, 0xAD,
+
+            0xAE,
+            0x67, 0xAE,
+            0xAF,
+            0x66, 0xAF,
+            0x67, 0x48, 0xAF,
+            0x64, 0xAF,
         };
-        test_write_bytes(arena, curr_dir, String("test_aa_to_ad"), instr, sizeof(instr));
+        test_write_bytes(arena, curr_dir, String("test_aa_to_af"), instr, sizeof(instr));
     }
 
     return 0;

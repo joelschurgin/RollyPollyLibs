@@ -244,32 +244,26 @@ internal inline u8 _disasm_operand_8_16_size(Disasm_Prefix prefix) {
     return (prefix.op_override) ? 2 : 4;
 }
 
-internal Disasm_Operand _disasm_decode_string_src(Disasm_Prefix prefix, u8 size_bytes) {
+internal Disasm_Operand _disasm_decode_mem_reg(Disasm_Prefix prefix, u8 size_bytes, Disasm_Reg reg32, Disasm_Reg reg64, Disasm_Segment seg) {
     Disasm_Operand operand = {0};
 
     operand.type = DISASM_OP_TYPE_MEM;
     operand.size_bytes = size_bytes;
-    operand.mem.base_reg = (prefix.addr_override) ? DISASM_REG_ESI : DISASM_REG_RSI;
+    operand.mem.base_reg = (prefix.addr_override) ? reg32 : reg64;
     operand.mem.idx_reg = DISASM_REG_NONE;
     operand.mem.scale = 0;
     operand.mem.displacement = 0;
-    operand.mem.segment = prefix.segment ? prefix.segment : DISASM_SEG_DS;
+    operand.mem.segment = seg;
 
     return operand;
 }
 
+internal Disasm_Operand _disasm_decode_string_src(Disasm_Prefix prefix, u8 size_bytes) {
+    return _disasm_decode_mem_reg(prefix, size_bytes, DISASM_REG_ESI, DISASM_REG_RSI, prefix.segment ? prefix.segment : DISASM_SEG_DS);
+}
+
 internal Disasm_Operand _disasm_decode_string_dest(Disasm_Prefix prefix, u8 size_bytes) {
-    Disasm_Operand operand = {0};
-
-    operand.type = DISASM_OP_TYPE_MEM;
-    operand.size_bytes = size_bytes;
-    operand.mem.base_reg = (prefix.addr_override) ? DISASM_REG_EDI : DISASM_REG_RDI;
-    operand.mem.idx_reg = DISASM_REG_NONE;
-    operand.mem.scale = 0;
-    operand.mem.displacement = 0;
-    operand.mem.segment = DISASM_SEG_ES;
-
-    return operand;
+    return _disasm_decode_mem_reg(prefix, size_bytes, DISASM_REG_EDI, DISASM_REG_RDI, DISASM_SEG_ES);
 }
 
 internal Disasm_Reg _disasm_decode_reg(u8 reg_idx, u8 size_bytes, u8 rex) {
@@ -386,7 +380,7 @@ internal inline Disasm_Operand _disasm_decode_m64(u8* byte, Disasm_Prefix prefix
     return _disasm_decode_m(byte, prefix, num_bytes_read, sizeof(u64));
 }
 
-internal Disasm_Operand _disasm_decode_rm(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read, u8 size_bytes) {
+internal Disasm_Operand _disasm_decode_rm(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read, u8 size_bytes, b8 is_fpu) {
     Disasm_Operand operand = {0};
     u8 mod = (*byte & 0b11000000) >> 6;
     u8 rm  = (*byte & 0b00000111);
@@ -395,7 +389,10 @@ internal Disasm_Operand _disasm_decode_rm(u8* byte, Disasm_Prefix prefix, u8* nu
         *num_bytes_read += 1;
         operand.type = DISASM_OP_TYPE_REG;
         operand.size_bytes = size_bytes;
-        operand.reg = _disasm_decode_reg(rm | RexB(prefix.rex), operand.size_bytes, prefix.rex);
+
+        if (is_fpu) operand.reg = DISASM_REG_ST0 + rm;
+        else        operand.reg = _disasm_decode_reg(rm | RexB(prefix.rex), operand.size_bytes, prefix.rex);
+
         return operand;
     }
 
@@ -403,25 +400,25 @@ internal Disasm_Operand _disasm_decode_rm(u8* byte, Disasm_Prefix prefix, u8* nu
 }
 
 internal inline Disasm_Operand _disasm_decode_rm8(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
-    return _disasm_decode_rm(byte, prefix, num_bytes_read, sizeof(u8));
+    return _disasm_decode_rm(byte, prefix, num_bytes_read, sizeof(u8), 0);
 }
 
 internal inline Disasm_Operand _disasm_decode_rm16(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
-    return _disasm_decode_rm(byte, prefix, num_bytes_read, sizeof(u16));
+    return _disasm_decode_rm(byte, prefix, num_bytes_read, sizeof(u16), 0);
 }
 
 internal inline Disasm_Operand _disasm_decode_rm32(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
-    return _disasm_decode_rm(byte, prefix, num_bytes_read, sizeof(u32));
+    return _disasm_decode_rm(byte, prefix, num_bytes_read, sizeof(u32), 0);
 }
 
 internal inline Disasm_Operand _disasm_decode_rm16_64(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
     u8 size_bytes = _disasm_operand_16_64_size(prefix);
-    return _disasm_decode_rm(byte, prefix, num_bytes_read, size_bytes);
+    return _disasm_decode_rm(byte, prefix, num_bytes_read, size_bytes, 0);
 }
 
 internal inline Disasm_Operand _disasm_decode_rm16_32_64(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
     u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
-    return _disasm_decode_rm(byte, prefix, num_bytes_read, size_bytes);
+    return _disasm_decode_rm(byte, prefix, num_bytes_read, size_bytes, 0);
 }
 
 internal inline Disasm_Operand _disasm_decode_m16_r16_32_64(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
@@ -439,6 +436,10 @@ internal inline Disasm_Operand _disasm_decode_m16_r16_32_64(u8* byte, Disasm_Pre
     }
 
     return _disasm_decode_m16(byte, prefix, num_bytes_read);
+}
+
+internal inline Disasm_Operand _disasm_decode_sti_m32real(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    return _disasm_decode_rm(byte, prefix, num_bytes_read, sizeof(f32), 1);
 }
 
 internal Disasm_Operand _disasm_decode_moffs(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read, u8 size_bytes) {
@@ -482,6 +483,10 @@ internal Disasm_Operand _disasm_specific_reg(Disasm_Reg reg) {
     operand.type = DISASM_OP_TYPE_REG;
 
     switch (reg) {
+        case DISASM_REG_ST:
+        case DISASM_REG_ST0: case DISASM_REG_ST1: case DISASM_REG_ST2: case DISASM_REG_ST3:
+        case DISASM_REG_ST4: case DISASM_REG_ST5: case DISASM_REG_ST6: case DISASM_REG_ST7: 
+
         case DISASM_REG_AL:   case DISASM_REG_CL:   case DISASM_REG_DL:   case DISASM_REG_BL:
         case DISASM_REG_AH:   case DISASM_REG_CH:   case DISASM_REG_DH:   case DISASM_REG_BH:
         case DISASM_REG_SPL:  case DISASM_REG_BPL:  case DISASM_REG_SIL:  case DISASM_REG_DIL:
@@ -1443,7 +1448,30 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             instr.operand[1] = _disasm_specific_reg(DISASM_REG_CL);
             instr.instr_len += prefix.count;
             return instr;
-
+        case 0xd7:
+            instr.opcode = DISASM_XLAT;
+            instr.instr_len = 1;
+            instr.num_operands = 1;
+            instr.operand[0] = _disasm_decode_mem_reg(prefix, 1, DISASM_REG_EBX, DISASM_REG_RBX, prefix.segment ? prefix.segment : DISASM_SEG_DS);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xd8:
+            switch (((*ModRMBytePtr & 0b00111000) >> 3)) {
+                case 0: instr.opcode = DISASM_FADD; break;
+                case 1: instr.opcode = DISASM_FMUL; break;
+                case 2: instr.opcode = DISASM_FCOM; break;
+                case 3: instr.opcode = DISASM_FCOMP; break;
+                case 4: instr.opcode = DISASM_FSUB; break;
+                case 5: instr.opcode = DISASM_FSUBR; break;
+                case 6: instr.opcode = DISASM_FDIV; break;
+                case 7: instr.opcode = DISASM_FDIVR; break;
+            }
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+            instr.operand[1] = _disasm_decode_sti_m32real(ModRMBytePtr, prefix, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
     }
  
     return instr;

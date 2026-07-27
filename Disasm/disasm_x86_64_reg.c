@@ -76,6 +76,15 @@ u8* disasm_reg_stringify(Disasm_Reg reg) {
         case DISASM_REG_DS: return Stringify(DISASM_REG_DS);
         case DISASM_REG_FS: return Stringify(DISASM_REG_FS);
         case DISASM_REG_GS: return Stringify(DISASM_REG_GS);
+        case DISASM_REG_ST: return Stringify(DISASM_REG_ST);
+        case DISASM_REG_ST0: return Stringify(DISASM_REG_ST0);
+        case DISASM_REG_ST1: return Stringify(DISASM_REG_ST1);
+        case DISASM_REG_ST2: return Stringify(DISASM_REG_ST2);
+        case DISASM_REG_ST3: return Stringify(DISASM_REG_ST3);
+        case DISASM_REG_ST4: return Stringify(DISASM_REG_ST4);
+        case DISASM_REG_ST5: return Stringify(DISASM_REG_ST5);
+        case DISASM_REG_ST6: return Stringify(DISASM_REG_ST6);
+        case DISASM_REG_ST7: return Stringify(DISASM_REG_ST7);
     }
 
     return "";

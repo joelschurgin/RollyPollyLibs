@@ -1142,6 +1142,93 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
                 instr.instr_len = prefix.count + 1;
             }
             return instr;
+        case 0xa8:
+            instr.opcode = DISASM_TEST;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_specific_reg(DISASM_REG_AL);
+            instr.operand[1] = _disasm_decode_imm8(InstrNext, 1, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xa9:
+            instr.opcode = DISASM_TEST;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            switch (_disasm_operand_16_32_64_size(prefix)) {
+                case 2: instr.operand[0] = _disasm_specific_reg(DISASM_REG_AX); break;
+                case 4: instr.operand[0] = _disasm_specific_reg(DISASM_REG_EAX); break;
+                case 8: instr.operand[0] = _disasm_specific_reg(DISASM_REG_RAX); break;
+            }
+            instr.operand[1] = _disasm_decode_imm16_32(InstrNext, prefix, 8, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xaa:
+            instr.opcode = DISASM_STOSB;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_string_dest(prefix, 1);
+            instr.operand[1] = _disasm_specific_reg(DISASM_REG_AL);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xab:
+            {
+                instr.num_operands = 2;
+
+                u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
+
+                instr.operand[0] = _disasm_decode_string_dest(prefix, size_bytes);
+                switch (size_bytes) {
+                    case 2:
+                        instr.opcode = DISASM_STOSW;
+                        instr.operand[1] = _disasm_specific_reg(DISASM_REG_AX);
+                    break;
+                    case 4:
+                        instr.opcode = DISASM_STOSD;
+                        instr.operand[1] = _disasm_specific_reg(DISASM_REG_EAX);
+                    break;
+                    case 8:
+                        instr.opcode = DISASM_STOSQ;
+                        instr.operand[1] = _disasm_specific_reg(DISASM_REG_RAX);
+                    break;
+                };
+
+                instr.instr_len = prefix.count + 1;
+            }
+            return instr;
+        case 0xac:
+            instr.opcode = DISASM_LODSB;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_specific_reg(DISASM_REG_AL);
+            instr.operand[1] = _disasm_decode_string_src(prefix, 1);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xad:
+            {
+                instr.num_operands = 2;
+
+                u8 size_bytes = _disasm_operand_16_32_64_size(prefix);
+
+                switch (size_bytes) {
+                    case 2:
+                        instr.opcode = DISASM_LODSW;
+                        instr.operand[0] = _disasm_specific_reg(DISASM_REG_AX);
+                    break;
+                    case 4:
+                        instr.opcode = DISASM_LODSD;
+                        instr.operand[0] = _disasm_specific_reg(DISASM_REG_EAX);
+                    break;
+                    case 8:
+                        instr.opcode = DISASM_LODSQ;
+                        instr.operand[0] = _disasm_specific_reg(DISASM_REG_RAX);
+                    break;
+                };
+
+                instr.operand[1] = _disasm_decode_string_src(prefix, size_bytes);
+                instr.instr_len = prefix.count + 1;
+            }
+            return instr;
+
     }
  
     return instr;

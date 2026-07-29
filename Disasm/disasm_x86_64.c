@@ -380,6 +380,10 @@ internal inline Disasm_Operand _disasm_decode_m16(u8* byte, Disasm_Prefix prefix
     return _disasm_decode_m(byte, prefix, num_bytes_read, sizeof(u16));
 }
 
+internal inline Disasm_Operand _disasm_decode_m32int(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    return _disasm_decode_m(byte, prefix, num_bytes_read, sizeof(i32));
+}
+
 internal inline Disasm_Operand _disasm_decode_m64(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
     return _disasm_decode_m(byte, prefix, num_bytes_read, sizeof(u64));
 }
@@ -448,6 +452,18 @@ internal inline Disasm_Operand _disasm_decode_m16_r16_32_64(u8* byte, Disasm_Pre
 
 internal inline Disasm_Operand _disasm_decode_sti_m32real(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
     return _disasm_decode_rm(byte, prefix, num_bytes_read, sizeof(f32), 1);
+}
+
+internal inline Disasm_Operand _disasm_decode_sti(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    Disasm_Operand operand = {0};
+
+    *num_bytes_read += 1;
+
+    operand.type = DISASM_OP_TYPE_REG;
+    operand.size_bytes = sizeof(f32);
+    operand.reg = DISASM_REG_ST0 + GetRM(*byte);
+
+    return operand;
 }
 
 internal Disasm_Operand _disasm_decode_moffs(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read, u8 size_bytes) {
@@ -1471,6 +1487,8 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             return _disasm_decode_flops_d8(instr_ptr, prefix);
         case 0xd9:
             return _disasm_decode_flops_d9(instr_ptr, prefix);
+        case 0xda:
+            return _disasm_decode_flops_da(instr_ptr, prefix);
     }
  
     return instr;

@@ -384,6 +384,10 @@ internal inline Disasm_Operand _disasm_decode_m64(u8* byte, Disasm_Prefix prefix
     return _disasm_decode_m(byte, prefix, num_bytes_read, sizeof(u64));
 }
 
+internal inline Disasm_Operand _disasm_decode_m14_28(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    return _disasm_decode_m(byte, prefix, num_bytes_read, (prefix.op_override) ? 14 : 28);
+}
+
 internal Disasm_Operand _disasm_decode_rm(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read, u8 size_bytes, b8 is_fpu) {
     Disasm_Operand operand = {0};
     u8 mod = GetMod(*byte);
@@ -596,7 +600,6 @@ internal Disasm_Operand _disasm_decode_rel(u8* byte, u8 size_bytes, u8* instr_le
     return operand;
 }
 
-
 internal inline Disasm_Operand _disasm_decode_rel8(u8* byte, u8* instr_len) {
     return _disasm_decode_rel(byte, sizeof(i8), instr_len);
 }
@@ -605,9 +608,12 @@ internal inline Disasm_Operand _disasm_decode_rel8(u8* byte, u8* instr_len) {
                         instr.instr_len = 1 + prefix.count; \
                         instr.num_operands = 0; } while (0)
 
-Disasm_Instr disasm_decode(u8* instr_ptr) {
 #define InstrNext (instr_ptr + instr.instr_len)
 #define ModRMBytePtr (instr_ptr + 1)
+
+#include "disasm_x86_64_flops.c"
+
+Disasm_Instr disasm_decode(u8* instr_ptr) {
     Disasm_Instr instr = {0};
     instr.instr = instr_ptr;
 
@@ -1462,84 +1468,16 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             instr.instr_len += prefix.count;
             return instr;
         case 0xd8:
-            switch (((*ModRMBytePtr & 0b00111000) >> 3)) {
-                case 0: instr.opcode = DISASM_FADD; break;
-                case 1: instr.opcode = DISASM_FMUL; break;
-                case 2: instr.opcode = DISASM_FCOM; break;
-                case 3: instr.opcode = DISASM_FCOMP; break;
-                case 4: instr.opcode = DISASM_FSUB; break;
-                case 5: instr.opcode = DISASM_FSUBR; break;
-                case 6: instr.opcode = DISASM_FDIV; break;
-                case 7: instr.opcode = DISASM_FDIVR; break;
-            }
-            instr.instr_len = 1;
-            instr.num_operands = 2;
-            instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
-            instr.operand[1] = _disasm_decode_sti_m32real(ModRMBytePtr, prefix, &instr.instr_len);
-            instr.instr_len += prefix.count;
-            return instr;
+            return _disasm_decode_flops_d8(instr_ptr, prefix);
         case 0xd9:
-            instr.instr_len = 1;
-            switch (GetReg(*ModRMBytePtr)) {
-                case 0:
-                    instr.opcode = DISASM_FLD;
-                    instr.num_operands = 2;
-                    instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
-                    instr.operand[1] = _disasm_decode_sti_m32real(ModRMBytePtr, prefix, &instr.instr_len);
-                break;
-                case 1:
-                    instr.opcode = DISASM_FXCH;
-                    if (GetMod(*ModRMBytePtr) != 3) {
-                        DisasmInvalid;
-                        instr.instr_len += 1;
-                        return instr;
-                    }
-                    instr.num_operands = 2;
-                    instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
-                    instr.operand[1] = _disasm_decode_sti_m32real(ModRMBytePtr, prefix, &instr.instr_len);
-                break;
-                case 2:
-                    if (GetMod(*ModRMBytePtr) == 3) {
-                        instr.opcode = DISASM_FNOP;
-                        instr.num_operands = 0;
-                        instr.instr_len += 1;
-                    } else {
-                        instr.opcode = DISASM_FST;
-                        instr.num_operands = 2;
-                        instr.operand[0] = _disasm_decode_sti_m32real(ModRMBytePtr, prefix, &instr.instr_len);
-                        instr.operand[1] = _disasm_specific_reg(DISASM_REG_ST);
-                    }
-                break;
-                case 3:
-                    instr.opcode = DISASM_FSTP;
-                    instr.num_operands = 2;
-                    instr.operand[0] = _disasm_decode_sti_m32real(ModRMBytePtr, prefix, &instr.instr_len);
-                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_ST);
-                break;
-                case 4:
-                    // TODO: !!!
-                    instr.opcode = DISASM_INVALID;
-                break;
-                case 5:
-                    instr.opcode = DISASM_INVALID;
-                break;
-                case 6:
-                    instr.opcode = DISASM_INVALID;
-                break;
-                case 7:
-                    instr.opcode = DISASM_INVALID;
-                break;
-            }
-            instr.instr_len += prefix.count;
-            return instr;
-
+            return _disasm_decode_flops_d9(instr_ptr, prefix);
     }
  
     return instr;
+}
 
 #undef InstrNext
 #undef ModRMBytePtr
-}
 
 u8* disasm_seg_stringify(Disasm_Segment seg) {
     switch (seg) {
@@ -1649,9 +1587,11 @@ String disasm_operand_format(Arena* arena, Disasm_Instr instr, u8 operand_idx) {
     }
 }
 
-
 #undef RexB
 #undef RexX
 #undef RexR
 #undef RexW
 
+#undef GetMod
+#undef GetReg
+#undef GetRM

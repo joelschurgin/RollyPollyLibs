@@ -74,109 +74,6 @@ internal Disasm_Prefix _disasm_decode_prefix(u8** instr_ptr) {
     return prefix;
 }
 
-internal Disasm_Opcode _disasm_decode_fpu_mnemonic(Disasm_Prefix prefix, u8* instr, u64* instr_len) {
-    u8 mod = (instr[1] & 0b11000000) >> 6;
-    u8 reg = (instr[1] & 0b00111000) >> 3;
-
-    switch (*instr) {
-        case 0xd8:
-            switch (reg) {
-                case 0: return DISASM_FADD;
-                case 1: return DISASM_FMUL;
-                case 3: return DISASM_FCOMP;
-                case 4: return DISASM_FSUB;
-                case 5: return DISASM_FSUBR;
-                case 6: return DISASM_FDIV;
-                case 7: return DISASM_FDIVR;
-            }
-        break;
-        case 0xd9:
-            switch (reg) {
-                case 0: return DISASM_FLD;
-                case 1: return DISASM_FXCH;
-                case 2: return (mod != 3) ? DISASM_FST : DISASM_FNOP;
-                case 3: return DISASM_FSTP;
-                case 6: return ((prefix.value == 0x9b) ? DISASM_FSTENV : DISASM_FNSTENV);
-                case 7: return ((prefix.value == 0x9b) ? DISASM_FSTCW : DISASM_FNSTCW);
-            }
-        break;
-        case 0xda:
-            switch (reg) {
-                case 0: return (mod != 3) ? DISASM_FIADD : DISASM_FCMOVB;
-                case 1: return (mod != 3) ? DISASM_FIMUL : DISASM_FCMOVE;
-                case 2: return (mod != 3) ? DISASM_FICOM : DISASM_FCMOVBE;
-                case 3: return (mod != 3) ? DISASM_FICOMP : DISASM_FCMOVU;
-                case 4: return (mod != 3) ? DISASM_FISUB : DISASM_INVALID;
-                case 5: return (mod != 3) ? DISASM_FISUBR : DISASM_FUCOMPP;
-                case 6: return (mod != 3) ? DISASM_FIDIV : DISASM_INVALID;
-                case 7: return (mod != 3) ? DISASM_FIDIVR : DISASM_INVALID;
-            }
-        break;
-        case 0xdb:
-            switch (reg) {
-                case 0: return (mod != 3) ? DISASM_FILD : DISASM_FCMOVNB;
-                case 1: return (mod != 3) ? DISASM_FISTTP : DISASM_FCMOVNE;
-                case 2: return (mod != 3) ? DISASM_FIST : DISASM_FCMOVNBE;
-                case 3: return (mod != 3) ? DISASM_FISTP : DISASM_FCMOVNU;
-                case 4: return (mod != 3) ? DISASM_INVALID : ((prefix.value == 0x9b) ? DISASM_FCLEX : DISASM_FNCLEX);
-                case 5: return (mod != 3) ? DISASM_FLD : ((prefix.value == 0x9b) ? DISASM_FINIT : DISASM_FNINIT);
-                case 7: return (mod != 3) ? DISASM_FSTP : DISASM_INVALID;
-            }
-        break;
-        case 0xdc:
-            switch (reg) {
-                case 0: return DISASM_FADD;
-                case 1: return DISASM_FMUL;
-                case 2: return DISASM_FCOM;
-                case 3: return DISASM_FCOMP;
-                case 4: return DISASM_FSUB;
-                case 5: return DISASM_FSUBR;
-                case 6: return DISASM_FDIV;
-                case 7: return DISASM_FDIVR;
-            }
-        break;
-        case 0xdd:
-            switch (reg) {
-                case 0: return (mod != 3) ? DISASM_FLD : DISASM_FFREE;
-                case 1: return (mod != 3) ? DISASM_FISTTP : DISASM_INVALID;
-                case 2: return (mod != 3) ? DISASM_FST : DISASM_FCOM;
-                case 3: return (mod != 3) ? DISASM_FSTP : DISASM_FCOMP;
-                case 4: return (mod != 3) ? DISASM_FRSTOR : DISASM_FUCOM;
-                case 5: return (mod != 3) ? DISASM_INVALID : DISASM_FUCOMP;
-                case 6: return (mod != 3) ? ((prefix.value == 0x9b) ? DISASM_FSAVE : DISASM_FNSAVE) : DISASM_INVALID;
-                case 7: return (mod != 3) ? ((prefix.value == 0x9b) ? DISASM_FSTSW : DISASM_FNSTSW) : DISASM_INVALID;
-            }
-        break;
-        case 0xde:
-            switch (reg) {
-                case 0: return (mod != 3) ? DISASM_FIADD : DISASM_FADDP;
-                case 1: return (mod != 3) ? DISASM_FIMUL : DISASM_FMULP;
-                case 2: return (mod != 3) ? DISASM_FICOM : DISASM_INVALID;
-                case 3: return (mod != 3) ? DISASM_FICOMP : DISASM_FCOMPP;
-                case 4: return (mod != 3) ? DISASM_FISUB : DISASM_FSUBRP;
-                case 5: return (mod != 3) ? DISASM_FISUBR : DISASM_FSUBP;
-                case 6: return (mod != 3) ? DISASM_FIDIV : DISASM_FDIVRP;
-                case 7: return (mod != 3) ? DISASM_FIDIVR : DISASM_FDIVP;
-            }
-        break;
-        case 0xdf:
-            switch (reg) {
-                case 0: return (mod != 3) ? DISASM_FILD : DISASM_INVALID;
-                case 1: return (mod != 3) ? DISASM_FISTTP : DISASM_INVALID;
-                case 2: return (mod != 3) ? DISASM_FIST : DISASM_INVALID;
-                case 3: return (mod != 3) ? DISASM_FISTP : DISASM_INVALID;
-                case 4: return (mod != 3) ? DISASM_FBSTP : DISASM_FNSTSW;
-                case 5: return (mod != 3) ? DISASM_FILD : DISASM_FUCOMIP;
-                case 6: return (mod != 3) ? DISASM_FISTP : DISASM_FCOMIP;
-                case 7: return (mod != 3) ? DISASM_FISTP : DISASM_INVALID;
-            }
-        break;
-    }
-
-    *instr_len = 1;
-	return DISASM_INVALID;
-}
-
 internal Disasm_Opcode _disasm_group1_mnemonic(u8* byte) {
     u8 reg = (*byte & 0b00111000) >> 3;
     switch (reg) {
@@ -390,6 +287,10 @@ internal inline Disasm_Operand _disasm_decode_m64(u8* byte, Disasm_Prefix prefix
 
 internal inline Disasm_Operand _disasm_decode_m14_28(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
     return _disasm_decode_m(byte, prefix, num_bytes_read, (prefix.op_override) ? 14 : 28);
+}
+
+internal inline Disasm_Operand _disasm_decode_m80real(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    return _disasm_decode_m(byte, prefix, num_bytes_read, 10);
 }
 
 internal Disasm_Operand _disasm_decode_rm(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read, u8 size_bytes, b8 is_fpu) {
@@ -1489,6 +1390,8 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             return _disasm_decode_flops_d9(instr_ptr, prefix);
         case 0xda:
             return _disasm_decode_flops_da(instr_ptr, prefix);
+        case 0xdb:
+            return _disasm_decode_flops_db(instr_ptr, prefix);
     }
  
     return instr;
@@ -1532,6 +1435,7 @@ internal String _disasm_mem_format(Arena* arena, Disasm_Operand operand, Disasm_
             case 2: string_builder_append(arena, &str, String("w_ptr ")); break;
             case 4: string_builder_append(arena, &str, String("d_ptr ")); break;
             case 8: string_builder_append(arena, &str, String("q_ptr ")); break;
+            case 10: string_builder_append(arena, &str, String("t_ptr ")); break;
         }
 
         if (operand.mem.segment != DISASM_SEG_NONE) {

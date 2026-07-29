@@ -289,6 +289,10 @@ internal inline Disasm_Operand _disasm_decode_m14_28(u8* byte, Disasm_Prefix pre
     return _disasm_decode_m(byte, prefix, num_bytes_read, (prefix.op_override) ? 14 : 28);
 }
 
+internal inline Disasm_Operand _disasm_decode_m64real(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    return _disasm_decode_m(byte, prefix, num_bytes_read, sizeof(f64));
+}
+
 internal inline Disasm_Operand _disasm_decode_m80real(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
     return _disasm_decode_m(byte, prefix, num_bytes_read, 10);
 }
@@ -1392,6 +1396,8 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             return _disasm_decode_flops_da(instr_ptr, prefix);
         case 0xdb:
             return _disasm_decode_flops_db(instr_ptr, prefix);
+        case 0xdc:
+            return _disasm_decode_flops_dc(instr_ptr, prefix);
     }
  
     return instr;

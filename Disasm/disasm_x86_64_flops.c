@@ -434,3 +434,109 @@ internal Disasm_Instr _disasm_decode_flops_db(u8* instr_ptr, Disasm_Prefix prefi
     instr.instr_len += prefix.count;
     return instr;
 }
+
+internal Disasm_Instr _disasm_decode_flops_dc(u8* instr_ptr, Disasm_Prefix prefix) {
+    Disasm_Instr instr = {0};
+    instr.instr = instr_ptr - prefix.count;
+    instr.instr_len = 1;
+    switch (GetReg(*ModRMBytePtr)) {
+        case 0:
+            instr.num_operands = 2;
+            if (GetMod(*ModRMBytePtr) != 3) {
+                instr.opcode = DISASM_FADD;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+                instr.operand[1] = _disasm_decode_m64real(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.opcode = DISASM_FADD;
+                instr.operand[0] = _disasm_decode_sti(ModRMBytePtr, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_specific_reg(DISASM_REG_ST);
+            }
+        break;
+        case 1:
+            instr.num_operands = 2;
+            if (GetMod(*ModRMBytePtr) != 3) {
+                instr.opcode = DISASM_FMUL;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+                instr.operand[1] = _disasm_decode_m64real(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.opcode = DISASM_FMUL;
+                instr.operand[0] = _disasm_decode_sti(ModRMBytePtr, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_specific_reg(DISASM_REG_ST);
+            }
+        break;
+        case 2:
+            instr.num_operands = 2;
+            if (GetMod(*ModRMBytePtr) != 3) {
+                instr.opcode = DISASM_FCOM;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+                instr.operand[1] = _disasm_decode_m64real(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                DisasmInvalid;
+                instr.instr_len += 1;
+                return instr;
+            }
+        break;
+        case 3:
+            instr.num_operands = 2;
+            if (GetMod(*ModRMBytePtr) != 3) {
+                instr.opcode = DISASM_FCOMP;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+                instr.operand[1] = _disasm_decode_m64real(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                DisasmInvalid;
+                instr.instr_len += 1;
+                return instr;
+            }
+        break;
+        case 4:
+            instr.num_operands = 2;
+            if (GetMod(*ModRMBytePtr) != 3) {
+                instr.opcode = DISASM_FSUB;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+                instr.operand[1] = _disasm_decode_m64real(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.opcode = DISASM_FSUBR;
+                instr.operand[0] = _disasm_decode_sti(ModRMBytePtr, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_specific_reg(DISASM_REG_ST);
+            }
+        break;
+        case 5:
+            instr.num_operands = 2;
+            if (GetMod(*ModRMBytePtr) != 3) {
+                instr.opcode = DISASM_FSUBR;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+                instr.operand[1] = _disasm_decode_m64real(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.opcode = DISASM_FSUB;
+                instr.operand[0] = _disasm_decode_sti(ModRMBytePtr, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_specific_reg(DISASM_REG_ST);
+            }
+        break;
+        case 6:
+            instr.num_operands = 2;
+            if (GetMod(*ModRMBytePtr) != 3) {
+                instr.opcode = DISASM_FDIV;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+                instr.operand[1] = _disasm_decode_m64real(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.opcode = DISASM_FDIVR;
+                instr.operand[0] = _disasm_decode_sti(ModRMBytePtr, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_specific_reg(DISASM_REG_ST);
+            }
+        break;
+        case 7:
+            instr.num_operands = 2;
+            if (GetMod(*ModRMBytePtr) != 3) {
+                instr.opcode = DISASM_FDIVR;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+                instr.operand[1] = _disasm_decode_m64real(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.opcode = DISASM_FDIV;
+                instr.operand[0] = _disasm_decode_sti(ModRMBytePtr, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_specific_reg(DISASM_REG_ST);
+            }
+        break;
+    }
+    instr.instr_len += prefix.count;
+    return instr;
+}

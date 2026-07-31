@@ -1,1 +1,2 @@
-#include "disasm_x86_64.h"
+#include "x86_64/decode.h"
+#include "disasm_format.h"

@@ -499,3 +499,94 @@ internal Disasm_Instr _disasm_decode_flops_dd(u8* instr_ptr, Disasm_Prefix prefi
     instr.instr_len += prefix.count;
     return instr;
 }
+
+internal Disasm_Instr _disasm_decode_flops_de(u8* instr_ptr, Disasm_Prefix prefix) {
+    Disasm_Instr instr = {0};
+    instr.instr = instr_ptr - prefix.count;
+    instr.instr_len = 1;
+    if (GetMod(*ModRMBytePtr) != 3) {
+        switch (GetReg(*ModRMBytePtr)) {
+            case 0:
+                instr.num_operands = 2;
+                instr.opcode = DISASM_FLD;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+                instr.operand[1] = _disasm_decode_m64real(ModRMBytePtr, prefix, &instr.instr_len);
+            break;
+            case 1:
+                instr.num_operands = 2;
+                instr.opcode = DISASM_FISTTP;
+                instr.operand[0] = _disasm_decode_m64int(ModRMBytePtr, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_specific_reg(DISASM_REG_ST);
+            break;
+            case 2:
+                instr.num_operands = 2;
+                instr.opcode = DISASM_FST;
+                instr.operand[0] = _disasm_decode_m64real(ModRMBytePtr, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_specific_reg(DISASM_REG_ST);
+            break;
+            case 3:
+                instr.num_operands = 2;
+                instr.opcode = DISASM_FSTP;
+                instr.operand[0] = _disasm_decode_m64real(ModRMBytePtr, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_specific_reg(DISASM_REG_ST);
+            break;
+            case 4:
+                instr.num_operands = 2;
+                instr.opcode = DISASM_FRSTOR;
+                instr.operand[0] = _disasm_decode_m64real(ModRMBytePtr, prefix, &instr.instr_len);
+                instr.operand[1] = _disasm_specific_reg(DISASM_REG_ST);
+            break;
+            case 6:
+                instr.num_operands = 1;
+                instr.opcode = DISASM_FNSAVE;
+                instr.operand[0] = _disasm_decode_m94_108(ModRMBytePtr, prefix, &instr.instr_len);
+            break;
+            case 7:
+                instr.num_operands = 1;
+                instr.opcode = DISASM_FNSTSW;
+                instr.operand[0] = _disasm_decode_m16(ModRMBytePtr, prefix, &instr.instr_len);
+            break;
+            default:
+                DisasmInvalidFlop;
+            break;
+        }
+    } else {
+        switch (GetReg(*ModRMBytePtr)) {
+            case 0:
+                instr.num_operands = 1;
+                instr.opcode = DISASM_FFREE;
+                instr.operand[0] = _disasm_decode_sti(ModRMBytePtr, prefix, &instr.instr_len);
+            break;
+            case 2:
+                instr.num_operands = 2;
+                instr.opcode = DISASM_FST;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+                instr.operand[1] = _disasm_decode_sti(ModRMBytePtr, prefix, &instr.instr_len);
+            break;
+            case 3:
+                instr.num_operands = 2;
+                instr.opcode = DISASM_FSTP;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+                instr.operand[1] = _disasm_decode_sti(ModRMBytePtr, prefix, &instr.instr_len);
+            break;
+            case 4:
+                instr.num_operands = 2;
+                instr.opcode = DISASM_FUCOM;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+                instr.operand[1] = _disasm_decode_sti(ModRMBytePtr, prefix, &instr.instr_len);
+            break;
+            case 5:
+                instr.num_operands = 3;
+                instr.opcode = DISASM_FUCOMP;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ST);
+                instr.operand[1] = _disasm_decode_sti(ModRMBytePtr, prefix, &instr.instr_len);
+            break;
+            default:
+                DisasmInvalidFlop;
+            break;
+        }
+    }
+    instr.instr_len += prefix.count;
+    return instr;
+}
+

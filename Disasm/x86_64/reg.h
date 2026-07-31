@@ -1,5 +1,5 @@
-#ifndef DISASM_x86_64_REG_H
-#define DISASM_x86_64_REG_H
+#ifndef DISASM_REG_H
+#define DISASM_REG_H
 
 typedef enum {
     DISASM_REG_NONE = 0,

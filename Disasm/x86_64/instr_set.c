@@ -1,3 +1,15 @@
+u8* disasm_seg_stringify(Disasm_Segment seg) {
+    switch (seg) {
+        case DISASM_SEG_ES: return Stringify(DISASM_SEG_ES);
+        case DISASM_SEG_CS: return Stringify(DISASM_SEG_CS);
+        case DISASM_SEG_SS: return Stringify(DISASM_SEG_SS);
+        case DISASM_SEG_DS: return Stringify(DISASM_SEG_DS);
+        case DISASM_SEG_FS: return Stringify(DISASM_SEG_FS);
+        case DISASM_SEG_GS: return Stringify(DISASM_SEG_GS);
+    }
+    return "";
+}
+
 u8* disasm_opcode_stringify(Disasm_Opcode opcode) {
     switch (opcode) {
         case DISASM_INVALID: return Stringify(DISASM_INVALID);

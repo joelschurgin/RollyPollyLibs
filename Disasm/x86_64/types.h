@@ -1,9 +1,8 @@
-#ifndef DISASM_X86_64_H
-#define DISASM_X86_64_H
+#ifndef DISASM_TYPES_H
+#define DISASM_TYPES_H
 
-#include "base.h"
-#include "disasm_x86_64_instr_set.h"
-#include "disasm_x86_64_reg.h"
+#include "instr_set.h"
+#include "reg.h"
 
 typedef enum {
     DISASM_OP_TYPE_NONE,
@@ -13,15 +12,16 @@ typedef enum {
     DISASM_OP_TYPE_REL,
 } Disasm_OperandType;
 
-typedef enum {
-    DISASM_SEG_NONE = 0x00,
-    DISASM_SEG_ES   = 0x26,
-    DISASM_SEG_CS   = 0x2E,
-    DISASM_SEG_SS   = 0x36,
-    DISASM_SEG_DS   = 0x3E,
-    DISASM_SEG_FS   = 0x64,
-    DISASM_SEG_GS   = 0x65,
-} Disasm_Segment;
+typedef struct {
+    b8 op_override;
+    b8 addr_override;
+    b8 lock;
+    b8 repeat;
+    b8 repeat_nz;
+    Disasm_Segment segment;
+    u8 rex;
+    u32 count;
+} Disasm_Prefix;
 
 typedef struct {
     Disasm_OperandType type;
@@ -49,9 +49,6 @@ typedef struct {
     u8 instr_len;
 } Disasm_Instr;
 
-Disasm_Instr  disasm_decode(u8* instr_ptr);
 
-String        disasm_opcode_format(Arena* arena, Disasm_Opcode opcode);
-String        disasm_operand_format(Arena* arena, Disasm_Instr instr, u8 operand_idx);
 
 #endif

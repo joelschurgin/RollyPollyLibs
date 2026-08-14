@@ -63,7 +63,6 @@ internal inline Disasm_Operand _disasm_decode_imm16_32_64(u8* byte, Disasm_Prefi
 
 internal Disasm_Operand _disasm_decode_rel(u8* byte, u8 size_bytes, u8* instr_len);
 internal inline Disasm_Operand _disasm_decode_rel8(u8* byte, u8* instr_len);
-
-
+internal inline Disasm_Operand _disasm_decode_rel16_32(u8* byte, Disasm_Prefix prefix, u8* instr_len);
 
 #endif

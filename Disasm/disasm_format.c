@@ -68,10 +68,10 @@ internal String _disasm_imm_format(Arena* arena, Disasm_Operand operand) {
     return str;
 }
 
-internal String _disasm_rel_format(Arena* arena, Disasm_Operand operand, u8 instr_len) {
+internal String _disasm_rel_format(Arena* arena, Disasm_Operand operand, u8 instr_len, u64 addr) {
     String str;
     StringBuilderBlock(arena, str) {
-        i64 rel = operand.rel + instr_len;
+        i64 rel = operand.rel + instr_len + addr;
         if (rel < 0) string_builder_append_char(arena, &str, '-');
         string_builder_append(arena, &str, String("0x"));
         string_builder_append_int(arena, &str, Abs(rel), 16);
@@ -84,13 +84,13 @@ String disasm_opcode_format(Arena* arena, Disasm_Opcode opcode) {
     return string_to_lower(arena, mnemonic);
 }
 
-String disasm_operand_format(Arena* arena, Disasm_Instr instr, u8 operand_idx) {
+String disasm_operand_format(Arena* arena, u64 addr, Disasm_Instr instr, u8 operand_idx) {
     Disasm_Operand operand = instr.operand[operand_idx];
     switch (operand.type) {
         case DISASM_OP_TYPE_REG: return _disasm_reg_format(arena, operand.reg);
         case DISASM_OP_TYPE_IMM: return _disasm_imm_format(arena, operand);
         case DISASM_OP_TYPE_MEM: return _disasm_mem_format(arena, operand, instr.opcode);
-        case DISASM_OP_TYPE_REL: return _disasm_rel_format(arena, operand, instr.instr_len);
+        case DISASM_OP_TYPE_REL: return _disasm_rel_format(arena, operand, instr.instr_len, addr);
         default:                 return String("");
     }
 }

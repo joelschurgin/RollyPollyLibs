@@ -480,3 +480,8 @@ internal Disasm_Operand _disasm_decode_rel(u8* byte, u8 size_bytes, u8* instr_le
 internal inline Disasm_Operand _disasm_decode_rel8(u8* byte, u8* instr_len) {
     return _disasm_decode_rel(byte, sizeof(i8), instr_len);
 }
+
+internal inline Disasm_Operand _disasm_decode_rel16_32(u8* byte, Disasm_Prefix prefix, u8* instr_len) {
+    u8 size_bytes = _disasm_operand_16_32_size(prefix);
+    return _disasm_decode_rel(byte, size_bytes, instr_len);
+}

@@ -918,6 +918,128 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
         case 0xdd: return _disasm_decode_flops_dd(instr_ptr, prefix);
         case 0xde: return _disasm_decode_flops_de(instr_ptr, prefix);
         case 0xdf: return _disasm_decode_flops_df(instr_ptr, prefix);
+        case 0xe0:
+            instr.opcode = DISASM_LOOPNE;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_specific_reg(DISASM_REG_RCX);
+            instr.operand[1] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xe1:
+            instr.opcode = DISASM_LOOPE;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_specific_reg(DISASM_REG_RCX);
+            instr.operand[1] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xe2:
+            instr.opcode = DISASM_LOOP;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_specific_reg(DISASM_REG_RCX);
+            instr.operand[1] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xe3:
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            if (prefix.addr_override) {
+                instr.opcode = DISASM_JECXZ;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_ECX);
+            } else {
+                instr.opcode = DISASM_JRCXZ;
+                instr.operand[0] = _disasm_specific_reg(DISASM_REG_RCX);
+            }
+            instr.operand[1] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xe4:
+            instr.opcode = DISASM_IN;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_specific_reg(DISASM_REG_AL);
+            instr.operand[1] = _disasm_decode_imm8(InstrNext, instr.operand[0].size_bytes, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xe5:
+            instr.opcode = DISASM_IN;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_specific_reg(prefix.op_override ? DISASM_REG_AX : DISASM_REG_EAX);
+            instr.operand[1] = _disasm_decode_imm8(InstrNext, instr.operand[0].size_bytes, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xe6:
+            instr.opcode = DISASM_OUT;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[1] = _disasm_specific_reg(DISASM_REG_AL);
+            instr.operand[0] = _disasm_decode_imm8(InstrNext, instr.operand[1].size_bytes, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xe7:
+            instr.opcode = DISASM_OUT;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[1] = _disasm_specific_reg(prefix.op_override ? DISASM_REG_AX : DISASM_REG_EAX);
+            instr.operand[0] = _disasm_decode_imm8(InstrNext, instr.operand[1].size_bytes, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xe8:
+            instr.opcode = DISASM_CALL;
+            instr.instr_len = 1;
+            instr.num_operands = 1;
+            instr.operand[0] = _disasm_decode_rel16_32(InstrNext, prefix, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xe9:
+            instr.opcode = DISASM_JMP;
+            instr.instr_len = 1;
+            instr.num_operands = 1;
+            instr.operand[0] = _disasm_decode_rel16_32(InstrNext, prefix, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xeb:
+            instr.opcode = DISASM_JMP;
+            instr.instr_len = 1;
+            instr.num_operands = 1;
+            instr.operand[0] = _disasm_decode_rel8(InstrNext, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xec:
+            instr.opcode = DISASM_IN;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_specific_reg(DISASM_REG_AL);
+            instr.operand[1] = _disasm_specific_reg(DISASM_REG_DX);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xed:
+            instr.opcode = DISASM_IN;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_specific_reg(prefix.op_override ? DISASM_REG_AX : DISASM_REG_EAX);
+            instr.operand[1] = _disasm_specific_reg(DISASM_REG_DX);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xee:
+            instr.opcode = DISASM_OUT;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_specific_reg(DISASM_REG_DX);
+            instr.operand[1] = _disasm_specific_reg(DISASM_REG_AL);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0xef:
+            instr.opcode = DISASM_OUT;
+            instr.instr_len = 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_specific_reg(DISASM_REG_DX);
+            instr.operand[1] = _disasm_specific_reg(prefix.op_override ? DISASM_REG_AX : DISASM_REG_EAX);
+            instr.instr_len += prefix.count;
+            return instr;
     }
  
     return instr;

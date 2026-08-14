@@ -9,5 +9,6 @@ internal Disasm_Instr _disasm_decode_flops_db(u8* instr_ptr, Disasm_Prefix prefi
 internal Disasm_Instr _disasm_decode_flops_dc(u8* instr_ptr, Disasm_Prefix prefix);
 internal Disasm_Instr _disasm_decode_flops_dd(u8* instr_ptr, Disasm_Prefix prefix);
 internal Disasm_Instr _disasm_decode_flops_de(u8* instr_ptr, Disasm_Prefix prefix);
+internal Disasm_Instr _disasm_decode_flops_df(u8* instr_ptr, Disasm_Prefix prefix);
 
 #endif

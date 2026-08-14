@@ -910,18 +910,14 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             instr.operand[0] = _disasm_decode_mem_reg(prefix, 1, DISASM_REG_EBX, DISASM_REG_RBX, prefix.segment ? prefix.segment : DISASM_SEG_DS);
             instr.instr_len += prefix.count;
             return instr;
-        case 0xd8:
-            return _disasm_decode_flops_d8(instr_ptr, prefix);
-        case 0xd9:
-            return _disasm_decode_flops_d9(instr_ptr, prefix);
-        case 0xda:
-            return _disasm_decode_flops_da(instr_ptr, prefix);
-        case 0xdb:
-            return _disasm_decode_flops_db(instr_ptr, prefix);
-        case 0xdc:
-            return _disasm_decode_flops_dc(instr_ptr, prefix);
-        case 0xdd:
-            return _disasm_decode_flops_dd(instr_ptr, prefix);
+        case 0xd8: return _disasm_decode_flops_d8(instr_ptr, prefix);
+        case 0xd9: return _disasm_decode_flops_d9(instr_ptr, prefix);
+        case 0xda: return _disasm_decode_flops_da(instr_ptr, prefix);
+        case 0xdb: return _disasm_decode_flops_db(instr_ptr, prefix);
+        case 0xdc: return _disasm_decode_flops_dc(instr_ptr, prefix);
+        case 0xdd: return _disasm_decode_flops_dd(instr_ptr, prefix);
+        case 0xde: return _disasm_decode_flops_de(instr_ptr, prefix);
+        case 0xdf: return _disasm_decode_flops_df(instr_ptr, prefix);
     }
  
     return instr;

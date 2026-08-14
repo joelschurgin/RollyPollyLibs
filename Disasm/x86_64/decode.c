@@ -1040,6 +1040,276 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
             instr.operand[1] = _disasm_specific_reg(prefix.op_override ? DISASM_REG_AX : DISASM_REG_EAX);
             instr.instr_len += prefix.count;
             return instr;
+        case 0xf1:
+            instr.opcode = DISASM_INT1;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0xf4:
+            instr.opcode = DISASM_HLT;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0xf5:
+            instr.opcode = DISASM_CMC;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0xf6:
+            switch (GetReg(*ModRMBytePtr)) {
+                case 0:
+                case 1:
+                    instr.opcode = DISASM_TEST;
+                    instr.instr_len = 1;
+                    instr.num_operands = 2;
+                    instr.operand[0] = _disasm_decode_rm8(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.operand[1] = _disasm_decode_imm8(InstrNext, instr.operand[0].size_bytes, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 2:
+                    instr.opcode = DISASM_NOT;
+                    instr.instr_len = 1;
+                    instr.num_operands = 1;
+                    instr.operand[0] = _disasm_decode_rm8(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 3:
+                    instr.opcode = DISASM_NEG;
+                    instr.instr_len = 1;
+                    instr.num_operands = 1;
+                    instr.operand[0] = _disasm_decode_rm8(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 4:
+                    instr.opcode = DISASM_MUL;
+                    instr.instr_len = 1;
+                    instr.num_operands = 3;
+                    instr.operand[0] = _disasm_specific_reg(DISASM_REG_AX);
+                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_AL);
+                    instr.operand[2] = _disasm_decode_rm8(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 5:
+                    instr.opcode = DISASM_IMUL;
+                    instr.instr_len = 1;
+                    instr.num_operands = 3;
+                    instr.operand[0] = _disasm_specific_reg(DISASM_REG_AX);
+                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_AL);
+                    instr.operand[2] = _disasm_decode_rm8(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 6:
+                    instr.opcode = DISASM_DIV;
+                    instr.instr_len = 1;
+                    instr.num_operands = 4;
+                    instr.operand[0] = _disasm_specific_reg(DISASM_REG_AL);
+                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_AH);
+                    instr.operand[2] = _disasm_specific_reg(DISASM_REG_AX);
+                    instr.operand[3] = _disasm_decode_rm8(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 7:
+                    instr.opcode = DISASM_DIV;
+                    instr.instr_len = 1;
+                    instr.num_operands = 4;
+                    instr.operand[0] = _disasm_specific_reg(DISASM_REG_AL);
+                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_AH);
+                    instr.operand[2] = _disasm_specific_reg(DISASM_REG_AX);
+                    instr.operand[3] = _disasm_decode_rm8(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                default:
+                    DisasmInvalid;
+                    instr.instr_len += 1;
+                    return instr;
+            }
+        case 0xf7:
+            switch (GetReg(*ModRMBytePtr)) {
+                case 0:
+                case 1:
+                    instr.opcode = DISASM_TEST;
+                    instr.instr_len = 1;
+                    instr.num_operands = 2;
+                    instr.operand[0] = _disasm_decode_rm16_32_64(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.operand[1] = _disasm_decode_imm16_32(InstrNext, prefix, instr.operand[0].size_bytes, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 2:
+                    instr.opcode = DISASM_NOT;
+                    instr.instr_len = 1;
+                    instr.num_operands = 1;
+                    instr.operand[0] = _disasm_decode_rm16_32_64(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 3:
+                    instr.opcode = DISASM_NEG;
+                    instr.instr_len = 1;
+                    instr.num_operands = 1;
+                    instr.operand[0] = _disasm_decode_rm16_32_64(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 4:
+                    instr.opcode = DISASM_MUL;
+                    instr.instr_len = 1;
+                    instr.num_operands = 3;
+                    instr.operand[0] = _disasm_specific_reg(DISASM_REG_RDX);
+                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_RAX);
+                    instr.operand[2] = _disasm_decode_rm16_32_64(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 5:
+                    instr.opcode = DISASM_IMUL;
+                    instr.instr_len = 1;
+                    instr.num_operands = 3;
+                    instr.operand[0] = _disasm_specific_reg(DISASM_REG_RDX);
+                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_RAX);
+                    instr.operand[2] = _disasm_decode_rm16_32_64(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 6:
+                    instr.opcode = DISASM_DIV;
+                    instr.instr_len = 1;
+                    instr.num_operands = 3;
+                    instr.operand[0] = _disasm_specific_reg(DISASM_REG_RDX);
+                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_RAX);
+                    instr.operand[2] = _disasm_decode_rm16_32_64(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 7:
+                    instr.opcode = DISASM_DIV;
+                    instr.instr_len = 1;
+                    instr.num_operands = 4;
+                    instr.operand[0] = _disasm_specific_reg(DISASM_REG_RDX);
+                    instr.operand[1] = _disasm_specific_reg(DISASM_REG_RAX);
+                    instr.operand[2] = _disasm_decode_rm8(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                default:
+                    DisasmInvalid;
+                    instr.instr_len += 1;
+                    return instr;
+            }
+        case 0xf8:
+            instr.opcode = DISASM_CLC;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0xf9:
+            instr.opcode = DISASM_STC;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0xfa:
+            instr.opcode = DISASM_CLI;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0xfb:
+            instr.opcode = DISASM_STI;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0xfc:
+            instr.opcode = DISASM_CLD;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0xfd:
+            instr.opcode = DISASM_STD;
+            instr.instr_len = 1 + prefix.count;
+            instr.num_operands = 0;
+            return instr;
+        case 0xfe:
+            switch (GetReg(*ModRMBytePtr)) {
+                case 0:
+                    instr.opcode = DISASM_INC;
+                    instr.instr_len = 1;
+                    instr.num_operands = 1;
+                    instr.operand[0] = _disasm_decode_rm8(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 1:
+                    instr.opcode = DISASM_DEC;
+                    instr.instr_len = 1;
+                    instr.num_operands = 1;
+                    instr.operand[0] = _disasm_decode_rm8(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                default:
+                    DisasmInvalid;
+                    instr.instr_len += 1;
+                    return instr;
+            }
+        case 0xff:
+            switch (GetReg(*ModRMBytePtr)) {
+                case 0:
+                    instr.opcode = DISASM_INC;
+                    instr.instr_len = 1;
+                    instr.num_operands = 1;
+                    instr.operand[0] = _disasm_decode_rm16_32_64(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 1:
+                    instr.opcode = DISASM_DEC;
+                    instr.instr_len = 1;
+                    instr.num_operands = 1;
+                    instr.operand[0] = _disasm_decode_rm16_32_64(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 2:
+                    instr.opcode = DISASM_CALL;
+                    instr.instr_len = 1;
+                    instr.num_operands = 1;
+                    instr.operand[0] = _disasm_decode_rm16_64(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 3:
+                    if (GetMod(*ModRMBytePtr) == 3) {
+                        DisasmInvalid;
+                        instr.instr_len += 1;
+                        return instr;
+                    }
+                    instr.opcode = DISASM_CALL;
+                    instr.instr_len = 1;
+                    instr.num_operands = 1;
+                    instr.operand[0] = _disasm_decode_rm16_64(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 4:
+                    instr.opcode = DISASM_JMP;
+                    instr.instr_len = 1;
+                    instr.num_operands = 1;
+                    instr.operand[0] = _disasm_decode_rm16_64(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 5:
+                    if (GetMod(*ModRMBytePtr) == 3) {
+                        DisasmInvalid;
+                        instr.instr_len += 1;
+                        return instr;
+                    }
+                    instr.opcode = DISASM_JMP;
+                    instr.instr_len = 1;
+                    instr.num_operands = 1;
+                    instr.operand[0] = _disasm_decode_rm16_64(ModRMBytePtr, prefix, &instr.instr_len);
+                    instr.instr_len += prefix.count;
+                    return instr;
+                case 6:
+                    instr.opcode = DISASM_PUSH;
+                    instr.instr_len = 1;
+                    instr.num_operands = 1;
+                    if (GetMod(*ModRMBytePtr) != 3) {
+                        instr.operand[0] = _disasm_decode_rm16_32(ModRMBytePtr, prefix, &instr.instr_len);
+                    } else {
+                        instr.operand[0] = _disasm_decode_rm16_64(ModRMBytePtr, prefix, &instr.instr_len);
+                    }
+                    instr.instr_len += prefix.count;
+                    return instr;
+                default:
+                    DisasmInvalid;
+                    instr.instr_len += 1;
+                    return instr;
+            }
     }
  
     return instr;

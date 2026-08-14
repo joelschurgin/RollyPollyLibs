@@ -284,6 +284,11 @@ internal inline Disasm_Operand _disasm_decode_rm32(u8* byte, Disasm_Prefix prefi
     return _disasm_decode_rm(byte, prefix, num_bytes_read, sizeof(u32), 0);
 }
 
+internal inline Disasm_Operand _disasm_decode_rm16_32(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    u8 size_bytes = _disasm_operand_16_32_size(prefix);
+    return _disasm_decode_rm(byte, prefix, num_bytes_read, size_bytes, 0);
+}
+
 internal inline Disasm_Operand _disasm_decode_rm16_64(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
     u8 size_bytes = _disasm_operand_16_64_size(prefix);
     return _disasm_decode_rm(byte, prefix, num_bytes_read, size_bytes, 0);

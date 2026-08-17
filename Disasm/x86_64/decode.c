@@ -4,6 +4,7 @@
 #include "reg.c"
 #include "operands.c"
 #include "flops.c"
+#include "decode_two_byte_opcodes.c"
 
 internal Disasm_Prefix _disasm_decode_prefix(u8** instr_ptr) {
     Disasm_Prefix prefix = {0};
@@ -63,6 +64,8 @@ Disasm_Instr disasm_decode(u8* instr_ptr) {
     Disasm_Prefix prefix = _disasm_decode_prefix(&instr_ptr);
 
     if (*instr_ptr <= 0x3f) {
+        if (*instr_ptr == 0x0f) return _disasm_decode_two_byte_opcodes(prefix, instr_ptr);
+
         u8 op_combo = (*instr_ptr) & 7;
         u8 op_type = (*instr_ptr) & ~7;
 

@@ -1085,5 +1085,44 @@ i32 main(i32 argc, u8 **argv) {
     };
     test_write_bytes(arena, curr_dir, String("test_0f_10"), instr, sizeof(instr));
 }
+{
+    u8 instr[] = {
+        // ================= 0x0F 0x11: MOVUPS / MOVUPD / MOVSS / MOVSD (Store Forms) =================
+        0x0F, 0x11, 0x00,                         // movups xmmword ptr [RAX], xmm0 (Packed Single Store: 16 bytes memory)
+        0x66, 0x0F, 0x11, 0x13,                   // movupd xmmword ptr [RBX], xmm2 (Packed Double Store: 16 bytes memory)
+        0xF3, 0x0F, 0x11, 0x0C, 0x24,             // movss  dword ptr [RSP], xmm0   (Scalar Single Store: 4 bytes memory)
+        0xF2, 0x0F, 0x11, 0x1E,                   // movsd  qword ptr [RSI], xmm3   (Scalar Double Store: 8 bytes memory)
+        0x44, 0x0F, 0x11, 0xC8,                   // movups xmm0, xmm9              (Register form: moves xmm9 into xmm0)
+
+        // ================= 0x0F 0x12: MOVLPS / MOVLPD / MOVHLPS / MOVSLDUP =================
+        0x0F, 0x12, 0x00,                         // movlps xmm0, qword ptr [RAX]   (No Prefix: Low Packed Single - 8 bytes memory)
+        0x0F, 0x12, 0xC2,                         // movhlps xmm0, xmm2             (No Prefix + Register Mode: High to Low copy)
+        0x66, 0x0F, 0x12, 0x03,                   // movlpd xmm0, qword ptr [RBX]   (0x66 Prefix: Low Packed Double - 8 bytes memory)
+        0xF3, 0x0F, 0x12, 0x06,                   // movsldup xmm0, xmmword ptr [RSI](0xF3 Prefix: Move Single Dup - 16 bytes memory)
+
+        // ================= 0x0F 0x13: MOVLPS / MOVLPD (Store Lower Half Forms) =================
+        0x0F, 0x13, 0x00,                         // movlps qword ptr [RAX], xmm0   (No Prefix: Store Low Packed Single - 8 bytes)
+        0x66, 0x0F, 0x13, 0x03,                   // movlpd qword ptr [RBX], xmm0   (0x66 Prefix: Store Low Packed Double - 8 bytes)
+
+        // ================= 0x0F 0x14: UNPCKLPS / UNPCKLPD (Unpack Low Data) =================
+        0x0F, 0x14, 0xC1,                         // unpcklps xmm0, xmm1            (No Prefix: Unpack Low Packed Single)
+        0x66, 0x0F, 0x14, 0xC2,                   // unpcklpd xmm0, xmm2            (0x66 Prefix: Unpack Low Packed Double)
+
+        // ================= 0x0F 0x15: UNPCKHPS / UNPCKHPD (Unpack High Data) =================
+        0x0F, 0x15, 0xC1,                         // unpckhps xmm0, xmm1            (No Prefix: Unpack High Packed Single)
+        0x66, 0x0F, 0x15, 0xC2,                   // unpckhpd xmm0, xmm2            (0x66 Prefix: Unpack High Packed Double)
+
+        // ================= 0x0F 0x16: MOVHPS / MOVHPD / MOVLHPS / MOVSHDUP =================
+        0x0F, 0x16, 0x00,                         // movhps xmm0, qword ptr [RAX]   (No Prefix: High Packed Single - 8 bytes memory)
+        0x0F, 0x16, 0xC2,                         // movlhps xmm0, xmm2             (No Prefix + Register Mode: Low to High copy)
+        0x66, 0x0F, 0x16, 0x03,                   // movhpd xmm0, qword ptr [RBX]   (0x66 Prefix: High Packed Double - 8 bytes memory)
+        0xF3, 0x0F, 0x16, 0x06,                   // movshdup xmm0, xmmword ptr [RSI](0xF3 Prefix: Move Single Dup - 16 bytes memory)
+
+        // ================= 0x0F 0x17: MOVHPS / MOVHPD (Store Upper Half Forms) =================
+        0x0F, 0x17, 0x00,                         // movhps qword ptr [RAX], xmm0   (No Prefix: Store High Packed Single - 8 bytes)
+        0x66, 0x0F, 0x17, 0x03,                   // movhpd qword ptr [RBX], xmm0   (0x66 Prefix: Store High Packed Double - 8 bytes)
+    };
+    test_write_bytes(arena, curr_dir, String("test_0f_11_to_0f_17"), instr, sizeof(instr));
+}
     return 0;
 }

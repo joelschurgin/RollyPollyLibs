@@ -511,7 +511,7 @@ internal inline Disasm_Operand _disasm_decode_rel16_32(u8* byte, Disasm_Prefix p
     return _disasm_decode_rel(byte, size_bytes, instr_len);
 }
 
-internal Disasm_Operand _disasm_decode_xmm(u8* byte, Disasm_Prefix prefix, u8* instr_len) {
+internal Disasm_Operand _disasm_decode_xmm(u8* byte, Disasm_Prefix prefix) {
     u8 xmm_dest_idx = GetReg(*byte) | RexR(prefix.rex);
     return _disasm_specific_reg(DISASM_REG_XMM0 + xmm_dest_idx);
 }

@@ -85,6 +85,22 @@ u8* disasm_reg_stringify(Disasm_Reg reg) {
         case DISASM_REG_ST5: return Stringify(DISASM_REG_ST5);
         case DISASM_REG_ST6: return Stringify(DISASM_REG_ST6);
         case DISASM_REG_ST7: return Stringify(DISASM_REG_ST7);
+        case DISASM_REG_XMM0: return Stringify(DISASM_REG_XMM0);
+        case DISASM_REG_XMM1: return Stringify(DISASM_REG_XMM1);
+        case DISASM_REG_XMM2: return Stringify(DISASM_REG_XMM2);
+        case DISASM_REG_XMM3: return Stringify(DISASM_REG_XMM3);
+        case DISASM_REG_XMM4: return Stringify(DISASM_REG_XMM4);
+        case DISASM_REG_XMM5: return Stringify(DISASM_REG_XMM5);
+        case DISASM_REG_XMM6: return Stringify(DISASM_REG_XMM6);
+        case DISASM_REG_XMM7: return Stringify(DISASM_REG_XMM7);
+        case DISASM_REG_XMM8: return Stringify(DISASM_REG_XMM8);
+        case DISASM_REG_XMM9: return Stringify(DISASM_REG_XMM9);
+        case DISASM_REG_XMM10: return Stringify(DISASM_REG_XMM10);
+        case DISASM_REG_XMM11: return Stringify(DISASM_REG_XMM11);
+        case DISASM_REG_XMM12: return Stringify(DISASM_REG_XMM12);
+        case DISASM_REG_XMM13: return Stringify(DISASM_REG_XMM13);
+        case DISASM_REG_XMM14: return Stringify(DISASM_REG_XMM14);
+        case DISASM_REG_XMM15: return Stringify(DISASM_REG_XMM15);
     }
 
     return "";

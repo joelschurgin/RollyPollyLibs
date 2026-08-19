@@ -261,6 +261,25 @@ internal Disasm_Instr _disasm_decode_two_byte_opcodes(Disasm_Prefix prefix, u8* 
                 instr.instr_len += prefix.count;
             }
             return instr;
+        case 0x10:
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix, &instr.instr_len);
+            if (prefix.repeat) {
+                instr.opcode = DISASM_MOVSS;
+                instr.operand[1] = _disasm_decode_xmm_m32(ModRMBytePtr, prefix, &instr.instr_len);
+            } else if (prefix.repeat_nz) {
+                instr.opcode = DISASM_MOVSD;
+                instr.operand[1] = _disasm_decode_xmm_m64(ModRMBytePtr, prefix, &instr.instr_len);
+            } else if (prefix.op_override) {
+                instr.opcode = DISASM_MOVUPD;
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.opcode = DISASM_MOVUPS;
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
     }
 
     DisasmInvalidTwoByte;

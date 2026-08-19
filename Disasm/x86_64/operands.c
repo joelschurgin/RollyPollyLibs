@@ -416,6 +416,12 @@ internal Disasm_Operand _disasm_specific_reg(Disasm_Reg reg) {
         case DISASM_REG_R12: case DISASM_REG_R13: case DISASM_REG_R14: case DISASM_REG_R15:
             operand.size_bytes = 8;
         break;
+        case DISASM_REG_XMM0:  case DISASM_REG_XMM1:  case DISASM_REG_XMM2:  case DISASM_REG_XMM3:
+        case DISASM_REG_XMM4:  case DISASM_REG_XMM5:  case DISASM_REG_XMM6:  case DISASM_REG_XMM7:
+        case DISASM_REG_XMM8:  case DISASM_REG_XMM9:  case DISASM_REG_XMM10: case DISASM_REG_XMM11:
+        case DISASM_REG_XMM12: case DISASM_REG_XMM13: case DISASM_REG_XMM14: case DISASM_REG_XMM15:
+            operand.size_bytes = 16;
+        break;
         default:
             Assert(!"Invalid reg");
         break;
@@ -503,4 +509,31 @@ internal inline Disasm_Operand _disasm_decode_rel8(u8* byte, u8* instr_len) {
 internal inline Disasm_Operand _disasm_decode_rel16_32(u8* byte, Disasm_Prefix prefix, u8* instr_len) {
     u8 size_bytes = _disasm_operand_16_32_size(prefix);
     return _disasm_decode_rel(byte, size_bytes, instr_len);
+}
+
+internal Disasm_Operand _disasm_decode_xmm(u8* byte, Disasm_Prefix prefix, u8* instr_len) {
+    u8 xmm_dest_idx = GetReg(*byte) | RexR(prefix.rex);
+    return _disasm_specific_reg(DISASM_REG_XMM0 + xmm_dest_idx);
+}
+
+internal Disasm_Operand _disasm_decode_xmm_m(u8* byte, Disasm_Prefix prefix, u8* instr_len, u8 size_bytes) {
+    if (GetMod(*byte) == 3) {
+        *instr_len += 1;
+        u8 xmm_src_idx = GetRM(*byte) | RexB(prefix.rex);
+        return _disasm_specific_reg(DISASM_REG_XMM0 + xmm_src_idx);
+    }
+
+    return _disasm_decode_m(byte, prefix, instr_len, size_bytes);
+}
+
+internal inline Disasm_Operand _disasm_decode_xmm_m32(u8* byte, Disasm_Prefix prefix, u8* instr_len) {
+    return _disasm_decode_xmm_m(byte, prefix, instr_len, 4);
+}
+
+internal inline Disasm_Operand _disasm_decode_xmm_m64(u8* byte, Disasm_Prefix prefix, u8* instr_len) {
+    return _disasm_decode_xmm_m(byte, prefix, instr_len, 8);
+}
+
+internal inline Disasm_Operand _disasm_decode_xmm_m128(u8* byte, Disasm_Prefix prefix, u8* instr_len) {
+    return _disasm_decode_xmm_m(byte, prefix, instr_len, 16);
 }

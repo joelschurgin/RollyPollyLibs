@@ -1056,5 +1056,34 @@ i32 main(i32 argc, u8 **argv) {
     test_write_bytes(arena, curr_dir, String("test_0f_02_to_0f_0f"), instr, sizeof(instr));
 }
 
+{
+    u8 instr[] = {
+        // --- 1. Baseline Mode (No Prefix): MOVUPS xmm1, xmm2/m128 (Size = 16 bytes) ---
+        0x0F, 0x10, 0x00,                         // movups xmm0, xmmword ptr [RAX] (mod=00, reg=000, rm=000)
+        0x0F, 0x10, 0xC1,                         // movups xmm0, xmm1             (Register-to-register copy form)
+
+        // --- 2. Packed Double Precision (0x66 Prefix): MOVUPD xmm1, xmm2/m128(Size = 16 bytes) ---
+        0x66, 0x0F, 0x10, 0x13,                   // movupd xmm2, xmmword ptr [RBX] (0x66 switches mnemonic to packed double)
+        0x66, 0x0F, 0x10, 0xD4,                   // movupd xmm2, xmm4             (Register form)
+
+        // --- 3. Scalar Single Precision (0xF3 Prefix): MOVSS xmm1, xmm2/m32 (Size = 4 bytes) ---
+        0xF3, 0x0F, 0x10, 0x0C, 0x24,             // movss  xmm0, dword ptr [RSP]  (0xF3 selects scalar single; memory forms fetch 4 bytes)
+        0xF3, 0x0F, 0x10, 0xC2,                   // movss  xmm0, xmm2             (Register form)
+
+        // --- 4. Scalar Double Precision (0xF2 Prefix): MOVSD xmm1, xmm2/m64 (Size = 8 bytes) ---
+        0xF2, 0x0F, 0x10, 0x1E,                   // movsd  xmm3, qword ptr [RSI]  (0xF2 selects scalar double; memory forms fetch 8 bytes)
+        0xF2, 0x0F, 0x10, 0xFA,                   // movsd  xmm7, xmm2             (Register form)
+
+        // --- 5. REX Prefix Configurations (Tracking Extended XMM Registers XMM8 - XMM15) ---
+        0x41, 0x0F, 0x10, 0x00,                   // movups xmm0, xmmword ptr [R8]  (REX.B extends memory base to R8 register)
+        0x44, 0x0F, 0x10, 0xC1,                   // movups xmm8, xmm1              (REX.R extends destination to register XMM8)
+        0x45, 0x0F, 0x10, 0xC2,                   // movups xmm8, xmm10             (REX.R and REX.B map XMM8 and XMM10 registers)
+
+        // --- 6. Complex SIB & Override Variants ---
+        0x67, 0xF3, 0x0F, 0x10, 0x03,             // movss  xmm0, dword ptr [EBX]  (Address size override downscales base to 32 bits)
+        0x2E, 0xF2, 0x0F, 0x10, 0x10,             // movsd  xmm2, CS:qword ptr [RAX](Segment override prefix prepended)
+    };
+    test_write_bytes(arena, curr_dir, String("test_0f_10"), instr, sizeof(instr));
+}
     return 0;
 }

@@ -537,3 +537,28 @@ internal inline Disasm_Operand _disasm_decode_xmm_m64(u8* byte, Disasm_Prefix pr
 internal inline Disasm_Operand _disasm_decode_xmm_m128(u8* byte, Disasm_Prefix prefix, u8* instr_len) {
     return _disasm_decode_xmm_m(byte, prefix, instr_len, 16);
 }
+
+internal Disasm_Operand _disasm_decode_mm(u8* byte, Disasm_Prefix prefix) {
+    return _disasm_specific_reg(DISASM_REG_MM0 + GetReg(*byte));
+}
+
+internal Disasm_Operand _disasm_decode_mm_m(u8* byte, Disasm_Prefix prefix, u8* instr_len, u8 size_bytes) {
+    if (GetMod(*byte) == 3) {
+        *instr_len += 1;
+        return _disasm_specific_reg(DISASM_REG_MM0 + GetRM(*byte));
+    }
+
+    return _disasm_decode_m(byte, prefix, instr_len, size_bytes);
+}
+
+internal inline Disasm_Operand _disasm_decode_mm_m32(u8* byte, Disasm_Prefix prefix, u8* instr_len) {
+    return _disasm_decode_mm_m(byte, prefix, instr_len, 4);
+}
+
+internal inline Disasm_Operand _disasm_decode_mm_m64(u8* byte, Disasm_Prefix prefix, u8* instr_len) {
+    return _disasm_decode_mm_m(byte, prefix, instr_len, 8);
+}
+
+internal inline Disasm_Operand _disasm_decode_mm_m128(u8* byte, Disasm_Prefix prefix, u8* instr_len) {
+    return _disasm_decode_mm_m(byte, prefix, instr_len, 16);
+}

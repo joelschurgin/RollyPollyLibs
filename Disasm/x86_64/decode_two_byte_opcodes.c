@@ -430,6 +430,153 @@ internal Disasm_Instr _disasm_decode_two_byte_opcodes(Disasm_Prefix prefix, u8* 
             instr.operand[0] = _disasm_decode_rm16_32(ModRMBytePtr, prefix, &instr.instr_len);
             instr.instr_len += prefix.count;
             return instr;
+        case 0x20:
+            instr.opcode = DISASM_MOV;
+            instr.instr_len += 2;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_r64(ModRMBytePtr, prefix);
+            instr.operand[1] = _disasm_decode_crn(ModRMBytePtr, prefix);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x21:
+            instr.opcode = DISASM_MOV;
+            instr.instr_len += 2;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_r64(ModRMBytePtr, prefix);
+            instr.operand[1] = _disasm_decode_drn(ModRMBytePtr, prefix);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x22:
+            instr.opcode = DISASM_MOV;
+            instr.instr_len += 2;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_crn(ModRMBytePtr, prefix);
+            instr.operand[1] = _disasm_decode_r64(ModRMBytePtr, prefix);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x23:
+            instr.opcode = DISASM_MOV;
+            instr.instr_len += 2;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_drn(ModRMBytePtr, prefix);
+            instr.operand[1] = _disasm_decode_r64(ModRMBytePtr, prefix);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x28:
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            instr.opcode = (prefix.op_override) ? DISASM_MOVAPD : DISASM_MOVAPS;
+            instr.operand[0] = _disasm_decode_xmm_m64(ModRMBytePtr, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x29:
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            instr.opcode = (prefix.op_override) ? DISASM_MOVAPD : DISASM_MOVAPS;
+            instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+            instr.operand[1] = _disasm_decode_xmm_m64(ModRMBytePtr, prefix, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x2a:
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+            if (prefix.repeat) { // 0xf3
+                instr.opcode = DISASM_CVTSI2SS;
+                instr.operand[1] = _disasm_decode_rm32_64(ModRMBytePtr, prefix, &instr.instr_len);
+            } else if (prefix.repeat_nz) { // 0xf2
+                instr.opcode = DISASM_CVTSI2SD;
+                instr.operand[1] = _disasm_decode_rm32_64(ModRMBytePtr, prefix, &instr.instr_len);
+            } else if (prefix.op_override) { // 0x66
+                instr.opcode = DISASM_CVTPI2PD;
+                instr.operand[1] = _disasm_decode_mm_m64(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.opcode = DISASM_CVTPI2PS;
+                instr.operand[1] = _disasm_decode_mm_m64(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x2b:
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            instr.opcode = (prefix.op_override) ? DISASM_MOVNTPD : DISASM_MOVNTPS;
+            instr.operand[0] = _disasm_decode_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            instr.operand[1] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x2c:
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.repeat) { // 0xf3
+                instr.opcode = DISASM_CVTTSS2SI;
+                instr.operand[0] = _disasm_decode_r32_64(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m32(ModRMBytePtr, prefix, &instr.instr_len);
+            } else if (prefix.repeat_nz) { // 0xf2
+                instr.opcode = DISASM_CVTSI2SD;
+                instr.operand[0] = _disasm_decode_r32_64(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m32(ModRMBytePtr, prefix, &instr.instr_len);
+            } else if (prefix.op_override) { // 0x66
+                instr.opcode = DISASM_CVTTPD2PI;
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m64(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.opcode = DISASM_CVTTPS2PI;
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m64(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x2d:
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.repeat) { // 0xf3
+                instr.opcode = DISASM_CVTSS2SI;
+                instr.operand[0] = _disasm_decode_r32_64(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m32(ModRMBytePtr, prefix, &instr.instr_len);
+            } else if (prefix.repeat_nz) { // 0xf2
+                instr.opcode = DISASM_CVTSD2SI;
+                instr.operand[0] = _disasm_decode_r32_64(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m32(ModRMBytePtr, prefix, &instr.instr_len);
+            } else if (prefix.op_override) { // 0x66
+                instr.opcode = DISASM_CVTPD2PI;
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m64(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.opcode = DISASM_CVTPS2PI;
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m64(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x2e:
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.opcode = DISASM_UCOMISD;
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m64(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.opcode = DISASM_UCOMISS;
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m32(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x2f:
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.opcode = DISASM_COMISD;
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m64(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.opcode = DISASM_COMISS;
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m32(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
 
         case 0x40:
             instr.opcode = DISASM_CMOVO;

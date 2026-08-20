@@ -101,6 +101,30 @@ u8* disasm_reg_stringify(Disasm_Reg reg) {
         case DISASM_REG_XMM13: return Stringify(DISASM_REG_XMM13);
         case DISASM_REG_XMM14: return Stringify(DISASM_REG_XMM14);
         case DISASM_REG_XMM15: return Stringify(DISASM_REG_XMM15);
+        case DISASM_REG_CR0: return Stringify(DISASM_REG_CR0);
+        case DISASM_REG_CR1: return Stringify(DISASM_REG_CR1);
+        case DISASM_REG_CR2: return Stringify(DISASM_REG_CR2);
+        case DISASM_REG_CR3: return Stringify(DISASM_REG_CR3);
+        case DISASM_REG_CR4: return Stringify(DISASM_REG_CR4);
+        case DISASM_REG_CR5: return Stringify(DISASM_REG_CR5);
+        case DISASM_REG_CR6: return Stringify(DISASM_REG_CR6);
+        case DISASM_REG_CR7: return Stringify(DISASM_REG_CR7);
+        case DISASM_REG_CR8: return Stringify(DISASM_REG_CR8);
+        case DISASM_REG_CR9: return Stringify(DISASM_REG_CR9);
+        case DISASM_REG_CR10: return Stringify(DISASM_REG_CR10);
+        case DISASM_REG_CR11: return Stringify(DISASM_REG_CR11);
+        case DISASM_REG_CR12: return Stringify(DISASM_REG_CR12);
+        case DISASM_REG_CR13: return Stringify(DISASM_REG_CR13);
+        case DISASM_REG_CR14: return Stringify(DISASM_REG_CR14);
+        case DISASM_REG_CR15: return Stringify(DISASM_REG_CR15);
+        case DISASM_REG_DR0: return Stringify(DISASM_REG_DR0);
+        case DISASM_REG_DR1: return Stringify(DISASM_REG_DR1);
+        case DISASM_REG_DR2: return Stringify(DISASM_REG_DR2);
+        case DISASM_REG_DR3: return Stringify(DISASM_REG_DR3);
+        case DISASM_REG_DR4: return Stringify(DISASM_REG_DR4);
+        case DISASM_REG_DR5: return Stringify(DISASM_REG_DR5);
+        case DISASM_REG_DR6: return Stringify(DISASM_REG_DR6);
+        case DISASM_REG_DR7: return Stringify(DISASM_REG_DR7);
     }
 
     return "";

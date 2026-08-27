@@ -577,6 +577,43 @@ internal Disasm_Instr _disasm_decode_two_byte_opcodes(Disasm_Prefix prefix, u8* 
             }
             instr.instr_len += prefix.count;
             return instr;
+        case 0x30:
+            instr.instr_len += 1 + prefix.count;
+            instr.num_operands = 0;
+            instr.opcode = DISASM_WRMSR;
+            return instr;
+        case 0x31:
+            instr.instr_len += 1 + prefix.count;
+            instr.num_operands = 0;
+            instr.opcode = DISASM_RDTSC;
+            return instr;
+        case 0x32:
+            instr.instr_len += 1 + prefix.count;
+            instr.num_operands = 0;
+            instr.opcode = DISASM_RDMSR;
+            return instr;
+        case 0x33:
+            instr.instr_len += 1 + prefix.count;
+            instr.num_operands = 0;
+            instr.opcode = DISASM_RDPMC;
+            return instr;
+        case 0x34:
+            instr.instr_len += 1 + prefix.count;
+            instr.num_operands = 0;
+            instr.opcode = DISASM_SYSENTER;
+            return instr;
+        case 0x35:
+            instr.instr_len += 1 + prefix.count;
+            instr.num_operands = 0;
+            instr.opcode = DISASM_SYSEXIT;
+            return instr;
+        case 0x37:
+            instr.instr_len += 1 + prefix.count;
+            instr.num_operands = 0;
+            instr.opcode = DISASM_GETSEC;
+            return instr;
+        // TODO: the rest of 0x3... but these don't seem to show up in practice when compiling C99
+
 
         case 0x40:
             instr.opcode = DISASM_CMOVO;

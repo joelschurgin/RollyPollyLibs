@@ -40,7 +40,7 @@ i32 main(i32 argc, u8 **argv) {
     Arena* arena = default_arena();
 
     String dir = curr_dir(String(argv[0]));
-    String test_path = string_format(arena, "%.*s/../dev_tools/disasm/test_0f_30_to_0f_3f", dir.size, dir.str);
+    String test_path = string_format(arena, "%.*s/../dev_tools/disasm/test_0f_50_to_0f_5f", dir.size, dir.str);
 
     FileRead(arena, test_path, f) {
         u64 addr = 0x0;

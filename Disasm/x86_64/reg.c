@@ -101,6 +101,14 @@ u8* disasm_reg_stringify(Disasm_Reg reg) {
         case DISASM_REG_XMM13: return Stringify(DISASM_REG_XMM13);
         case DISASM_REG_XMM14: return Stringify(DISASM_REG_XMM14);
         case DISASM_REG_XMM15: return Stringify(DISASM_REG_XMM15);
+        case DISASM_REG_MM0: return Stringify(DISASM_REG_MM0);
+        case DISASM_REG_MM1: return Stringify(DISASM_REG_MM1);
+        case DISASM_REG_MM2: return Stringify(DISASM_REG_MM2);
+        case DISASM_REG_MM3: return Stringify(DISASM_REG_MM3);
+        case DISASM_REG_MM4: return Stringify(DISASM_REG_MM4);
+        case DISASM_REG_MM5: return Stringify(DISASM_REG_MM5);
+        case DISASM_REG_MM6: return Stringify(DISASM_REG_MM6);
+        case DISASM_REG_MM7: return Stringify(DISASM_REG_MM7);
         case DISASM_REG_CR0: return Stringify(DISASM_REG_CR0);
         case DISASM_REG_CR1: return Stringify(DISASM_REG_CR1);
         case DISASM_REG_CR2: return Stringify(DISASM_REG_CR2);

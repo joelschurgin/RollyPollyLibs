@@ -1000,7 +1000,212 @@ internal Disasm_Instr _disasm_decode_two_byte_opcodes(Disasm_Prefix prefix, u8* 
             }
             instr.instr_len += prefix.count;
             return instr;
-
+        case 0x60:
+            instr.opcode = DISASM_PUNPCKLBW;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_mm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x61:
+            instr.opcode = DISASM_PUNPCKLWD;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_mm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x62:
+            instr.opcode = DISASM_PUNPCKLDQ;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_mm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x63:
+            instr.opcode = DISASM_PACKSSWB;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_mm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x64:
+            instr.opcode = DISASM_PCMPGTB;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_mm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x65:
+            instr.opcode = DISASM_PCMPGTB;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_mm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x66:
+            instr.opcode = DISASM_PCMPGTW;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_mm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x67:
+            instr.opcode = DISASM_PCMPGTD;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_mm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x68:
+            instr.opcode = DISASM_PUNPCKHBW;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_mm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x69:
+            instr.opcode = DISASM_PUNPCKHWD;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_mm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x6a:
+            instr.opcode = DISASM_PUNPCKHDQ;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_mm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x6b:
+            instr.opcode = DISASM_PACKSSDW;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_mm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x6c:
+            instr.opcode = DISASM_PUNPCKLQDQ;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                DisasmInvalidTwoByte;
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x6d:
+            instr.opcode = DISASM_PUNPCKHQDQ;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.op_override) {
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                DisasmInvalidTwoByte;
+            }
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x6e:
+            instr.opcode = (RexW(*ModRMBytePtr) != 0) ? DISASM_MOVQ : DISASM_MOVD;
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+            instr.operand[1] = _disasm_decode_rm32(ModRMBytePtr, prefix, &instr.instr_len);
+            instr.instr_len += prefix.count;
+            return instr;
+        case 0x6f:
+            instr.instr_len += 1;
+            instr.num_operands = 2;
+            if (prefix.repeat) { // 0xf3
+                instr.opcode = DISASM_MOVDQU;
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else if (prefix.op_override) { // 0x66
+                instr.opcode = DISASM_MOVDQA;
+                instr.operand[0] = _disasm_decode_xmm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_xmm_m128(ModRMBytePtr, prefix, &instr.instr_len);
+            } else {
+                instr.opcode = DISASM_MOVQ;
+                instr.operand[0] = _disasm_decode_mm(ModRMBytePtr, prefix);
+                instr.operand[1] = _disasm_decode_mm_m64(ModRMBytePtr, prefix, &instr.instr_len);
+            }
+            instr.instr_len += prefix.count;
+            return instr;
 
         case 0x90:
             instr.opcode = DISASM_SETO;

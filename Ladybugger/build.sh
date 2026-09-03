@@ -21,3 +21,8 @@ mkdir -p ../build
 mv ladybugger ../build/ladybugger
 
 echo -e "=> \033[32mBUILD COMPLETE: ladybugger\033[0m"
+
+{
+  cd ..
+  echo -e "\033[34mExecutable Path: $(ls $(pwd)/build/ladybugger)\033[0m"
+}

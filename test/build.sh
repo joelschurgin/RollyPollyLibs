@@ -61,3 +61,8 @@ BUILD_DIR=../build/tests/dwarf_tests
 mkdir -p $BUILD_DIR
 gcc main.c -o $BUILD_DIR/$EXEC_NAME -g3 $ARCH $DWARF_VERSION 
 echo -e "=> \033[32mBUILD COMPLETE: $EXEC_NAME\033[0m"
+
+{
+  cd ..
+  echo -e "\033[34mTest Executable Path: $(ls $(pwd)/build/tests/dwarf_tests/$EXEC_NAME)\033[0m"
+}

@@ -30,3 +30,8 @@ mkdir -p ../build
 mv moonfruit ../build/moonfruit
 
 echo -e "=> \033[32mBUILD COMPLETE: moonfruit\033[0m"
+
+{
+  cd ..
+  echo -e "\033[34mExecutable Path: $(ls $(pwd)/build/moonfruit)\033[0m"
+}

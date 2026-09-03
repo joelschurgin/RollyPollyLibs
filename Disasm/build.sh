@@ -38,3 +38,7 @@ mv disasm_test_create ../build/dev_tools/disasm_test_create
 
 ../build/dev_tools/disasm_test_create
 
+{
+  cd ..
+  echo -e "\033[34mTest Executable Path: $(ls $(pwd)/build/tests/disasm_test)\033[0m"
+}

@@ -29,3 +29,8 @@ mkdir -p ../build/tests
 mv graphics_test ../build/tests/graphics_test
 
 echo -e "=> \033[32mBUILD COMPLETE: graphics_test\033[0m"
+
+{
+  cd ..
+  echo -e "\033[34mTest Executable Path: $(ls $(pwd)/build/tests/graphics_test)\033[0m"
+}

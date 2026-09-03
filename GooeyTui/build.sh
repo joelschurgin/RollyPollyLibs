@@ -28,3 +28,8 @@ mkdir -p ../build/tests
 mv gooey_tui_test ../build/tests/gooey_tui_test
 
 echo -e "=> \033[32mBUILD COMPLETE: gooey_tui_test\033[0m"
+
+{
+  cd ..
+  echo -e "\033[34mTest Executable Path: $(ls $(pwd)/build/tests/gooey_tui_test)\033[0m"
+}

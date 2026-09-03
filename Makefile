@@ -1,26 +1,26 @@
 .PHONY: all base disasm misty ladybugger moonfruit graphics gooey_tui test
 
-all: base disasm misty ladybugger moonfruit graphics gooey_tui test
+all: base disasm misty ladybugger gooey_tui moonfruit graphics test
 
 base:
 	./Base/build.sh
 
-disasm:
+disasm: base
 	./Disasm/build.sh
 
-misty:
+misty: base
 	./MistyMountainParser/build.sh
 
-ladybugger:
+ladybugger: base disasm misty
 	./Ladybugger/build.sh
 
-moonfruit:
+moonfruit: base gooey_tui
 	./MoonFruitMacros/build.sh
 
-graphics:
+graphics: base
 	./Graphics/build.sh
 
-gooey_tui:
+gooey_tui: base
 	./GooeyTui/build.sh
 
 test:

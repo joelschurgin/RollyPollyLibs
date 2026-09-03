@@ -1,7 +1,6 @@
-.PHONY: all base misty test clean
+.PHONY: all base disasm misty ladybugger moonfruit graphics gooey_tui test
 
-#all: base misty moonfruit graphics gooey_tui test
-all: base misty ladybugger disasm
+all: base disasm misty ladybugger moonfruit graphics gooey_tui test
 
 base:
 	./Base/build.sh

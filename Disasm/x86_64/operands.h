@@ -46,6 +46,7 @@ internal Disasm_Operand _disasm_decode_rm(u8* byte, Disasm_Prefix prefix, u8* nu
 internal inline Disasm_Operand _disasm_decode_rm8(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read);
 internal inline Disasm_Operand _disasm_decode_rm16(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read);
 internal inline Disasm_Operand _disasm_decode_rm32(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read);
+internal inline Disasm_Operand _disasm_decode_rm64(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read);
 internal inline Disasm_Operand _disasm_decode_rm16_32(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read);
 internal inline Disasm_Operand _disasm_decode_rm16_64(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read);
 internal inline Disasm_Operand _disasm_decode_rm32_64(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read);
@@ -74,10 +75,18 @@ internal inline Disasm_Operand _disasm_decode_rel8(u8* byte, u8* instr_len);
 internal inline Disasm_Operand _disasm_decode_rel16_32(u8* byte, Disasm_Prefix prefix, u8* instr_len);
 
 internal Disasm_Operand _disasm_decode_xmm(u8* byte, Disasm_Prefix prefix);
+internal Disasm_Operand _disasm_decode_xmm_second(u8* byte, Disasm_Prefix prefix);
 internal Disasm_Operand _disasm_decode_xmm_m(u8* byte, Disasm_Prefix prefix, u8* instr_len, u8 size_bytes);
 internal inline Disasm_Operand _disasm_decode_xmm_m32(u8* byte, Disasm_Prefix prefix, u8* instr_len);
 internal inline Disasm_Operand _disasm_decode_xmm_m64(u8* byte, Disasm_Prefix prefix, u8* instr_len);
 internal inline Disasm_Operand _disasm_decode_xmm_m128(u8* byte, Disasm_Prefix prefix, u8* instr_len);
+
+internal Disasm_Operand _disasm_decode_mm(u8* byte, Disasm_Prefix prefix);
+internal Disasm_Operand _disasm_decode_mm_second(u8* byte, Disasm_Prefix prefix);
+internal Disasm_Operand _disasm_decode_mm_m(u8* byte, Disasm_Prefix prefix, u8* instr_len, u8 size_bytes);
+internal inline Disasm_Operand _disasm_decode_mm_m32(u8* byte, Disasm_Prefix prefix, u8* instr_len);
+internal inline Disasm_Operand _disasm_decode_mm_m64(u8* byte, Disasm_Prefix prefix, u8* instr_len);
+internal inline Disasm_Operand _disasm_decode_mm_m128(u8* byte, Disasm_Prefix prefix, u8* instr_len);
 
 internal Disasm_Operand _disasm_decode_crn(u8* byte, Disasm_Prefix prefix);
 internal Disasm_Operand _disasm_decode_drn(u8* byte, Disasm_Prefix prefix);

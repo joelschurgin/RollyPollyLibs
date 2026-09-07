@@ -85,6 +85,7 @@ typedef void VoidProc(void);
 #define InvalidPath     Assert(!"Invalid Path!")
 #define NotImplemented  Assert(!"Not Implemented!")
 #define StaticAssert(condition, ID) global u8 Glue(ID, __LINE__)[(condition)?1:-1]
+#define TODO(...) Assert(0)
 
 // misc
 

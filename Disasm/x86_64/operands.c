@@ -306,6 +306,10 @@ internal inline Disasm_Operand _disasm_decode_rm32(u8* byte, Disasm_Prefix prefi
     return _disasm_decode_rm(byte, prefix, num_bytes_read, sizeof(u32), 0);
 }
 
+internal inline Disasm_Operand _disasm_decode_rm64(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
+    return _disasm_decode_rm(byte, prefix, num_bytes_read, sizeof(u64), 0);
+}
+
 internal inline Disasm_Operand _disasm_decode_rm16_32(u8* byte, Disasm_Prefix prefix, u8* num_bytes_read) {
     u8 size_bytes = _disasm_operand_16_32_size(prefix);
     return _disasm_decode_rm(byte, prefix, num_bytes_read, size_bytes, 0);
@@ -540,11 +544,15 @@ internal Disasm_Operand _disasm_decode_xmm(u8* byte, Disasm_Prefix prefix) {
     return _disasm_specific_reg(DISASM_REG_XMM0 + xmm_dest_idx);
 }
 
+internal Disasm_Operand _disasm_decode_xmm_second(u8* byte, Disasm_Prefix prefix) {
+    u8 xmm_dest_idx = GetRM(*byte) | RexB(prefix.rex);
+    return _disasm_specific_reg(DISASM_REG_XMM0 + xmm_dest_idx);
+}
+
 internal Disasm_Operand _disasm_decode_xmm_m(u8* byte, Disasm_Prefix prefix, u8* instr_len, u8 size_bytes) {
     if (GetMod(*byte) == 3) {
         *instr_len += 1;
-        u8 xmm_src_idx = GetRM(*byte) | RexB(prefix.rex);
-        return _disasm_specific_reg(DISASM_REG_XMM0 + xmm_src_idx);
+        return _disasm_decode_xmm_second(byte, prefix);
     }
 
     return _disasm_decode_m(byte, prefix, instr_len, size_bytes);
@@ -566,10 +574,14 @@ internal Disasm_Operand _disasm_decode_mm(u8* byte, Disasm_Prefix prefix) {
     return _disasm_specific_reg(DISASM_REG_MM0 + GetReg(*byte));
 }
 
+internal Disasm_Operand _disasm_decode_mm_second(u8* byte, Disasm_Prefix prefix) {
+    return _disasm_specific_reg(DISASM_REG_MM0 + GetRM(*byte));
+}
+
 internal Disasm_Operand _disasm_decode_mm_m(u8* byte, Disasm_Prefix prefix, u8* instr_len, u8 size_bytes) {
     if (GetMod(*byte) == 3) {
         *instr_len += 1;
-        return _disasm_specific_reg(DISASM_REG_MM0 + GetRM(*byte));
+        return _disasm_decode_mm_second(byte, prefix);
     }
 
     return _disasm_decode_m(byte, prefix, instr_len, size_bytes);

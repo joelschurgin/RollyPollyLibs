@@ -8,13 +8,7 @@ ssize_t process_vm_writev(pid_t pid,
                           unsigned long flags);
 
 #define CHILD_PROCESS 0
-pid_t proc_launch_and_pause(String path) {
-    if (!ladybugger_ctx) {
-        ladybugger_ctx = push_struct(thread_ctx.shared_arena, LadybuggerCtx);
-    } else {
-        *ladybugger_ctx = (LadybuggerCtx){0};
-    }
-
+internal pid_t proc_launch_and_pause(String path) {
     pid_t pid = fork();
 
     if (pid == CHILD_PROCESS) {
@@ -40,7 +34,7 @@ pid_t proc_launch_and_pause(String path) {
     return pid;
 }
 
-u64 proc_base_addr(Arena* arena, pid_t pid) {
+internal u64 proc_base_addr(Arena* arena, pid_t pid) {
     u8 bytes[12] = {0};
     TempArenaBlock(arena) {
         String proc_path = string_format(arena, "/proc/%d/maps", (i32)pid);
@@ -48,7 +42,7 @@ u64 proc_base_addr(Arena* arena, pid_t pid) {
         i32 fd = open(proc_path.str, O_RDONLY);
         read(fd, bytes, sizeof(bytes));
         close(fd);
-    }
+   }
 
     u64 base_addr = 0;
     for (u8* c = bytes; (u64)(c - bytes) < sizeof(bytes); c++) {
@@ -61,7 +55,32 @@ u64 proc_base_addr(Arena* arena, pid_t pid) {
     return base_addr;
 }
 
-i32 proc_continue(pid_t pid) {
+Lady_Ctx* lady_ctx_create(Arena* arena, String path) {
+    Lady_Ctx* ctx = push_struct(arena, Lady_Ctx);
+
+    ctx->pid = proc_launch_and_pause(path);
+    ctx->base_addr = proc_base_addr(arena, ctx->pid);
+
+    return ctx;
+}
+
+internal Lady_Event lady_status_to_event(i32 status) {
+    if (WIFEXITED(status)) {
+        return LADY_EXIT;
+    } else if (WIFSIGNALED(status)) {
+        return LADY_KILL;
+    } else if (WIFSTOPPED(status)) {
+        if (WSTOPSIG(status) == SIGTRAP) {
+            return LADY_TRAP;
+        } else {
+            TODO("Handle other signals");
+        }
+    }
+
+    return LADY_NONE;
+}
+
+internal i32 proc_continue(pid_t pid) {
     i32 status = 0;
     if (ptrace(PTRACE_CONT, pid, 0L, 0L) < 0) {
         perror("Cannot continue process!\n");
@@ -71,7 +90,7 @@ i32 proc_continue(pid_t pid) {
     return status;
 }
 
-i32 proc_single_step(pid_t pid) {
+internal i32 proc_single_step(pid_t pid) {
     i32 status = 0;
     if (ptrace(PTRACE_SINGLESTEP, pid, 0L, 0L) < 0) {
         perror("Cannot single step process!\n");
@@ -79,6 +98,14 @@ i32 proc_single_step(pid_t pid) {
     waitpid(pid, &status, 0);
 
     return status;
+}
+
+Lady_Event lady_continue(Lady_Ctx* ctx) {
+    return lady_status_to_event(proc_continue(ctx->pid));
+}
+
+Lady_Event lady_single_step(Lady_Ctx* ctx) {
+    return lady_status_to_event(proc_single_step(ctx->pid));
 }
 
 void* remote_mmap(pid_t pid, void* addr, size_t len, int prot, int flags, int fd, off_t offset) {
@@ -190,15 +217,31 @@ void remote_read(pid_t pid, void* remote_addr, void* read_buf, u64 size) {
     Assert(num_bytes == (ssize_t)size);
 }
 
-u8 trap_insert(pid_t pid, u64 addr) {
+internal inline u8 trap_insert(pid_t pid, u64 addr) {
     u64 curr_instr = ptrace(PTRACE_PEEKDATA, pid, addr, 0L);
     u64 trap_instr = (curr_instr & ~0xff) | 0xcc;
     ptrace(PTRACE_POKEDATA, pid, addr, trap_instr);
     return curr_instr & 0xff;
 }
 
-void trap_restore(pid_t pid, u64 addr, u8 data) {
+internal inline void trap_restore(pid_t pid, u64 addr, u8 data) {
     u64 curr_instr = ptrace(PTRACE_PEEKDATA, pid, addr, 0L);
     u64 prev_instr = (curr_instr & ~0xff) | data;
     ptrace(PTRACE_POKEDATA, pid, addr, prev_instr);
+}
+
+Lady_Trap lady_trap_set(Lady_Ctx* ctx, u64 addr) {
+    Lady_Trap trap = {
+        .addr = addr,
+        .data = trap_insert(ctx->pid, ctx->base_addr + addr),
+    };
+    return trap;
+}
+
+void lady_trap_unset(Lady_Ctx* ctx, Lady_Trap trap) {
+    return trap_restore(ctx->pid, ctx->base_addr + trap.addr, trap.data);
+}
+
+void lady_trap_reset(Lady_Ctx* ctx, Lady_Trap* trap) {
+    trap->data = trap_insert(ctx->pid, ctx->base_addr + trap->addr);
 }

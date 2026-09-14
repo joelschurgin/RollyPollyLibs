@@ -11,6 +11,38 @@ typedef struct {
     u8** argv;
 } MainArgs;
 
+void lady_event(Lady_Ctx* ctx, Lady_Event event, Lady_Trap trap) { // passing in trap is temporary because we need a full data structure for breakpoints
+    switch (event) {
+        case LADY_TRAP:
+            printf("[Ladybugger] Intercepted SIGTRAP!\n");
+
+            struct user_regs_struct regs;
+            ptrace(PTRACE_GETREGS, ctx->pid, NULL, &regs);
+            regs.rip -= 1;
+            ptrace(PTRACE_SETREGS, ctx->pid, NULL, &regs);
+
+            lady_trap_unset(ctx, trap);
+            lady_single_step(ctx);
+            lady_trap_reset(ctx, &trap);
+
+            printf("Press ENTER to continue: ");
+            fflush(stdout);
+            read(STDIN_FILENO, 0L, 1);
+        break;
+        default:
+            TODO("Handle Other Event Type");
+    }
+}
+
+void debug_event_loop(Lady_Ctx* ctx) {
+    u64 target_addr = ctx->line_info.data[8].addr;
+    Lady_Trap trap = lady_trap_set(ctx, target_addr);
+    do {
+        Lady_Event event = lady_continue(ctx);
+        lady_event(ctx, event, trap);
+    } while (true);
+}
+
 void* parallel_main(void* main_args) {
     i32 argc = ((MainArgs*)main_args)->argc;
     u8** argv = ((MainArgs*)main_args)->argv;
@@ -41,58 +73,20 @@ void* parallel_main(void* main_args) {
     LaneSync();
     Misty_LineInfoArray line_info = {0};
     AssignLane(1) {
-        ThreadLocalTimer(NULL) {
-            line_info = misty_read_line_info(mountain, f);
-        }
+        line_info = misty_read_line_info(mountain, f);
     }
 
-    pid_t pid = 0;
+    Lady_Ctx* ctx = 0L;
     AssignLane(0) {
-        ThreadLocalTimer(NULL) {
-            pid = proc_launch_and_pause(path);
-        }
+        ctx = lady_ctx_create(thread_ctx.shared_arena, path);
     }
-    LaneSyncStruct(pid, 0);
+    LaneSyncPtr(ctx, 0);
     LaneSyncStruct(line_info, 1);
 
     AssignLane(0) {
-        if (pid != 0) {
-            u64 base_addr = proc_base_addr(LaneArena(), pid);
-            u64 target_addr = base_addr + line_info.data[8].addr;
-            u8 prev_instr = trap_insert(pid, target_addr);
-
-            do {
-                printf("Press ENTER to continue: ");
-                fflush(stdout);
-                read(STDIN_FILENO, 0L, 1);
-                i32 status = proc_continue(pid);
-
-                if (WIFEXITED(status)) {
-                    TODO("Handle exit signal");
-                    break;
-                } else if (WIFSIGNALED(status)) {
-                    printf("killed by signal %d\n", WTERMSIG(status));
-                    TODO("Handle kill signal");
-                } else if (WIFSTOPPED(status)) {
-                    printf("stopped by signal %d\n", WSTOPSIG(status));
-
-                    TODO("testing todo");
-                    if (WSTOPSIG(status) == SIGTRAP) {
-                        printf("[Debugger] Intercepted SIGTRAP from child!\n");
-
-                        struct user_regs_struct regs;
-                        ptrace(PTRACE_GETREGS, pid, NULL, &regs);
-                        regs.rip -= 1;
-                        ptrace(PTRACE_SETREGS, pid, NULL, &regs);
-
-                        trap_restore(pid, target_addr, prev_instr);
-                        proc_single_step(pid);
-                        prev_instr = trap_insert(pid, target_addr);
-                    } else {
-                        TODO("Handle other signals");
-                    }
-                }
-            } while (true);
+        if (ctx->pid != 0) {
+            ctx->line_info = line_info;
+            debug_event_loop(ctx);
         }
     }
     LaneSync();

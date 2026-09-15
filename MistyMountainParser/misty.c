@@ -382,6 +382,9 @@ Misty_LineInfoArray misty_read_line_info(Misty* mountain, File* f) {
 
     Misty_LineInfoArray line_info = {0};
     ArrayBuilderBlock(mountain->arena, line_info, Misty_LineInfo) {
+
+        array_builder_push(mountain->arena, line_info, (Misty_LineInfo){0});
+
         for (; !state.end_sequence ;) {
             u8 opcode = 0;
             DwarfSectionRead_Struct(f, section, opcode);

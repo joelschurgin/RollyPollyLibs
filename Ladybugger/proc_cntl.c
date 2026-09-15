@@ -245,3 +245,20 @@ void lady_trap_unset(Lady_Ctx* ctx, Lady_Trap trap) {
 void lady_trap_reset(Lady_Ctx* ctx, Lady_Trap* trap) {
     trap->data = trap_insert(ctx->pid, ctx->base_addr + trap->addr);
 }
+
+void lady_bp_set(Lady_Ctx* ctx, u64 line_info_idx, Lady_BpType type) {
+    Assert(line_info_idx < ctx->line_info.count);
+    Assert(ctx->bp.count <= MAX_BREAKPOINTS - 1);
+
+    switch (type) {
+        case LADY_BP_TRAP:
+            u64 bp_idx = ++ctx->bp.count;
+            ctx->bp.data[bp_idx] = (Lady_Bp){
+                .type = LADY_BP_TRAP,
+                .trap = lady_trap_set(ctx, ctx->line_info.data[line_info_idx].addr),
+            };
+        break;
+        default:
+            TODO("Unhandled Breakpoint Type");
+    }
+}

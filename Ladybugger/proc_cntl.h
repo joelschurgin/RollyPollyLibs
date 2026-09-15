@@ -8,6 +8,27 @@
 #include <sys/syscall.h>
 #include <signal.h>
 
+#define MAX_BREAKPOINTS 256
+
+typedef struct {
+    u64 addr;
+    u8 data;
+} Lady_Trap;
+
+typedef enum {
+    LADY_BP_TRAP,
+} Lady_BpType;
+
+typedef struct {
+    Lady_BpType type;
+    union {
+        Lady_Trap trap;
+    };
+    u64 line_info_idx;
+} Lady_Bp;
+
+DefineArray(Lady_Bp);
+
 typedef struct {
     pid_t pid;
     u64 base_addr;
@@ -16,12 +37,8 @@ typedef struct {
     i32 pipe_write;
 
     Misty_LineInfoArray line_info;
+    Lady_BpArray bp;
 } Lady_Ctx;
-
-typedef struct {
-    u64 addr;
-    u8 data;
-} Lady_Trap;
 
 typedef enum {
     LADY_NONE,
@@ -54,6 +71,8 @@ internal inline void    trap_restore(pid_t pid, u64 addr, u8 data);
 Lady_Trap lady_trap_set(Lady_Ctx* ctx, u64 addr);
 void lady_trap_unset(Lady_Ctx* ctx, Lady_Trap trap);
 void lady_trap_reset(Lady_Ctx* ctx, Lady_Trap* trap);
+
+void lady_bp_set(Lady_Ctx* ctx, u64 line_info_idx, Lady_BpType type);
 
 #endif
 

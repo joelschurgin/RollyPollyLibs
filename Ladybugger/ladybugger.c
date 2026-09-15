@@ -11,7 +11,8 @@ typedef struct {
     u8** argv;
 } MainArgs;
 
-void lady_event(Lady_Ctx* ctx, Lady_Event event, Lady_Trap trap) { // passing in trap is temporary because we need a full data structure for breakpoints
+// passing in trap is temporary because we need a full data structure for breakpoints
+void lady_event(Lady_Ctx* ctx, Lady_Event event, Lady_Trap* trap) {
     switch (event) {
         case LADY_TRAP:
             printf("[Ladybugger] Intercepted SIGTRAP!\n");
@@ -21,13 +22,9 @@ void lady_event(Lady_Ctx* ctx, Lady_Event event, Lady_Trap trap) { // passing in
             regs.rip -= 1;
             ptrace(PTRACE_SETREGS, ctx->pid, NULL, &regs);
 
-            lady_trap_unset(ctx, trap);
+            lady_trap_unset(ctx, *trap);
             lady_single_step(ctx);
-            lady_trap_reset(ctx, &trap);
-
-            printf("Press ENTER to continue: ");
-            fflush(stdout);
-            read(STDIN_FILENO, 0L, 1);
+            lady_trap_reset(ctx, trap);
         break;
         default:
             TODO("Handle Other Event Type");
@@ -39,7 +36,11 @@ void debug_event_loop(Lady_Ctx* ctx) {
     Lady_Trap trap = lady_trap_set(ctx, target_addr);
     do {
         Lady_Event event = lady_continue(ctx);
-        lady_event(ctx, event, trap);
+        lady_event(ctx, event, &trap);
+
+        printf("Press ENTER to continue: ");
+        fflush(stdout);
+        read(STDIN_FILENO, 0L, 1);
     } while (true);
 }
 
@@ -83,11 +84,12 @@ void* parallel_main(void* main_args) {
     LaneSyncPtr(ctx, 0);
     LaneSyncStruct(line_info, 1);
 
+    if (ctx->pid == 0) ThreadExit(NULL);
+
     AssignLane(0) {
-        if (ctx->pid != 0) {
-            ctx->line_info = line_info;
-            debug_event_loop(ctx);
-        }
+        ctx->line_info = line_info;
+        ctx->bp = Array(thread_ctx.shared_arena, Lady_Bp, MAX_BREAKPOINTS);
+        debug_event_loop(ctx);
     }
     LaneSync();
 }

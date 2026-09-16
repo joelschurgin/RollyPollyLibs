@@ -9,7 +9,7 @@ int main() {
     pid_t pid = getpid();
     printf("test pid: %lu\n", pid);
 
-    while (true) {
+    for (int i = 0; i < 10000; i++) {
         float a = 0.1f;
         float b = func(a);
         printf("LOOP: %f\n", b);

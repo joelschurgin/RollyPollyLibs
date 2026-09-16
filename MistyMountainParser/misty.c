@@ -402,8 +402,10 @@ Misty_LineInfoArray misty_read_line_info(Misty* mountain, File* f) {
                         MemoryCopy(&state.addr, ext_opcode + 1, header.address_size_bytes);
                         state.op_idx = 0;
                     break;
-                    case DW_LNE_define_file:
                     case DW_LNE_set_discriminator:
+                        state.discriminator = DwarfSectionRead_uleb128(f, section);
+                    break;
+                    case DW_LNE_define_file:
                     case DW_LNE_lo_user:
                     case DW_LNE_hi_user:
                     case DW_LNE_NVIDIA_inlined_call:

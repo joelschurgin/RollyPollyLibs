@@ -58,6 +58,8 @@ internal u64 proc_base_addr(Arena* arena, pid_t pid) {
 Lady_Ctx* lady_ctx_create(Arena* arena, String path) {
     Lady_Ctx* ctx = push_struct(arena, Lady_Ctx);
 
+    ctx->bp_hash = lady_bp_hash_create(arena, 256);
+
     ctx->pid = proc_launch_and_pause(path);
     ctx->base_addr = proc_base_addr(arena, ctx->pid);
 
@@ -246,6 +248,7 @@ void lady_trap_reset(Lady_Ctx* ctx, Lady_Trap* trap) {
     trap->data = trap_insert(ctx->pid, ctx->base_addr + trap->addr);
 }
 
+/*
 void lady_bp_set(Lady_Ctx* ctx, u64 line_info_idx, Lady_BpType type) {
     Assert(line_info_idx < ctx->line_info.count);
     Assert(ctx->bp.count <= MAX_BREAKPOINTS - 1);
@@ -262,3 +265,4 @@ void lady_bp_set(Lady_Ctx* ctx, u64 line_info_idx, Lady_BpType type) {
             TODO("Unhandled Breakpoint Type");
     }
 }
+*/

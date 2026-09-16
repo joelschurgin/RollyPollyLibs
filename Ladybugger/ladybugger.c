@@ -3,7 +3,10 @@
 #define BASE_ENTRY_POINT
 #include "base.h"
 
+#include "breakpoint.h"
 #include "proc_cntl.h"
+
+#include "breakpoint.c"
 #include "proc_cntl.c"
 
 typedef struct {
@@ -12,7 +15,7 @@ typedef struct {
 } MainArgs;
 
 // passing in trap is temporary because we need a full data structure for breakpoints
-void lady_event(Lady_Ctx* ctx, Lady_Event event, Lady_Trap* trap) {
+void lady_event(Lady_Ctx* ctx, Lady_Event event) {
     switch (event) {
         case LADY_TRAP:
             printf("[Ladybugger] Intercepted SIGTRAP!\n");
@@ -22,9 +25,16 @@ void lady_event(Lady_Ctx* ctx, Lady_Event event, Lady_Trap* trap) {
             regs.rip -= 1;
             ptrace(PTRACE_SETREGS, ctx->pid, NULL, &regs);
 
-            lady_trap_unset(ctx, *trap);
+            u64 proc_addr = regs.rip - ctx->base_addr;
+            Lady_Bp* bp = lady_bp_hash_get(&ctx->bp_hash, proc_addr);
+
+            Assert(bp->type == LADY_BP_TRAP);
+
+            lady_trap_unset(ctx, bp->trap);
             lady_single_step(ctx);
-            lady_trap_reset(ctx, trap);
+            lady_trap_reset(ctx, &bp->trap);
+        break;
+        case LADY_EXIT:
         break;
         default:
             TODO("Handle Other Event Type");
@@ -32,16 +42,22 @@ void lady_event(Lady_Ctx* ctx, Lady_Event event, Lady_Trap* trap) {
 }
 
 void debug_event_loop(Lady_Ctx* ctx) {
-    u64 target_addr = ctx->line_info.data[8].addr;
-    Lady_Trap trap = lady_trap_set(ctx, target_addr);
-    do {
-        Lady_Event event = lady_continue(ctx);
-        lady_event(ctx, event, &trap);
+    u64 target_addr = ctx->line_info.data[9].addr;
+    Lady_Bp bp = (Lady_Bp){
+        .type = LADY_BP_TRAP,
+        .trap = lady_trap_set(ctx, target_addr),
+        .line_info_idx = 9,
+    };
 
-        printf("Press ENTER to continue: ");
-        fflush(stdout);
-        read(STDIN_FILENO, 0L, 1);
-    } while (true);
+    lady_bp_hash_insert(&ctx->bp_hash, bp.trap.addr, bp);
+
+    ThreadLocalTimer("Timing Int3 Style Breakpoints") {
+        Lady_Event event = LADY_NONE;
+        do {
+            event = lady_continue(ctx);
+            lady_event(ctx, event);
+        } while (event != LADY_EXIT);
+    }
 }
 
 void* parallel_main(void* main_args) {
@@ -88,7 +104,6 @@ void* parallel_main(void* main_args) {
 
     AssignLane(0) {
         ctx->line_info = line_info;
-        ctx->bp = Array(thread_ctx.shared_arena, Lady_Bp, MAX_BREAKPOINTS);
         debug_event_loop(ctx);
     }
     LaneSync();
@@ -115,7 +130,7 @@ i32 main(i32 argc, u8** argv) {
         //"test64_dwarf2",
         //"test64_dwarf3",
         //"test64_dwarf4",
-        "test64_dwarf5",
+        //"test64_dwarf5",
     };
 
     for (u64 i = 0; i < sizeof(test_execs)/sizeof(*test_execs); i++) {

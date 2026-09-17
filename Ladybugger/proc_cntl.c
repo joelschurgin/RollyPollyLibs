@@ -369,23 +369,24 @@ u64 lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr) {
     void* remote_func_ptr = (u8*)alloc->base + alloc->pos;
     void* proc_remote_func_ptr = (u8*)alloc->remote_base + alloc->pos;
     alloc->pos += func_size;
-    TempArenaBlock(LaneArena()) {
-        u8* local_func_copy = push_array(LaneArena(), u8, func_size, true);
-        MemoryCopy(local_func_copy, trampoline_trap, func_size);
+
+    {
+        //u8* local_func_copy = push_array(LaneArena(), u8, func_size, true);
+        MemoryCopy(remote_func_ptr, trampoline_trap, func_size);
 
         {
             u64 trampoline_trap_stolen_bytes_offset = (u64)&__trampoline_trap_stolen_bytes - (u64)&trampoline_trap;
             u64 stolen_bytes = ptrace(PTRACE_PEEKDATA, alloc->pid, addr, 0L);
-            MemoryCopy(local_func_copy + trampoline_trap_stolen_bytes_offset, &stolen_bytes, 5);
+            MemoryCopy(remote_func_ptr + trampoline_trap_stolen_bytes_offset, &stolen_bytes, 5);
         }
 
         {
             u64 trampoline_trap_return_ptr_offset = (u64)&__trampoline_trap_return_ptr - (u64)&trampoline_trap;
             u64 ret_addr = (u64)addr + 5;
-            MemoryCopy(local_func_copy + trampoline_trap_return_ptr_offset, &ret_addr, sizeof(u64));
+            MemoryCopy(remote_func_ptr + trampoline_trap_return_ptr_offset, &ret_addr, sizeof(u64));
         }
 
-        MemoryCopy(remote_func_ptr, local_func_copy, func_size);
+        //MemoryCopy(remote_func_ptr, local_func_copy, func_size);
     }
 
     proc_insert_jmp(ctx->pid, addr, (u64)proc_remote_func_ptr);

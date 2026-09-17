@@ -6,9 +6,11 @@
 #include "types.h"
 
 #include "breakpoint.h"
+#include "trampoline.h"
 #include "proc_cntl.h"
 
 #include "breakpoint.c"
+#include "trampoline.c"
 #include "proc_cntl.c"
 
 typedef struct {

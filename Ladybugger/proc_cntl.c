@@ -275,7 +275,7 @@ RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size)
                                    (void*)target_addr,
                                    size,
                                    PROT_READ | PROT_WRITE | PROT_EXEC,
-                                   MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
+                                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
                                    -1,
                                    0);
     func_alloc.pos = 0;

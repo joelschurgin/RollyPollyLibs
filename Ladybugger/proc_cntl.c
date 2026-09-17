@@ -153,41 +153,6 @@ void* remote_mmap(pid_t pid, void* addr, size_t len, int prot, int flags, int fd
     return allocated_mem;
 }
 
-i32 remote_mprotect(pid_t pid, void* addr, size_t len, int prot) {
-    struct user_regs_struct old_regs, new_regs;
- 
-    Assert(ptrace(PTRACE_GETREGS, pid, NULL, &old_regs) >= 0);
-
-    u64 orig_instr = ptrace(PTRACE_PEEKDATA, pid, old_regs.rip, 0L);
-
-    u64 syscall_payload = orig_instr;
-    u8* payload_bytes = (u8*)&syscall_payload;
-    payload_bytes[0] = 0x0f;
-    payload_bytes[1] = 0x05;
-
-    Assert(ptrace(PTRACE_POKEDATA, pid, old_regs.rip, syscall_payload) >= 0);
-
-    new_regs = old_regs;
-
-    new_regs.rax = SYS_mprotect;
-    new_regs.rdi = (u64)addr;
-    new_regs.rsi = len;
-    new_regs.rdx = prot;
-
-    ptrace(PTRACE_SETREGS, pid, NULL, &new_regs);
-
-    ptrace(PTRACE_SINGLESTEP, pid, NULL, NULL);
-    waitpid(pid, NULL, 0);
-
-    ptrace(PTRACE_GETREGS, pid, NULL, &new_regs);
-    i32 ret = (i32)new_regs.rax;
-
-    Assert(ptrace(PTRACE_POKEDATA, pid, old_regs.rip, orig_instr) >= 0);
-    ptrace(PTRACE_SETREGS, pid, NULL, &old_regs);
-
-    return ret;
-}
-
 i32 remote_open(pid_t pid, const char* path, int flags, mode_t mode) {
     struct user_regs_struct old_regs, new_regs;
  
@@ -233,43 +198,6 @@ i32 remote_open(pid_t pid, const char* path, int flags, mode_t mode) {
     ptrace(PTRACE_SETREGS, pid, NULL, &old_regs);
 
     return child_fd;
-}
-
-
-void remote_write(pid_t pid, void* remote_addr, void* write_buf, u64 size) {
-    struct iovec local_iov = {
-        .iov_base = write_buf,
-        .iov_len = size,
-    };
-
-    struct iovec remote_iov = {
-        .iov_base = remote_addr,
-        .iov_len = size,
-    };
-
-    ssize_t num_bytes = process_vm_writev(pid, &local_iov, 1, &remote_iov, 1, 0);
-    if (num_bytes < 0) {
-        perror("remote_write");
-    }
-    Assert(num_bytes == (ssize_t)size);
-}
-
-void remote_read(pid_t pid, void* remote_addr, void* read_buf, u64 size) {
-    struct iovec local_iov = {
-        .iov_base = read_buf,
-        .iov_len = size,
-    };
-
-    struct iovec remote_iov = {
-        .iov_base = remote_addr,
-        .iov_len = size,
-    };
-
-    ssize_t num_bytes = process_vm_readv(pid, &local_iov, 1, &remote_iov, 1, 0);
-    if (num_bytes < 0) {
-        perror("remote_read");
-    }
-    Assert(num_bytes == (ssize_t)size);
 }
 
 internal inline u8 trap_insert(pid_t pid, u64 addr) {
@@ -336,7 +264,7 @@ RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size)
                                    (void*)target_addr,
                                    size,
                                    PROT_READ | PROT_WRITE | PROT_EXEC,
-                                   MAP_SHARED,// | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
+                                   MAP_SHARED,
                                    func_alloc.remote_shm_fd,
                                    0);
 

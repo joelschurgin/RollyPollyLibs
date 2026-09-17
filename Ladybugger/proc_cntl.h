@@ -22,9 +22,7 @@ Lady_Event lady_continue(Lady_Ctx* ctx);
 Lady_Event lady_single_step(Lady_Ctx* ctx);
 
 void*   remote_mmap(pid_t pid, void* addr, size_t len, int prot, int flags, int fd, off_t offset);
-i32     remote_mprotect(pid_t pid, void* addr, size_t len, int prot);
-void    remote_write(pid_t pid, void* remote_addr, void* write_buf, u64 size);
-void    remote_read(pid_t pid, void* remote_addr, void* read_buf, u64 size);
+i32     remote_open(pid_t pid, const char* path, int flags, mode_t mode);
 
 internal inline u8      trap_insert(pid_t pid, u64 addr);
 internal inline void    trap_restore(pid_t pid, u64 addr, u8 data);

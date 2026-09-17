@@ -161,9 +161,6 @@ void thread_local_timer_print(ThreadLocalTimer timer, u8* fmt, ...) {
     va_start(args, fmt);
 
     local_persist u8* units[] = {"ns", "us", "ms", "s"};
-
-    printf("start: %lf\n", (f64)timer.start.tv_nsec);
-    printf("end: %lf\n", (f64)timer.end.tv_nsec);
  
     i64 sec_diff = timer.end.tv_sec - timer.start.tv_sec;
     i64 nsec_diff = timer.end.tv_nsec - timer.start.tv_nsec;

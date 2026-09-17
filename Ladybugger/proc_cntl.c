@@ -253,7 +253,7 @@ void lady_trap_reset(Lady_Ctx* ctx, Lady_Trap* trap) {
     trap->data = trap_insert(ctx->pid, ctx->base_addr + trap->addr);
 }
 
-void insert_jmp(pid_t pid, u64 addr, u64 func_ptr) {
+void proc_insert_jmp(pid_t pid, u64 addr, u64 func_ptr) {
     u64 curr_instr = ptrace(PTRACE_PEEKDATA, pid, addr, 0L);
 
     struct __attribute__((packed)) {
@@ -275,7 +275,7 @@ RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size)
                                    (void*)target_addr,
                                    size,
                                    PROT_READ | PROT_WRITE | PROT_EXEC,
-                                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
+                                   MAP_SHARED | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
                                    -1,
                                    0);
     func_alloc.pos = 0;
@@ -285,31 +285,38 @@ RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size)
     return func_alloc;
 }
 
-void* remote_func_alloc_push_(RemoteFuncAllocator* alloc, void* func, void* func_end, void* addr) {
-    u64 func_size = (u64)func_end - (u64)func;
+u64 lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr) {
+    addr += ctx->base_addr;
+
+    u64 func_size = (u64)REMOTE_FUNC_END_PTR(trampoline_trap) - (u64)trampoline_trap;
+
+    RemoteFuncAllocator* alloc = &ctx->remote_func_alloc;
     Assert(alloc->pos + func_size <= alloc->size);
 
     void* remote_func_ptr = alloc->base + alloc->pos;
     alloc->pos += func_size;
     TempArenaBlock(LaneArena()) {
         u8* local_func_copy = push_array(LaneArena(), u8, func_size, true);
-        MemoryCopy(local_func_copy, func, func_size);
+        MemoryCopy(local_func_copy, trampoline_trap, func_size);
 
-        u64 trampoline_stolen_bytes_offset = (u64)&__trampoline_stolen_bytes_label - (u64)&trampoline;
+        {
+            u64 trampoline_trap_stolen_bytes_offset = (u64)&__trampoline_trap_stolen_bytes - (u64)&trampoline_trap;
+            u64 stolen_bytes = ptrace(PTRACE_PEEKDATA, alloc->pid, addr, 0L);
+            MemoryCopy(local_func_copy + trampoline_trap_stolen_bytes_offset, &stolen_bytes, 5);
+        }
 
-        u64 stolen_bytes = ptrace(PTRACE_PEEKDATA, alloc->pid, addr, 0L);
-        MemoryCopy(local_func_copy + trampoline_stolen_bytes_offset, &stolen_bytes, 5);
-
-        u64 trampoline_return_ptr_offset = (u64)&__trampoline_return_ptr_label - (u64)&trampoline;
-
-        u64 ret_addr = (u64)addr + 5;
-        MemoryCopy(local_func_copy + trampoline_return_ptr_offset, &ret_addr, sizeof(u64));
+        {
+            u64 trampoline_trap_return_ptr_offset = (u64)&__trampoline_trap_return_ptr - (u64)&trampoline_trap;
+            u64 ret_addr = (u64)addr + 5;
+            MemoryCopy(local_func_copy + trampoline_trap_return_ptr_offset, &ret_addr, sizeof(u64));
+        }
 
         remote_write(alloc->pid, remote_func_ptr, local_func_copy, func_size);
     }
+
+    proc_insert_jmp(ctx->pid, addr, (u64)remote_func_ptr);
  
-    return remote_func_ptr;
+    u64 trap_offset = (u64)&__trampoline_trap - (u64)&trampoline_trap;
+    u64 bp_addr = (u64)remote_func_ptr + trap_offset - ctx->base_addr;
+    return bp_addr;
 }
-
-#define remote_func_alloc_push(alloc, func, ret_addr) remote_func_alloc_push_((alloc), (func), REMOTE_FUNC_END_PTR(func), ret_addr);
-

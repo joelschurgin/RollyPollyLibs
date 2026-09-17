@@ -58,15 +58,11 @@ void lady_bp_set(Lady_Ctx* ctx, u64 addr, Lady_BpType type) {
                 .line_info_idx = lady_addr_to_line_info_idx(ctx->line_info, addr),
             });
         break;
-        case LADY_BP_FAST:
+        case LADY_BP_TRAMPOLINE_TRAP:
         {
-            u64 target_addr = addr + ctx->base_addr;
-            u64 remote_func_ptr = (u64)remote_func_alloc_push(&ctx->remote_func_alloc, trampoline, (void*)target_addr);
-            insert_jmp(ctx->pid, target_addr, remote_func_ptr);
-            u64 trap_offset = (u64)&__trampoline_trap_label - (u64)&trampoline;
-            lady_bp_hash_insert(&ctx->bp_hash, remote_func_ptr + trap_offset - ctx->base_addr, (Lady_Bp){
-                .type = LADY_BP_FAST,
-                //.fast = (Lady_Fast){0},
+            u64 bp_addr = lady_trampoline_trap_set(ctx, addr); // address that we'll get from the trampoline trap
+            lady_bp_hash_insert(&ctx->bp_hash, bp_addr, (Lady_Bp){
+                .type = LADY_BP_TRAMPOLINE_TRAP,
                 .line_info_idx = lady_addr_to_line_info_idx(ctx->line_info, addr),
             });
         }

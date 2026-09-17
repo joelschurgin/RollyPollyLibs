@@ -20,8 +20,6 @@ void lady_event(Lady_Ctx* ctx, Lady_Event event) {
     switch (event) {
         case LADY_TRAP:
         {
-            printf("[Ladybugger] Intercepted SIGTRAP!\n");
-
             struct user_regs_struct regs;
             ptrace(PTRACE_GETREGS, ctx->pid, NULL, &regs);
             regs.rip -= 1;
@@ -31,13 +29,15 @@ void lady_event(Lady_Ctx* ctx, Lady_Event event) {
 
             switch (bp->type) {
                 case LADY_BP_TRAP:
+                {
                     ptrace(PTRACE_SETREGS, ctx->pid, NULL, &regs);
 
                     lady_trap_unset(ctx, bp->trap);
                     lady_single_step(ctx);
                     lady_trap_reset(ctx, &bp->trap);
+                }
                 break;
-                case LADY_BP_FAST:
+                case LADY_BP_TRAMPOLINE_TRAP:
                     //TODO("What do we do here?");
                 break;
             }
@@ -49,8 +49,6 @@ void lady_event(Lady_Ctx* ctx, Lady_Event event) {
             ptrace(PTRACE_GETREGS, ctx->pid, NULL, &regs);
 
             printf("[Ladybugger] Proc Segfaulted!\n");
-
-            Assert("Gotta inspect the trampoline");
         }
         break;
         case LADY_EXIT: break;
@@ -59,11 +57,11 @@ void lady_event(Lady_Ctx* ctx, Lady_Event event) {
     }
 }
 
-void debug_event_loop(Lady_Ctx* ctx) {
+void lady_debug_event_loop(Lady_Ctx* ctx) {
     u64 target_addr = ctx->line_info.data[2].addr;
-    lady_bp_set(ctx, target_addr, LADY_BP_FAST);
+    lady_bp_set(ctx, target_addr, LADY_BP_TRAMPOLINE_TRAP);
 
-    ThreadLocalTimer("Timing Int3 Style Breakpoints") {
+    ThreadLocalTimer("Timing TRAMPOLINE_TRAP Breakpoints") {
         Lady_Event event = LADY_NONE;
         do {
             event = lady_continue(ctx);
@@ -116,7 +114,7 @@ void* parallel_main(void* main_args) {
 
     AssignLane(0) {
         ctx->line_info = line_info;
-        debug_event_loop(ctx);
+        lady_debug_event_loop(ctx);
     }
     LaneSync();
 }

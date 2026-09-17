@@ -26,7 +26,7 @@ typedef struct {
 
 typedef enum {
     LADY_BP_TRAP,
-    LADY_BP_FAST,
+    LADY_BP_TRAMPOLINE_TRAP,
 } Lady_BpType;
 
 typedef struct {

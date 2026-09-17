@@ -366,32 +366,27 @@ u64 lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr) {
     RemoteFuncAllocator* alloc = &ctx->remote_func_alloc;
     Assert(alloc->pos + func_size <= alloc->size);
 
-    void* remote_func_ptr = (u8*)alloc->base + alloc->pos;
-    void* proc_remote_func_ptr = (u8*)alloc->remote_base + alloc->pos;
+    void* func_write_ptr = (u8*)alloc->base + alloc->pos;
+    void* remote_func_ptr = (u8*)alloc->remote_base + alloc->pos;
     alloc->pos += func_size;
 
+    MemoryCopy(func_write_ptr, trampoline_trap, func_size);
+
     {
-        //u8* local_func_copy = push_array(LaneArena(), u8, func_size, true);
-        MemoryCopy(remote_func_ptr, trampoline_trap, func_size);
-
-        {
-            u64 trampoline_trap_stolen_bytes_offset = (u64)&__trampoline_trap_stolen_bytes - (u64)&trampoline_trap;
-            u64 stolen_bytes = ptrace(PTRACE_PEEKDATA, alloc->pid, addr, 0L);
-            MemoryCopy(remote_func_ptr + trampoline_trap_stolen_bytes_offset, &stolen_bytes, 5);
-        }
-
-        {
-            u64 trampoline_trap_return_ptr_offset = (u64)&__trampoline_trap_return_ptr - (u64)&trampoline_trap;
-            u64 ret_addr = (u64)addr + 5;
-            MemoryCopy(remote_func_ptr + trampoline_trap_return_ptr_offset, &ret_addr, sizeof(u64));
-        }
-
-        //MemoryCopy(remote_func_ptr, local_func_copy, func_size);
+        u64 trampoline_trap_stolen_bytes_offset = (u64)&__trampoline_trap_stolen_bytes - (u64)&trampoline_trap;
+        u64 stolen_bytes = ptrace(PTRACE_PEEKDATA, alloc->pid, addr, 0L);
+        MemoryCopy(func_write_ptr + trampoline_trap_stolen_bytes_offset, &stolen_bytes, 5);
     }
 
-    proc_insert_jmp(ctx->pid, addr, (u64)proc_remote_func_ptr);
+    {
+        u64 trampoline_trap_return_ptr_offset = (u64)&__trampoline_trap_return_ptr - (u64)&trampoline_trap;
+        u64 ret_addr = (u64)addr + 5;
+        MemoryCopy(func_write_ptr + trampoline_trap_return_ptr_offset, &ret_addr, sizeof(u64));
+    }
+
+    proc_insert_jmp(ctx->pid, addr, (u64)remote_func_ptr);
  
     u64 trap_offset = (u64)&__trampoline_trap - (u64)&trampoline_trap;
-    u64 bp_addr = (u64)proc_remote_func_ptr + trap_offset - ctx->base_addr;
+    u64 bp_addr = (u64)remote_func_ptr + trap_offset - ctx->base_addr;
     return bp_addr;
 }

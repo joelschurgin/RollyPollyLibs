@@ -1,8 +1,4 @@
-REMOTE_FUNC_ATTRIBS
-void trampoline_trap(void) {
-    __asm__ __volatile__ (
-        ".intel_syntax noprefix\n"
-        /*
+  /*
         "pushfq\n"
 
         "sub rsp, 128\n"
@@ -22,10 +18,7 @@ void trampoline_trap(void) {
         "mov [rsp + 104], r14\n"
         "mov [rsp + 112], r15\n"
         */
-
-        "__trampoline_trap:\n"
-        "int3\n"
-        "nop\n"
+        
  
         /*
         "mov rax, [rsp + 0]\n"
@@ -47,6 +40,16 @@ void trampoline_trap(void) {
         "popfq\n"
 
         */
+
+
+REMOTE_FUNC_ATTRIBS
+void trampoline_trap(void) {
+    __asm__ __volatile__ (
+        ".intel_syntax noprefix\n"
+
+        "__trampoline_trap:\n"
+        "int3\n"
+        "nop\n"
 
         "__trampoline_trap_stolen_bytes:\n"
         ".byte 0x00\n"

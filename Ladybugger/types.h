@@ -1,8 +1,11 @@
 typedef struct {
+    void* remote_base;
     void* base;
     u64 pos;
     u64 size;
     pid_t pid;
+    i32 remote_shm_fd;
+    i32 shm_fd;
 } RemoteFuncAllocator;
 
 typedef enum {

@@ -3,6 +3,8 @@
 #define BASE_ENTRY_POINT
 #include "base.h"
 
+#include "types.h"
+
 #include "breakpoint.h"
 #include "proc_cntl.h"
 
@@ -14,42 +16,52 @@ typedef struct {
     u8** argv;
 } MainArgs;
 
-// passing in trap is temporary because we need a full data structure for breakpoints
 void lady_event(Lady_Ctx* ctx, Lady_Event event) {
     switch (event) {
         case LADY_TRAP:
+        {
             printf("[Ladybugger] Intercepted SIGTRAP!\n");
 
             struct user_regs_struct regs;
             ptrace(PTRACE_GETREGS, ctx->pid, NULL, &regs);
             regs.rip -= 1;
-            ptrace(PTRACE_SETREGS, ctx->pid, NULL, &regs);
 
             u64 proc_addr = regs.rip - ctx->base_addr;
             Lady_Bp* bp = lady_bp_hash_get(&ctx->bp_hash, proc_addr);
 
-            Assert(bp->type == LADY_BP_TRAP);
+            switch (bp->type) {
+                case LADY_BP_TRAP:
+                    ptrace(PTRACE_SETREGS, ctx->pid, NULL, &regs);
 
-            lady_trap_unset(ctx, bp->trap);
-            lady_single_step(ctx);
-            lady_trap_reset(ctx, &bp->trap);
+                    lady_trap_unset(ctx, bp->trap);
+                    lady_single_step(ctx);
+                    lady_trap_reset(ctx, &bp->trap);
+                break;
+                case LADY_BP_FAST:
+                    //TODO("What do we do here?");
+                break;
+            }
+        }
         break;
-        case LADY_EXIT:
+        case LADY_SEGFAULT:
+        {
+            struct user_regs_struct regs;
+            ptrace(PTRACE_GETREGS, ctx->pid, NULL, &regs);
+
+            printf("[Ladybugger] Proc Segfaulted!\n");
+
+            Assert("Gotta inspect the trampoline");
+        }
         break;
+        case LADY_EXIT: break;
         default:
             TODO("Handle Other Event Type");
     }
 }
 
 void debug_event_loop(Lady_Ctx* ctx) {
-    u64 target_addr = ctx->line_info.data[9].addr;
-    Lady_Bp bp = (Lady_Bp){
-        .type = LADY_BP_TRAP,
-        .trap = lady_trap_set(ctx, target_addr),
-        .line_info_idx = 9,
-    };
-
-    lady_bp_hash_insert(&ctx->bp_hash, bp.trap.addr, bp);
+    u64 target_addr = ctx->line_info.data[2].addr;
+    lady_bp_set(ctx, target_addr, LADY_BP_FAST);
 
     ThreadLocalTimer("Timing Int3 Style Breakpoints") {
         Lady_Event event = LADY_NONE;
@@ -130,7 +142,7 @@ i32 main(i32 argc, u8** argv) {
         //"test64_dwarf2",
         //"test64_dwarf3",
         //"test64_dwarf4",
-        //"test64_dwarf5",
+        "test64_dwarf5",
     };
 
     for (u64 i = 0; i < sizeof(test_execs)/sizeof(*test_execs); i++) {

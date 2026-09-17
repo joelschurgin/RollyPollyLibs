@@ -162,7 +162,17 @@ void thread_local_timer_print(ThreadLocalTimer timer, u8* fmt, ...) {
 
     local_persist u8* units[] = {"ns", "us", "ms", "s"};
 
-    f64 time_diff = (f64)(timer.end.tv_nsec - timer.start.tv_nsec);
+    printf("start: %lf\n", (f64)timer.start.tv_nsec);
+    printf("end: %lf\n", (f64)timer.end.tv_nsec);
+ 
+    i64 sec_diff = timer.end.tv_sec - timer.start.tv_sec;
+    i64 nsec_diff = timer.end.tv_nsec - timer.start.tv_nsec;
+    if (nsec_diff < 0) {
+        sec_diff -= 1;
+        nsec_diff += 1000000000L;
+    }
+    f64 time_diff = (f64)sec_diff * 1e9 + (f64)nsec_diff;
+
     i32 unit_idx = 0;
     while (time_diff > 1000.0) {
         time_diff /= 1000.0;
@@ -172,9 +182,9 @@ void thread_local_timer_print(ThreadLocalTimer timer, u8* fmt, ...) {
     TempArenaBlock(LaneArena()) {
         String msg = string_formatv(LaneArena(), fmt, args);
         if (msg.size > 0)
-            printf("Thread %d: %f%s => %.*s\n", LaneIdx(), time_diff, units[unit_idx], msg.size, msg.str);
+            printf("Thread %d: %lf%s => %.*s\n", LaneIdx(), time_diff, units[unit_idx], msg.size, msg.str);
         else
-            printf("Thread %d: %f%s\n", LaneIdx(), time_diff, units[unit_idx]);
+            printf("Thread %d: %lf%s\n", LaneIdx(), time_diff, units[unit_idx]);
     }
 
     va_end(args);

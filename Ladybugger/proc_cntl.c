@@ -63,6 +63,8 @@ Lady_Ctx* lady_ctx_create(Arena* arena, String path) {
     ctx->pid = proc_launch_and_pause(path);
     ctx->base_addr = proc_base_addr(arena, ctx->pid);
 
+    ctx->remote_func_alloc = remote_func_alloc_init(ctx->pid, ctx->base_addr + MB(128), PAGE_SIZE * 4);
+
     return ctx;
 }
 
@@ -72,8 +74,11 @@ internal Lady_Event lady_status_to_event(i32 status) {
     } else if (WIFSIGNALED(status)) {
         return LADY_KILL;
     } else if (WIFSTOPPED(status)) {
+        // man 7 signal explains these
         if (WSTOPSIG(status) == SIGTRAP) {
             return LADY_TRAP;
+        } else if (WSTOPSIG(status) == SIGSEGV) {
+            return LADY_SEGFAULT;
         } else {
             TODO("Handle other signals");
         }
@@ -248,21 +253,63 @@ void lady_trap_reset(Lady_Ctx* ctx, Lady_Trap* trap) {
     trap->data = trap_insert(ctx->pid, ctx->base_addr + trap->addr);
 }
 
-/*
-void lady_bp_set(Lady_Ctx* ctx, u64 line_info_idx, Lady_BpType type) {
-    Assert(line_info_idx < ctx->line_info.count);
-    Assert(ctx->bp.count <= MAX_BREAKPOINTS - 1);
+void insert_jmp(pid_t pid, u64 addr, u64 func_ptr) {
+    u64 curr_instr = ptrace(PTRACE_PEEKDATA, pid, addr, 0L);
 
-    switch (type) {
-        case LADY_BP_TRAP:
-            u64 bp_idx = ++ctx->bp.count;
-            ctx->bp.data[bp_idx] = (Lady_Bp){
-                .type = LADY_BP_TRAP,
-                .trap = lady_trap_set(ctx, ctx->line_info.data[line_info_idx].addr),
-            };
-        break;
-        default:
-            TODO("Unhandled Breakpoint Type");
-    }
+    struct __attribute__((packed)) {
+        u8 opcode;
+        i32 addr;
+    } jmp_instr = {
+        .opcode = 0xe9,
+        .addr = (i32)((i64)func_ptr - ((i64)addr + 5)),
+    };
+
+    MemoryCopy(&curr_instr, &jmp_instr, 5);
+    ptrace(PTRACE_POKEDATA, pid, addr, curr_instr);
 }
-*/
+
+RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size) {
+    RemoteFuncAllocator func_alloc = {0};
+
+    func_alloc.base = remote_mmap(pid,
+                                   (void*)target_addr,
+                                   size,
+                                   PROT_READ | PROT_WRITE | PROT_EXEC,
+                                   MAP_PRIVATE | MAP_ANONYMOUS | MAP_FIXED_NOREPLACE,
+                                   -1,
+                                   0);
+    func_alloc.pos = 0;
+    func_alloc.size = size;
+    func_alloc.pid = pid;
+
+    return func_alloc;
+}
+
+void* remote_func_alloc_push_(RemoteFuncAllocator* alloc, void* func, void* func_end, void* addr) {
+    u64 func_size = (u64)func_end - (u64)func;
+    Assert(alloc->pos + func_size <= alloc->size);
+
+    void* remote_func_ptr = alloc->base + alloc->pos;
+    alloc->pos += func_size;
+    TempArenaBlock(LaneArena()) {
+        u8* local_func_copy = push_array(LaneArena(), u8, func_size, true);
+        MemoryCopy(local_func_copy, func, func_size);
+
+        u64 trampoline_stolen_bytes_offset = (u64)&__trampoline_stolen_bytes_label - (u64)&trampoline;
+
+        u64 stolen_bytes = ptrace(PTRACE_PEEKDATA, alloc->pid, addr, 0L);
+        MemoryCopy(local_func_copy + trampoline_stolen_bytes_offset, &stolen_bytes, 5);
+
+        u64 trampoline_return_ptr_offset = (u64)&__trampoline_return_ptr_label - (u64)&trampoline;
+
+        u64 ret_addr = (u64)addr + 5;
+        MemoryCopy(local_func_copy + trampoline_return_ptr_offset, &ret_addr, sizeof(u64));
+
+        remote_write(alloc->pid, remote_func_ptr, local_func_copy, func_size);
+    }
+ 
+    return remote_func_ptr;
+}
+
+#define remote_func_alloc_push(alloc, func, ret_addr) remote_func_alloc_push_((alloc), (func), REMOTE_FUNC_END_PTR(func), ret_addr);
+

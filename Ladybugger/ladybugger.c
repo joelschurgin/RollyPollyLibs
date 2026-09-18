@@ -1,4 +1,5 @@
 #include "misty.h"
+#include "disasm.h"
 
 #define BASE_ENTRY_POINT
 #include "base.h"

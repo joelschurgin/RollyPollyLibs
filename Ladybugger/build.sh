@@ -6,13 +6,14 @@ cd $SCRIPT_DIR
 
 BASE="$(realpath ../Base)"
 MISTY="$(realpath ../MistyMountainParser)"
-INCLUDES="-I$BASE -I$MISTY"
+DISASM="$(realpath ../Disasm)"
+INCLUDES="-I$BASE -I$MISTY -I$DISASM"
 
 LIB="$(realpath ../build/lib)"
 
 CC="gcc"
 LADYBUGGER_CFLAGS="$INCLUDES -std=c99 -D_POSIX_C_SOURCE=200112L -Wextra -Werror -Wimplicit-function-declaration -nostartfiles -g3 -DBUILD_DEBUG"
-LDFLAGS="-L$LIB -lbase -L$LIB -lmisty -Wl,-e,entry_point -lpthread -lc"
+LDFLAGS="-L$LIB -lbase -L$LIB -lmisty -L$LIB -ldisasm -Wl,-e,entry_point -lpthread -lc"
 
 echo "Building ladybugger..."
 $CC ladybugger.c -o ladybugger $LADYBUGGER_CFLAGS $LDFLAGS

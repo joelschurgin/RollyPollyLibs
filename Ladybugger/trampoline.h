@@ -9,4 +9,11 @@ extern void __trampoline_trap(void);
 extern void __trampoline_trap_stolen_bytes(void);
 extern void __trampoline_trap_return_ptr(void);
 
+REMOTE_FUNC_ATTRIBS
+void trampoline(void);
 
+extern void __trampoline(void);
+extern void __trampoline_stolen_bytes(void);
+extern void __trampoline_return_ptr(void);
+extern void __trampoline_hit_count(void);
+extern void __trampoline_ret_val_addr(void);

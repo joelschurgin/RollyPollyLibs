@@ -22,23 +22,23 @@ typedef struct {
 } Lady_Trap;
 
 typedef struct {
-    //u64 proc_addr;
-    //u64 trampoline_addr;
-    //u8 data[5];
-} Lady_Fast;
+    u64* hit_count;
+} Lady_Trampoline;
 
 typedef enum {
     LADY_BP_TRAP,
     LADY_BP_TRAMPOLINE_TRAP,
+    LADY_BP_TRAMPOLINE,
 } Lady_BpType;
 
 typedef struct {
     Lady_BpType type;
     union {
         Lady_Trap trap;
-        //Lady_Fast fast;
+        Lady_Trampoline trampoline;
     };
     u64 line_info_idx;
+    u64 hit_count;
 } Lady_Bp;
 
 typedef struct {

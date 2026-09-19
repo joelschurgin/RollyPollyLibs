@@ -49,7 +49,7 @@ u64 lady_addr_to_line_info_idx(Misty_LineInfoArray line_info, u64 addr) {
     return (line_info.data[line_info.count-1].addr == addr) ? line_info.count-1 : 0;
 }
 
-void lady_bp_set(Lady_Ctx* ctx, u64 addr, Lady_BpType type) {
+u64 lady_bp_set(Lady_Ctx* ctx, u64 addr, Lady_BpType type) {
     switch (type) {
         case LADY_BP_TRAP:
             lady_bp_hash_insert(&ctx->bp_hash, addr, (Lady_Bp){
@@ -57,17 +57,35 @@ void lady_bp_set(Lady_Ctx* ctx, u64 addr, Lady_BpType type) {
                 .trap = lady_trap_set(ctx, addr),
                 .line_info_idx = lady_addr_to_line_info_idx(ctx->line_info, addr),
             });
+            return addr;
         break;
         case LADY_BP_TRAMPOLINE_TRAP:
         {
-            u64 bp_addr = lady_trampoline_trap_set(ctx, addr); // address that we'll get from the trampoline trap
+            u64 bp_addr = 0;
+            lady_trampoline_trap_set(ctx, addr, &bp_addr); // address that we'll get from the trampoline trap
             lady_bp_hash_insert(&ctx->bp_hash, bp_addr, (Lady_Bp){
                 .type = LADY_BP_TRAMPOLINE_TRAP,
                 .line_info_idx = lady_addr_to_line_info_idx(ctx->line_info, addr),
             });
+            return bp_addr;
+        }
+        break;
+        case LADY_BP_TRAMPOLINE:
+        {
+            u64* hit_count = 0;
+            lady_trampoline_set(ctx, addr, &hit_count); // address that we'll get from the trampoline trap
+            lady_bp_hash_insert(&ctx->bp_hash, addr, (Lady_Bp){
+                .type = LADY_BP_TRAMPOLINE_TRAP,
+                .trampoline = (Lady_Trampoline) {
+                    .hit_count = hit_count,
+                },
+                .line_info_idx = lady_addr_to_line_info_idx(ctx->line_info, addr),
+            });
+            return addr;
         }
         break;
         default:
             TODO("Unhandled breakpoint type");
+            return addr;
     }
 }

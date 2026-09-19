@@ -1,12 +1,3 @@
-ssize_t process_vm_readv(pid_t pid,
-                          const struct iovec *local_iov, unsigned long liovcnt,
-                          const struct iovec *remote_iov, unsigned long riovcnt,
-                          unsigned long flags);
-ssize_t process_vm_writev(pid_t pid,
-                          const struct iovec *local_iov, unsigned long liovcnt,
-                          const struct iovec *remote_iov, unsigned long riovcnt,
-                          unsigned long flags);
-
 #define CHILD_PROCESS 0
 internal pid_t proc_launch_and_pause(String path) {
     pid_t pid = fork();
@@ -286,7 +277,7 @@ RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size)
     return func_alloc;
 }
 
-u64 lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr) {
+void lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr, u64* bp_addr) {
     addr += ctx->base_addr;
 
     u64 func_size = (u64)REMOTE_FUNC_END_PTR(trampoline_trap) - (u64)trampoline_trap;
@@ -315,6 +306,46 @@ u64 lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr) {
     proc_insert_jmp(ctx->pid, addr, (u64)remote_func_ptr);
  
     u64 trap_offset = (u64)&__trampoline_trap - (u64)&trampoline_trap;
-    u64 bp_addr = (u64)remote_func_ptr + trap_offset - ctx->base_addr;
-    return bp_addr;
+    *bp_addr = (u64)remote_func_ptr + trap_offset - ctx->base_addr;
 }
+
+void lady_trampoline_set(Lady_Ctx* ctx, u64 addr, u64** hit_count) {
+    addr += ctx->base_addr;
+
+    u64 func_size = (u64)REMOTE_FUNC_END_PTR(trampoline) - (u64)trampoline;
+
+    RemoteFuncAllocator* alloc = &ctx->remote_func_alloc;
+    Assert(alloc->pos + func_size <= alloc->size);
+
+    void* func_write_ptr = (u8*)alloc->base + alloc->pos;
+    void* remote_func_ptr = (u8*)alloc->remote_base + alloc->pos;
+    alloc->pos += func_size;
+
+    MemoryCopy(func_write_ptr, trampoline, func_size);
+
+    {
+        u64 trampoline_stolen_bytes_offset = (u64)&__trampoline_stolen_bytes - (u64)&trampoline;
+        u64 stolen_bytes = ptrace(PTRACE_PEEKDATA, alloc->pid, addr, 0L);
+        MemoryCopy(func_write_ptr + trampoline_stolen_bytes_offset, &stolen_bytes, 5);
+    }
+
+    {
+        u64 trampoline_return_ptr_offset = (u64)&__trampoline_return_ptr - (u64)&trampoline;
+        u64 ret_addr = (u64)addr + 5;
+        MemoryCopy(func_write_ptr + trampoline_return_ptr_offset, &ret_addr, sizeof(u64));
+    }
+
+    proc_insert_jmp(ctx->pid, addr, (u64)remote_func_ptr);
+ 
+    *hit_count = (u64*)((u64)&__trampoline_hit_count - (u64)&trampoline);
+    //u64 rel_hit_count_addr = ((u64)&__trampoline_hit_count - (u64)&trampoline);
+
+    {
+        u64 trampoline_ret_val_addr = (u64)&__trampoline_ret_val_addr - (u64)&trampoline + 2; // extra bytes for movabs instruction
+        u64 hit_count_addr = (u64)*hit_count + (u64)remote_func_ptr;
+        MemoryCopy(func_write_ptr + trampoline_ret_val_addr, &hit_count_addr, sizeof(u64*));
+    }
+
+    *hit_count = (u64*)((u64)*hit_count + (u64)func_write_ptr);
+}
+

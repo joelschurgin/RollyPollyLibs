@@ -52,7 +52,6 @@ pid_t launch_process_and_pause(String path) {
         return 0;
     }
 
-    printf("process stopped!\n");
     return pid;
 }
 

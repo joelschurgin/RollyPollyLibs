@@ -3,7 +3,6 @@ typedef struct {
     void* base;
     u64 pos;
     u64 size;
-    pid_t pid;
     i32 remote_shm_fd;
     i32 shm_fd;
 } RemoteFuncAllocator;
@@ -14,6 +13,7 @@ typedef enum {
     LADY_KILL,
     LADY_TRAP,
     LADY_SEGFAULT,
+    LADY_SIGILL,
 } Lady_Event;
 
 typedef struct {

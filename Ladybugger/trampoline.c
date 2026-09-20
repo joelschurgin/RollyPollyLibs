@@ -15,6 +15,8 @@ void trampoline_trap(void) {
         "__trampoline_trap_return_ptr:\n"
         ".quad 0x9999999999999999\n" 
 
+        "__trampoline_trap_end:\n"
+
         ".att_syntax\n"
     );
 }
@@ -66,6 +68,9 @@ void trampoline(void) {
         "add rsp, 128\n"
         "popfq\n"
 
+        "__trampoline_end:\n"
+
+        /*
         "__trampoline_stolen_bytes:\n"
         ".byte 0x00\n"
         ".long 0x00000000\n"
@@ -76,6 +81,7 @@ void trampoline(void) {
 
         "__trampoline_hit_count:\n"
         ".quad 0x0000000000000000\n"
+        */
 
         ".att_syntax\n"
     );

@@ -56,6 +56,14 @@ void lady_event(Lady_Ctx* ctx, Lady_Event event) {
             printf("[Ladybugger] Proc Segfaulted!\n");
         }
         break;
+        case LADY_SIGILL:
+        {
+            struct user_regs_struct regs;
+            ptrace(PTRACE_GETREGS, ctx->pid, NULL, &regs);
+
+            printf("[Ladybugger] Illegal instruction!\n");
+        }
+        break;
         case LADY_EXIT: break;
         default:
             TODO("Handle Other Event Type");
@@ -130,6 +138,22 @@ void lady_test_trampoline(String path, Misty_LineInfoArray line_info) {
     }
 }
 
+void lady_sanity_check(String path, Misty_LineInfoArray line_info) {
+    Arena* arena = thread_ctx.shared_arena;
+    TempArenaBlock(arena) {
+        Lady_Ctx* ctx = lady_ctx_create(arena, path);
+
+        if (ctx->pid == 0) ThreadExit(NULL);
+
+        ctx->line_info = line_info;
+
+        ThreadLocalTimer("No Breakpoints Set") {
+            lady_debug_event_loop(ctx);
+        }
+    }
+}
+
+
 void* parallel_main(void* main_args) {
     i32 argc = ((MainArgs*)main_args)->argc;
     u8** argv = ((MainArgs*)main_args)->argv;
@@ -163,30 +187,9 @@ void* parallel_main(void* main_args) {
         lady_test_trap(path, line_info);
         lady_test_trampoline_trap(path, line_info);
         lady_test_trampoline(path, line_info);
+        lady_sanity_check(path, line_info);
     }
     LaneSync();
-
-    /*
-    Misty_LineInfoArray line_info = {0};
-    AssignLane(1) {
-        line_info = misty_read_line_info(mountain, f);
-    }
-
-    Lady_Ctx* ctx = 0L;
-    AssignLane(0) {
-        ctx = lady_ctx_create(thread_ctx.shared_arena, path);
-    }
-    LaneSyncPtr(ctx, 0);
-    LaneSyncStruct(line_info, 1);
-
-    if (ctx->pid == 0) ThreadExit(NULL);
-
-    AssignLane(0) {
-        ctx->line_info = line_info;
-        lady_debug_event_loop(ctx);
-    }
-    LaneSync();
-    */
 }
 
 String curr_dir(String path) {

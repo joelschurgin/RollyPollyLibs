@@ -21,7 +21,6 @@ internal pid_t proc_launch_and_pause(String path) {
         return 0;
     }
 
-    printf("process stopped!\n");
     return pid;
 }
 
@@ -70,6 +69,8 @@ internal Lady_Event lady_status_to_event(i32 status) {
             return LADY_TRAP;
         } else if (WSTOPSIG(status) == SIGSEGV) {
             return LADY_SEGFAULT;
+        } else if (WSTOPSIG(status) == SIGILL) {
+            return LADY_SIGILL;
         } else {
             TODO("Handle other signals");
         }
@@ -272,7 +273,6 @@ RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size)
 
     func_alloc.pos = 0;
     func_alloc.size = size;
-    func_alloc.pid = pid;
 
     return func_alloc;
 }
@@ -280,7 +280,7 @@ RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size)
 void lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr, u64* bp_addr) {
     addr += ctx->base_addr;
 
-    u64 func_size = (u64)REMOTE_FUNC_END_PTR(trampoline_trap) - (u64)trampoline_trap;
+    u64 func_size = (u64)&__trampoline_trap_end - (u64)trampoline_trap;
 
     RemoteFuncAllocator* alloc = &ctx->remote_func_alloc;
     Assert(alloc->pos + func_size <= alloc->size);
@@ -293,7 +293,7 @@ void lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr, u64* bp_addr) {
 
     {
         u64 trampoline_trap_stolen_bytes_offset = (u64)&__trampoline_trap_stolen_bytes - (u64)&trampoline_trap;
-        u64 stolen_bytes = ptrace(PTRACE_PEEKDATA, alloc->pid, addr, 0L);
+        u64 stolen_bytes = ptrace(PTRACE_PEEKDATA, ctx->pid, addr, 0L);
         MemoryCopy(func_write_ptr + trampoline_trap_stolen_bytes_offset, &stolen_bytes, 5);
     }
 
@@ -309,10 +309,46 @@ void lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr, u64* bp_addr) {
     *bp_addr = (u64)remote_func_ptr + trap_offset - ctx->base_addr;
 }
 
+typedef struct {
+    u32 total_len;
+    u32 num_instr;
+    u8 instr[24];
+} Lady_TrampolineSite;
+
+Lady_TrampolineSite lady_disasm_trampoline_site(Lady_Ctx* ctx, u64 addr) {
+    // upper bound is 18 bytes because we could have a 4 byte instruction followed by a 14 byte instruction and both would have to be included. Choosing next multiple of 8
+    Lady_TrampolineSite site = {0};
+    {
+        for (u64 i = 0; i < ArrayCount(site.instr); i += sizeof(u64)) {
+            *(u64*)(site.instr + i) = ptrace(PTRACE_PEEKDATA, ctx->pid, addr + i, 0L);
+        }
+    }
+
+    u8* instr_ptr = site.instr;
+    while (site.total_len < 5) {
+        Disasm_Instr instr = disasm_decode(instr_ptr);
+        site.total_len += Max(1, instr.instr_len);
+        site.num_instr += 1;
+    }
+
+    return site;
+}
+
+#define remote_func_push_bytes(alloc, func_ptr, func_size, bytes, num_bytes) \
+    do { \
+        MemoryCopy(func_ptr + func_size, bytes, num_bytes); \
+        (func_size) += num_bytes; \
+        (alloc->pos) += num_bytes; \
+    } while (0)
+
 void lady_trampoline_set(Lady_Ctx* ctx, u64 addr, u64** hit_count) {
     addr += ctx->base_addr;
 
-    u64 func_size = (u64)REMOTE_FUNC_END_PTR(trampoline) - (u64)trampoline;
+    Lady_TrampolineSite site = lady_disasm_trampoline_site(ctx, addr);
+
+    Assert(site.num_instr == 1); // TODO: this is where we need to do more magic because we have an exception
+
+    u64 func_size = (u64)&__trampoline_end - (u64)trampoline;
 
     RemoteFuncAllocator* alloc = &ctx->remote_func_alloc;
     Assert(alloc->pos + func_size <= alloc->size);
@@ -323,22 +359,47 @@ void lady_trampoline_set(Lady_Ctx* ctx, u64 addr, u64** hit_count) {
 
     MemoryCopy(func_write_ptr, trampoline, func_size);
 
+    remote_func_push_bytes(alloc, func_write_ptr, func_size, site.instr, site.total_len);
+
     {
-        u64 trampoline_stolen_bytes_offset = (u64)&__trampoline_stolen_bytes - (u64)&trampoline;
-        u64 stolen_bytes = ptrace(PTRACE_PEEKDATA, alloc->pid, addr, 0L);
-        MemoryCopy(func_write_ptr + trampoline_stolen_bytes_offset, &stolen_bytes, 5);
+        u8 jmp_instr[] = {0xff, 0x25, 0x00, 0x00, 0x00, 0x00};
+        remote_func_push_bytes(alloc, func_write_ptr, func_size, jmp_instr, sizeof(jmp_instr));
+
+        u64 ret_addr = (u64)addr + 5;
+        remote_func_push_bytes(alloc, func_write_ptr, func_size, &ret_addr, sizeof(ret_addr));
     }
 
+    {
+        u64 rel_hit_count_addr = func_size;
+        u64 hit_count_addr = rel_hit_count_addr + (u64)(uintptr_t)remote_func_ptr;
+
+        u64 trampoline_ret_val_addr = (u64)&__trampoline_ret_val_addr - (u64)&trampoline + 2; // extra bytes for movabs instruction
+        MemoryCopy(func_write_ptr + trampoline_ret_val_addr, &hit_count_addr, sizeof(u64));
+
+        *hit_count = (u64*)(rel_hit_count_addr + (u64)(uintptr_t)func_write_ptr);
+
+        u64 hit_count_start_val = 0;
+        remote_func_push_bytes(alloc, func_write_ptr, func_size, &hit_count_start_val, sizeof(hit_count_start_val));
+    }
+
+    /*
+    {
+        u64 trampoline_stolen_bytes_offset = (u64)&__trampoline_stolen_bytes - (u64)&trampoline;
+        u64 stolen_bytes = ptrace(PTRACE_PEEKDATA, ctx->pid, addr, 0L);
+        MemoryCopy(func_write_ptr + trampoline_stolen_bytes_offset, &stolen_bytes, 5);
+    }
+    */
+
+    /*
     {
         u64 trampoline_return_ptr_offset = (u64)&__trampoline_return_ptr - (u64)&trampoline;
         u64 ret_addr = (u64)addr + 5;
         MemoryCopy(func_write_ptr + trampoline_return_ptr_offset, &ret_addr, sizeof(u64));
     }
-
-    proc_insert_jmp(ctx->pid, addr, (u64)remote_func_ptr);
+    */
  
+    /*
     *hit_count = (u64*)((u64)&__trampoline_hit_count - (u64)&trampoline);
-    //u64 rel_hit_count_addr = ((u64)&__trampoline_hit_count - (u64)&trampoline);
 
     {
         u64 trampoline_ret_val_addr = (u64)&__trampoline_ret_val_addr - (u64)&trampoline + 2; // extra bytes for movabs instruction
@@ -347,5 +408,8 @@ void lady_trampoline_set(Lady_Ctx* ctx, u64 addr, u64** hit_count) {
     }
 
     *hit_count = (u64*)((u64)*hit_count + (u64)func_write_ptr);
+    */
+
+    proc_insert_jmp(ctx->pid, addr, (u64)remote_func_ptr);
 }
 

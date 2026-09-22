@@ -61,7 +61,7 @@ b32 lady_event(Lady_Ctx* ctx, Lady_Event event) {
             } instr;
             instr.word = ptrace(PTRACE_PEEKDATA, ctx->pid, regs.rip, 0L);
 
-            printf("[Ladybugger] Proc Segfaulted!\n");
+            printf("\033[31m[Ladybugger] Proc Segfaulted!\033[0m\n");
             return false;
         }
         break;
@@ -76,7 +76,7 @@ b32 lady_event(Lady_Ctx* ctx, Lady_Event event) {
             } instr;
             instr.word = ptrace(PTRACE_PEEKDATA, ctx->pid, regs.rip, 0L);
 
-            printf("[Ladybugger] Illegal instruction!\n");
+            printf("\033[31m[Ladybugger] Illegal instruction!\033[0m\n");
             return false;
         }
         break;
@@ -232,7 +232,7 @@ void* parallel_main(void* main_args) {
         for (u64 i = 1; i < ctx->line_info.count; i++) {
             u64 target_addr = ctx->line_info.data[i].addr;
 
-            printf("DEBUGGING: 0x%lx\n", target_addr);
+            printf("DEBUGGING: 0x%lx | Line Info: %d\n", target_addr, i);
             lady_test_trampoline(ctx, target_addr);
             printf("\n");
         }

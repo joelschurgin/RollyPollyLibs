@@ -12,8 +12,7 @@ struct ThreadArraySplit {
     u64 end_idx;
 };
 
-ThreadArraySplit thread_array_split(u64 thread_count, u64 array_size,
-                                    u64 thread_idx);
+ThreadArraySplit thread_array_split(u64 thread_count, u64 array_size, u64 thread_idx);
 
 typedef struct Barrier Barrier;
 struct Barrier {
@@ -39,7 +38,7 @@ void mutex_release(Mutex *mutex);
 void mutex_lock(Mutex *mutex);
 void mutex_unlock(Mutex *mutex);
 
-#define MutexBlock(mutex_ptr)                                                  \
+#define MutexBlock(mutex_ptr) \
     DeferBlock(mutex_lock(mutex_ptr), mutex_unlock(mutex_ptr))
 
 #define ThreadExit(ret) pthread_exit((ret))
@@ -100,11 +99,11 @@ typedef struct {
 
 void thread_local_timer_print(ThreadLocalTimer timer, u8* fmt, ...);
 
-#define ThreadLocalTimer(...) \
-        DeclareLocal(ThreadLocalTimer _timer_ = {0}) \
-        DeferBlock({ \
-            Assert(clock_gettime(CLOCK_MONOTONIC, &_timer_.start) >= 0); \
-        }, { \
-            Assert(clock_gettime(CLOCK_MONOTONIC, &_timer_.end) >= 0); \
-            thread_local_timer_print(_timer_, ##__VA_ARGS__); \
+#define ThreadLocalTimer(...)                                                   \
+        DeclareLocal(ThreadLocalTimer _timer_ = {0})                            \
+        DeferBlock({                                                            \
+            Assert(clock_gettime(CLOCK_MONOTONIC, &_timer_.start) >= 0);        \
+        }, {                                                                    \
+            Assert(clock_gettime(CLOCK_MONOTONIC, &_timer_.end) >= 0);          \
+            thread_local_timer_print(_timer_, ##__VA_ARGS__);                   \
         })

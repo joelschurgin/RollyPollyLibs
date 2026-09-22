@@ -9,17 +9,19 @@
 #include "breakpoint.h"
 #include "trampoline.h"
 #include "proc_cntl.h"
+#include "jump_instr.h"
 
 #include "breakpoint.c"
 #include "trampoline.c"
 #include "proc_cntl.c"
+#include "jump_instr.c"
 
 typedef struct {
     i32 argc;
     u8** argv;
 } MainArgs;
 
-void lady_event(Lady_Ctx* ctx, Lady_Event event) {
+b32 lady_event(Lady_Ctx* ctx, Lady_Event event) {
     switch (event) {
         case LADY_TRAP:
         {
@@ -53,7 +55,14 @@ void lady_event(Lady_Ctx* ctx, Lady_Event event) {
             struct user_regs_struct regs;
             ptrace(PTRACE_GETREGS, ctx->pid, NULL, &regs);
 
+            union {
+                u64 word;
+                u8 bytes[8];
+            } instr;
+            instr.word = ptrace(PTRACE_PEEKDATA, ctx->pid, regs.rip, 0L);
+
             printf("[Ladybugger] Proc Segfaulted!\n");
+            return false;
         }
         break;
         case LADY_SIGILL:
@@ -61,34 +70,39 @@ void lady_event(Lady_Ctx* ctx, Lady_Event event) {
             struct user_regs_struct regs;
             ptrace(PTRACE_GETREGS, ctx->pid, NULL, &regs);
 
+            union {
+                u64 word;
+                u8 bytes[8];
+            } instr;
+            instr.word = ptrace(PTRACE_PEEKDATA, ctx->pid, regs.rip, 0L);
+
             printf("[Ladybugger] Illegal instruction!\n");
+            return false;
         }
         break;
-        case LADY_EXIT: break;
+        case LADY_EXIT:
+            return false;
         default:
             TODO("Handle Other Event Type");
     }
+    return true;
 }
 
 void lady_debug_event_loop(Lady_Ctx* ctx) {
     Lady_Event event = LADY_NONE;
+    b32 run = true;
     do {
         event = lady_continue(ctx);
-        lady_event(ctx, event);
-    } while (event != LADY_EXIT);
+        run = lady_event(ctx, event);
+    } while (run);
 }
 
-void lady_test_trap(String path, Misty_LineInfoArray line_info, u64 target_addr) {
+void lady_test_trap(Lady_Ctx* ctx, u64 target_addr) {
     Arena* arena = thread_ctx.shared_arena;
     TempArenaBlock(arena) {
-        Lady_Ctx* ctx = lady_ctx_create(arena, path);
-
-        if (ctx->pid == 0) ThreadExit(NULL);
-
-        ctx->line_info = line_info;
+        lady_launch_process(arena, ctx);
 
         u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAP);
-
         Lady_Bp* bp = lady_bp_hash_get(&ctx->bp_hash, bp_key);
 
         ThreadLocalTimer("TRAP was hit %lux", bp->hit_count) {
@@ -97,17 +111,12 @@ void lady_test_trap(String path, Misty_LineInfoArray line_info, u64 target_addr)
     }
 }
 
-void lady_test_trampoline_trap(String path, Misty_LineInfoArray line_info, u64 target_addr) {
+void lady_test_trampoline_trap(Lady_Ctx* ctx, u64 target_addr) {
     Arena* arena = thread_ctx.shared_arena;
     TempArenaBlock(arena) {
-        Lady_Ctx* ctx = lady_ctx_create(arena, path);
-
-        if (ctx->pid == 0) ThreadExit(NULL);
-
-        ctx->line_info = line_info;
+        lady_launch_process(arena, ctx);
 
         u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAMPOLINE_TRAP);
-
         Lady_Bp* bp = lady_bp_hash_get(&ctx->bp_hash, bp_key);
 
         ThreadLocalTimer("TRAMPOLINE TRAP was hit %lux", bp->hit_count) {
@@ -116,17 +125,12 @@ void lady_test_trampoline_trap(String path, Misty_LineInfoArray line_info, u64 t
     }
 }
 
-void lady_test_trampoline(String path, Misty_LineInfoArray line_info, u64 target_addr) {
+void lady_test_trampoline(Lady_Ctx* ctx, u64 target_addr) {
     Arena* arena = thread_ctx.shared_arena;
     TempArenaBlock(arena) {
-        Lady_Ctx* ctx = lady_ctx_create(arena, path);
-
-        if (ctx->pid == 0) ThreadExit(NULL);
-
-        ctx->line_info = line_info;
+        lady_launch_process(arena, ctx);
 
         u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAMPOLINE);
-
         Lady_Bp* bp = lady_bp_hash_get(&ctx->bp_hash, bp_key);
 
         ThreadLocalTimer("TRAMPOLINE was hit %lux", *bp->trampoline.hit_count) {
@@ -135,15 +139,10 @@ void lady_test_trampoline(String path, Misty_LineInfoArray line_info, u64 target
     }
 }
 
-void lady_sanity_check(String path, Misty_LineInfoArray line_info) {
+void lady_sanity_check(Lady_Ctx* ctx) {
     Arena* arena = thread_ctx.shared_arena;
     TempArenaBlock(arena) {
-        Lady_Ctx* ctx = lady_ctx_create(arena, path);
-
-        if (ctx->pid == 0) ThreadExit(NULL);
-
-        ctx->line_info = line_info;
-
+        lady_launch_process(arena, ctx);
         ThreadLocalTimer("No Breakpoints Set") {
             lady_debug_event_loop(ctx);
         }
@@ -162,6 +161,7 @@ void* parallel_main(void* main_args) {
     Misty* mountain = 0L;
     Misty_SectionHeaderTableInfo section_header_table_info = {0};
     String path = {0};
+
     AssignLane(0) {
         Arena* arena = default_arena();
         path = String(argv[1]);
@@ -176,22 +176,80 @@ void* parallel_main(void* main_args) {
     LaneSyncStruct(path, 0);
 
     misty_read_elf_section_headers(mountain, f, section_header_table_info);
-
     LaneSync();
-    AssignLane(0) {
-        Misty_LineInfoArray line_info = line_info = misty_read_line_info(mountain, f);
 
-        for (u64 i = 1; i < line_info.count; i++) {
-            u64 target_addr = line_info.data[i].addr;
-            lady_test_trampoline(path, line_info, target_addr);
+    Lady_Ctx* ctx;
+    AssignLane(0) {
+        ctx = lady_ctx_create(thread_ctx.shared_arena, path);
+        ctx->line_info = misty_read_line_info(mountain, f);
+        mutex_assign(&ctx->mutex);
+    }
+    LaneSyncPtr(ctx, 0);
+
+    {
+        Misty_LineInfoArray line_info = ctx->line_info;
+
+        ThreadArraySplit split = ThreadArraySplit(line_info.count-2);
+        for (u64 line_info_idx = split.start_idx; line_info_idx < split.end_idx; line_info_idx++) {
+            u64 num_bytes_in_line = line_info.data[line_info_idx+2].addr - line_info.data[line_info_idx+1].addr;
+            u8 num_bytes_read = 0;
+
+            while (num_bytes_read < num_bytes_in_line) {
+                u64 curr_addr = line_info.data[line_info_idx+1].addr + num_bytes_read;
+                Disasm_Instr instr = disasm_decode(f->data + curr_addr);
+                num_bytes_read += Max(1, instr.instr_len);
+
+                u64 jump_addr = lady_check_jump_and_return_addr(&instr);
+                if (jump_addr > 0) {
+                    // add to hash
+                    Assert(instr.num_operands == 1);
+                    u64 dest_addr = 0;
+                    switch (instr.operand[0].type) {
+                        case DISASM_OP_TYPE_REL:
+                            dest_addr = instr.operand[0].rel + instr.instr_len + curr_addr;
+                        break;
+                        case DISASM_OP_TYPE_REG:
+
+                        break;
+                        default:
+                            TODO("Other operands");
+                    }
+
+                    MutexBlock(ctx->mutex) {
+                        lady_jmp_hash_insert(&ctx->jmp_hash, curr_addr, (Lady_Jmp){
+                            .dest_addr = dest_addr,
+                        });
+                        //printf("%d: ", LaneIdx());
+                        //disasm_format(LaneArena(), instr, curr_addr);
+                    }
+                }
+            }
         }
+    }
+    LaneSync();
+
+    AssignLane(0) {
+        for (u64 i = 1; i < ctx->line_info.count; i++) {
+            u64 target_addr = ctx->line_info.data[i].addr;
+
+            printf("DEBUGGING: 0x%lx\n", target_addr);
+            lady_test_trampoline(ctx, target_addr);
+            printf("\n");
+        }
+        /*
+        u64 target_addr = ctx->line_info.data[3].addr;
+        if (ctx->line_info.data[4].addr - ctx->line_info.data[3].addr >= 5) {
+            lady_test_trampoline(ctx, target_addr);
+        }
+        */
+
 
         /*
         u64 target_addr = line_info.data[2].addr;
-        lady_test_trap(path, line_info, target_addr);
-        lady_test_trampoline_trap(path, line_info, target_addr);
-        lady_test_trampoline(path, line_info, target_addr);
-        lady_sanity_check(path, line_info);
+        lady_test_trap(ctx, target_addr);
+        lady_test_trampoline_trap(ctx, target_addr);
+        lady_test_trampoline(ctx, target_addr);
+        lady_sanity_check(ctx);
         */
     }
     LaneSync();
@@ -235,7 +293,7 @@ i32 main(i32 argc, u8** argv) {
             .argv = argv_test,
         };
 
-        create_parallel_entry_point(num_threads, 0, parallel_main, &main_args);
+        create_parallel_entry_point(num_threads, 1, parallel_main, &main_args);
         temp_arena_end(temp_arena);
     }
 

@@ -53,14 +53,34 @@ typedef struct {
 } Lady_BpHash;
 
 typedef struct {
+    u64 dest_addr;
+} Lady_Jmp;
+
+typedef struct {
+    u64 key;
+    Lady_Jmp value;
+} Lady_JmpHashEntry;
+
+typedef struct {
+    Lady_JmpHashEntry* entries;
+    u64 num_entries;
+    u64 max_num_entries;
+} Lady_JmpHash;
+
+typedef struct {
     pid_t pid;
     u64 base_addr;
+
+    String path;
 
     i32 pipe_read;
     i32 pipe_write;
 
     Misty_LineInfoArray line_info;
     Lady_BpHash bp_hash;
+    Lady_JmpHash jmp_hash;
 
     RemoteFuncAllocator remote_func_alloc;
+
+    Mutex* mutex;
 } Lady_Ctx;

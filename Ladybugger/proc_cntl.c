@@ -49,13 +49,18 @@ Lady_Ctx* lady_ctx_create(Arena* arena, String path) {
     Lady_Ctx* ctx = push_struct(arena, Lady_Ctx);
 
     ctx->bp_hash = lady_bp_hash_create(arena, 256);
-
-    ctx->pid = proc_launch_and_pause(path);
-    ctx->base_addr = proc_base_addr(arena, ctx->pid);
-
-    ctx->remote_func_alloc = remote_func_alloc_init(ctx->pid, ctx->base_addr + MB(128), PAGE_SIZE * 4);
+    ctx->jmp_hash = lady_jmp_hash_create(arena, 256);
+    ctx->path = path;
 
     return ctx;
+}
+
+void lady_launch_process(Arena* arena, Lady_Ctx* ctx) {
+    ctx->pid = proc_launch_and_pause(ctx->path);
+    if (ctx->pid == 0) ThreadExit(NULL);
+
+    ctx->base_addr = proc_base_addr(arena, ctx->pid);
+    ctx->remote_func_alloc = remote_func_alloc_init(ctx->pid, ctx->base_addr + MB(128), PAGE_SIZE * 4);
 }
 
 internal Lady_Event lady_status_to_event(i32 status) {
@@ -221,9 +226,7 @@ void lady_trap_reset(Lady_Ctx* ctx, Lady_Trap* trap) {
     trap->data = trap_insert(ctx->pid, ctx->base_addr + trap->addr);
 }
 
-void proc_insert_jmp(pid_t pid, u64 addr, u64 func_ptr) {
-    u64 curr_instr = ptrace(PTRACE_PEEKDATA, pid, addr, 0L);
-
+void proc_insert_jmp(pid_t pid, u64 addr, u64 func_ptr, u8 instr_len) {
     struct __attribute__((packed)) {
         u8 opcode;
         i32 addr;
@@ -232,7 +235,9 @@ void proc_insert_jmp(pid_t pid, u64 addr, u64 func_ptr) {
         .addr = (i32)((i64)func_ptr - ((i64)addr + 5)),
     };
 
-    MemoryCopy(&curr_instr, &jmp_instr, 5);
+    u64 curr_instr = ptrace(PTRACE_PEEKDATA, pid, addr, 0L);
+
+    MemoryCopy(&curr_instr, &jmp_instr, sizeof(jmp_instr));
     ptrace(PTRACE_POKEDATA, pid, addr, curr_instr);
 }
 
@@ -303,39 +308,39 @@ void lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr, u64* bp_addr) {
         MemoryCopy(func_write_ptr + trampoline_trap_return_ptr_offset, &ret_addr, sizeof(u64));
     }
 
-    proc_insert_jmp(ctx->pid, addr, (u64)remote_func_ptr);
+    proc_insert_jmp(ctx->pid, addr, (u64)remote_func_ptr, 5);
  
     u64 trap_offset = (u64)&__trampoline_trap - (u64)&trampoline_trap;
     *bp_addr = (u64)remote_func_ptr + trap_offset - ctx->base_addr;
 }
 
 typedef struct {
-    u32 total_len;
-    u32 num_instr;
     u8 instr_bytes[24];
-    Disasm_Instr instr[5];
+    u8 rel_addr[5];
+    u8 num_instr;
 } Lady_TrampolineSite;
 
 Lady_TrampolineSite lady_disasm_trampoline_site(Lady_Ctx* ctx, u64 addr) {
     // upper bound is 18 bytes because we could have a 4 byte instruction followed by a 14 byte instruction and both would have to be included. Choosing next multiple of 8
     Lady_TrampolineSite site = {0};
     {
-        for (u64 i = 0; i < ArrayCount(site.instr_bytes); i += sizeof(u64)) {
-            *(u64*)(site.instr_bytes + i) = ptrace(PTRACE_PEEKDATA, ctx->pid, addr + i, 0L);
+        for (u64 i = 0; i < 24; i += 8) {
+            *(u64*)(&site.instr_bytes[i]) = ptrace(PTRACE_PEEKDATA, ctx->pid, addr + i, 0L);
         }
     }
 
     u8* instr_ptr = site.instr_bytes;
-    while (site.total_len < 5) {
-        site.instr[site.num_instr] = disasm_decode(instr_ptr);
+    u8 total_len = 0;
+    while (total_len < 5) {
+        Disasm_Instr instr = disasm_decode(instr_ptr);
  
-        u8 instr_len = Max(1, site.instr[site.num_instr].instr_len);
-        site.total_len += instr_len;
+        u8 instr_len = Max(1, instr.instr_len);
+        total_len += instr_len;
         instr_ptr += instr_len;
-
-        site.num_instr += 1;
+        site.rel_addr[site.num_instr++] = total_len;
     }
 
+    Assert(site.num_instr > 0);
     return site;
 }
 
@@ -346,13 +351,16 @@ Lady_TrampolineSite lady_disasm_trampoline_site(Lady_Ctx* ctx, u64 addr) {
         (alloc->pos) += num_bytes; \
     } while (0)
 
+#define trampoline_site_len(site) (site).rel_addr[(site).num_instr-1]
 void lady_trampoline_set(Lady_Ctx* ctx, u64 addr, u64** hit_count) {
     addr += ctx->base_addr;
 
     Lady_TrampolineSite site = lady_disasm_trampoline_site(ctx, addr);
-
-    if (site.num_instr > 1) {
-        TODO("Check if we have to do anything");
+    for (u8 instr_idx = 0; instr_idx < site.num_instr - 1; instr_idx++) {
+        Lady_Jmp* jmp = lady_jmp_hash_get(&ctx->jmp_hash, addr - ctx->base_addr + site.rel_addr[instr_idx]);
+        if (jmp->dest_addr > 0) {
+            TODO("How do we handle this?");
+        }
     }
 
     u64 func_size = (u64)&__trampoline_end - (u64)trampoline;
@@ -368,7 +376,7 @@ void lady_trampoline_set(Lady_Ctx* ctx, u64 addr, u64** hit_count) {
 
     // append replaced instructions and final returning jmp instruction
     {
-        remote_func_push_bytes(alloc, func_write_ptr, func_size, site.instr_bytes, site.total_len);
+        remote_func_push_bytes(alloc, func_write_ptr, func_size, site.instr_bytes, trampoline_site_len(site));
 
         {
             u8 jmp_instr[] = {0xff, 0x25, 0x00, 0x00, 0x00, 0x00};
@@ -392,6 +400,23 @@ void lady_trampoline_set(Lady_Ctx* ctx, u64 addr, u64** hit_count) {
         remote_func_push_bytes(alloc, func_write_ptr, func_size, &hit_count_start_val, sizeof(hit_count_start_val));
     }
 
-    proc_insert_jmp(ctx->pid, addr, (u64)remote_func_ptr);
+    {
+        u8 instr_bytes[24];
+        MemoryCopy(instr_bytes, site.instr_bytes, 24);
+        MemorySet(instr_bytes, 0x90, trampoline_site_len(site));
+
+        struct __attribute__((packed)) {
+            u8 opcode;
+            i32 addr;
+        } jmp_instr = {
+            .opcode = 0xe9,
+            .addr = (i32)((i64)remote_func_ptr - ((i64)addr + 5)),
+        };
+        MemoryCopy(instr_bytes, &jmp_instr, sizeof(jmp_instr));
+ 
+        for (u64 i = 0; i < trampoline_site_len(site); i += 8) {
+             ptrace(PTRACE_POKEDATA, ctx->pid, addr + i, *(u64*)(&instr_bytes[i]));
+        }
+    }
 }
 

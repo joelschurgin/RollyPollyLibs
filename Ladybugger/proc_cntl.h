@@ -12,7 +12,8 @@
 internal pid_t   proc_launch_and_pause(String path);
 internal u64     proc_base_addr(Arena* arena, pid_t pid);
 
-Lady_Ctx* lady_ctx_create(Arena* arena, String path);
+Lady_Ctx*           lady_ctx_create(Arena* arena, String path);
+void                lady_launch_process(Arena* arena, Lady_Ctx* ctx);
 internal Lady_Event lady_status_to_event(i32 status);
 
 internal i32 proc_continue(pid_t pid);
@@ -31,7 +32,7 @@ Lady_Trap lady_trap_set(Lady_Ctx* ctx, u64 addr);
 void lady_trap_unset(Lady_Ctx* ctx, Lady_Trap trap);
 void lady_trap_reset(Lady_Ctx* ctx, Lady_Trap* trap);
 
-void proc_insert_jmp(pid_t pid, u64 addr, u64 func_ptr);
+void proc_insert_jmp(pid_t pid, u64 addr, u64 func_ptr, u8 instr_len);
 
 RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size);
 

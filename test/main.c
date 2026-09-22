@@ -9,7 +9,10 @@ int main() {
     pid_t pid = getpid();
     printf("test pid: %lu\n", pid);
 
-    for (int i = 0; i < 100000; i++) {
+    //float (*func_ptr)(float) = func;
+    //float c = func_ptr(12.0f);
+
+    for (int i = 0; i < 10; i++) {
         float a = 0.1f;
         float b = func(a);
     }

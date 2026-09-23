@@ -379,10 +379,10 @@ void lady_trampoline_push_instr(Lady_Ctx* ctx, void* func_write_ptr, void* remot
     }
 }
 
-void lady_trampoline_set(Lady_Ctx* ctx, u64 addr, u64** hit_count) {
-    addr += ctx->base_addr;
+void lady_trampoline_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64** hit_count) {
+    target_addr += ctx->base_addr;
 
-    Lady_TrampolineSite site = lady_disasm_trampoline_site(ctx, addr);
+    Lady_TrampolineSite site = lady_disasm_trampoline_site(ctx, target_addr);
     /*
     for (u8 instr_idx = 0; instr_idx < site.num_instr - 1; instr_idx++) {
         Lady_Jmp* jmp = lady_jmp_hash_get(&ctx->jmp_hash, addr - ctx->base_addr + site.rel_addr[instr_idx]);
@@ -405,13 +405,13 @@ void lady_trampoline_set(Lady_Ctx* ctx, u64 addr, u64** hit_count) {
 
     // append replaced instructions and final returning jmp instruction
     {
-        lady_trampoline_push_instr(ctx, func_write_ptr, remote_func_ptr, &func_size, &site, addr);
+        lady_trampoline_push_instr(ctx, func_write_ptr, remote_func_ptr, &func_size, &site, target_addr);
 
         {
             u8 jmp_instr[] = {0xff, 0x25, 0x00, 0x00, 0x00, 0x00};
             remote_func_push_bytes(alloc, func_write_ptr, func_size, jmp_instr, sizeof(jmp_instr));
 
-            u64 ret_addr = (u64)addr + trampoline_site_len(site);
+            u64 ret_addr = (u64)target_addr + trampoline_site_len(site);
             remote_func_push_bytes(alloc, func_write_ptr, func_size, &ret_addr, sizeof(ret_addr));
         }
     }
@@ -441,12 +441,12 @@ void lady_trampoline_set(Lady_Ctx* ctx, u64 addr, u64** hit_count) {
             i32 addr;
         } jmp_instr = {
             .opcode = 0xe9,
-            .addr = (i32)((i64)remote_func_ptr - ((i64)addr + trampoline_site_len(site))),
+            .addr = (i32)((i64)remote_func_ptr - ((i64)target_addr + trampoline_site_len(site))),
         };
         MemoryCopy(instr_bytes + addr_adjust, &jmp_instr, sizeof(jmp_instr));
  
         for (u64 i = 0; i < trampoline_site_len(site); i += 8) {
-             ptrace(PTRACE_POKEDATA, ctx->pid, addr + i, *(u64*)(&instr_bytes[i]));
+             ptrace(PTRACE_POKEDATA, ctx->pid, target_addr + i, *(u64*)(&instr_bytes[i]));
         }
     }
 }

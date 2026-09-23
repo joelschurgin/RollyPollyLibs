@@ -49,6 +49,14 @@ u64 lady_addr_to_line_info_idx(Misty_LineInfoArray line_info, u64 addr) {
     return (line_info.data[line_info.count-1].addr == addr) ? line_info.count-1 : 0;
 }
 
+internal u64 _lady_look_ahead_addr(Lady_Ctx* ctx, u64 line_info_idx, u64 addr) {
+    u64 num_bytes_in_line = ctx->line_info.data[line_info_idx + 1].addr - addr;
+    if (num_bytes_in_line < 5) {
+        return ctx->line_info.data[line_info_idx - 1].addr;
+    }
+    return addr;
+}
+
 u64 lady_bp_set(Lady_Ctx* ctx, u64 addr, Lady_BpType type) {
     switch (type) {
         case LADY_BP_TRAP:
@@ -73,13 +81,14 @@ u64 lady_bp_set(Lady_Ctx* ctx, u64 addr, Lady_BpType type) {
         case LADY_BP_TRAMPOLINE:
         {
             u64* hit_count = 0;
-            lady_trampoline_set(ctx, addr, &hit_count); // address that we'll get from the trampoline trap
+            u64 line_info_idx = lady_addr_to_line_info_idx(ctx->line_info, addr);
+            lady_trampoline_set(ctx, _lady_look_ahead_addr(ctx, line_info_idx, addr), addr, &hit_count); // address that we'll get from the trampoline trap
             lady_bp_hash_insert(&ctx->bp_hash, addr, (Lady_Bp){
                 .type = LADY_BP_TRAMPOLINE_TRAP,
                 .trampoline = (Lady_Trampoline) {
                     .hit_count = hit_count,
                 },
-                .line_info_idx = lady_addr_to_line_info_idx(ctx->line_info, addr),
+                .line_info_idx = line_info_idx,
             });
             return addr;
         }

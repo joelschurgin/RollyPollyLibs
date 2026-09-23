@@ -375,7 +375,7 @@ void lady_trampoline_push_instr(Lady_Ctx* ctx, void* func_write_ptr, void* remot
                     TODO("Other operands");
             }
         }
-        remote_func_push_bytes(&ctx->remote_func_alloc, func_write_ptr, *func_size, instr_bytes, trampoline_site_len(*site));
+        remote_func_push_bytes(&ctx->remote_func_alloc, func_write_ptr, *func_size, instr_bytes, instr.instr_len);
     }
 }
 

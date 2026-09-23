@@ -229,6 +229,7 @@ void* parallel_main(void* main_args) {
     LaneSync();
 
     AssignLane(0) {
+        /*
         for (u64 i = 1; i < ctx->line_info.count; i++) {
             u64 target_addr = ctx->line_info.data[i].addr;
 
@@ -236,6 +237,14 @@ void* parallel_main(void* main_args) {
             lady_test_trampoline(ctx, target_addr);
             printf("\n");
         }
+        */
+
+        u64 target_addr = ctx->line_info.data[5].addr;
+        printf("DEBUGGING: 0x%lx | Line Info: %d\n", target_addr, 5);
+        lady_test_trampoline(ctx, target_addr);
+        printf("\n");
+
+
         /*
         u64 target_addr = ctx->line_info.data[3].addr;
         if (ctx->line_info.data[4].addr - ctx->line_info.data[3].addr >= 5) {

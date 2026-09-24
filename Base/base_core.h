@@ -1,6 +1,8 @@
 #ifndef BASE_CORE_H
 #define BASE_CORE_H
 
+#define _XOPEN_SOURCE 500
+
 #include <fcntl.h>
 #include <stdarg.h>
 #include <stdio.h>

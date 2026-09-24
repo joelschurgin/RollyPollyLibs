@@ -49,6 +49,6 @@ typedef struct {
     u8 instr_len;
 } Disasm_Instr;
 
-
+DefineArray(Disasm_Instr);
 
 #endif

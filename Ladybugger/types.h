@@ -70,6 +70,7 @@ typedef struct {
 typedef struct {
     pid_t pid;
     u64 base_addr;
+    i32 mem_fd;
 
     String path;
 

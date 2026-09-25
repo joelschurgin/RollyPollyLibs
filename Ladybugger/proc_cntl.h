@@ -36,7 +36,8 @@ void proc_insert_jmp(pid_t pid, u64 addr, u64 func_ptr, u8 instr_len);
 
 RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size);
 
-void lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr, u64* bp_addr);
+//void lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr, u64* bp_addr);
+void lady_trampoline_trap_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64 next_line_addr, u64* bp_addr);
 void lady_trampoline_counter_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64 next_line_addr, u64** hit_count);
 
 #endif

@@ -294,6 +294,7 @@ RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size)
     return func_alloc;
 }
 
+/*
 void lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr, u64* bp_addr) {
     addr += ctx->base_addr;
 
@@ -325,6 +326,7 @@ void lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr, u64* bp_addr) {
     u64 trap_offset = (u64)&__trampoline_trap - (u64)&trampoline_trap;
     *bp_addr = (u64)remote_func_ptr + trap_offset - ctx->base_addr;
 }
+*/
 
 #define remote_func_push_bytes(alloc, func_ptr, write_pos, bytes, num_bytes) \
     do { \
@@ -469,6 +471,24 @@ void lady_trampoline_end(Lady_Ctx* ctx, Lady_TrampolineCtx* tramp_ctx) {
 
         u64 ret_addr = tramp_ctx->site_end_addr;
         remote_func_push_bytes(alloc, tramp_ctx->func_local, tramp_ctx->write_pos, &ret_addr, sizeof(ret_addr));
+    }
+}
+
+void lady_trampoline_trap_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64 next_line_addr, u64* bp_addr) {
+    target_addr += ctx->base_addr;
+    look_ahead_addr += ctx->base_addr;
+    next_line_addr += ctx->base_addr;
+
+    Arena* arena = LaneArena();
+    TempArenaBlock(arena) {
+        Lady_TrampolineCtx tramp_ctx = lady_trampoline_begin(arena, ctx, look_ahead_addr, target_addr, next_line_addr);
+
+        *bp_addr = (u64)(uintptr_t)tramp_ctx.func_remote + tramp_ctx.write_pos - ctx->base_addr;
+
+        u8 int3 = 0xcc;
+        remote_func_push_bytes(&ctx->remote_func_alloc, tramp_ctx.func_local, tramp_ctx.write_pos, &int3, sizeof(int3));
+
+        lady_trampoline_end(ctx, &tramp_ctx);
     }
 }
 

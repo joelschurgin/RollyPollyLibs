@@ -125,7 +125,7 @@ void lady_test_trampoline_trap(Lady_Ctx* ctx, u64 target_addr) {
     }
 }
 
-void lady_test_trampoline(Lady_Ctx* ctx, u64 target_addr) {
+void lady_test_trampoline_counter(Lady_Ctx* ctx, u64 target_addr) {
     Arena* arena = thread_ctx.shared_arena;
     TempArenaBlock(arena) {
         lady_launch_process(arena, ctx);
@@ -229,29 +229,21 @@ void* parallel_main(void* main_args) {
     LaneSync();
 
     AssignLane(0) {
-
+        /*
         for (u64 i = 1; i < ctx->line_info.count; i++) {
             u64 target_addr = ctx->line_info.data[i].addr;
 
             printf("DEBUGGING: 0x%lx | Line Info: %d / %d\n", target_addr, i, ctx->line_info.count - 1);
-            lady_test_trampoline(ctx, target_addr);
+            lady_test_trampoline_trap(ctx, target_addr);
             printf("\n");
         }
-
-        /*
-        u64 target_addr = ctx->line_info.data[12].addr;
-        printf("DEBUGGING: 0x%lx | Line Info: %d\n", target_addr, 12);
-        lady_test_trampoline(ctx, target_addr);
-        printf("\n");
         */
 
-        /*
         u64 target_addr = ctx->line_info.data[2].addr;
         lady_test_trap(ctx, target_addr);
         lady_test_trampoline_trap(ctx, target_addr);
-        lady_test_trampoline(ctx, target_addr);
+        lady_test_trampoline_counter(ctx, target_addr);
         lady_sanity_check(ctx);
-        */
     }
     LaneSync();
 }

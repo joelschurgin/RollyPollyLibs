@@ -12,7 +12,7 @@ int main() {
     //float (*func_ptr)(float) = func;
     //float c = func_ptr(12.0f);
 
-    for (int i = 0; i < 10; i++) {
+    for (int i = 0; i < 100000; i++) {
         float a = 0.1f;
         float b = func(a);
     }

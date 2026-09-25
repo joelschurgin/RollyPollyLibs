@@ -1,6 +1,4 @@
 #define REMOTE_FUNC_ATTRIBS __attribute__((naked, noinline))
-#define REMOTE_FUNC_END_PTR(func_name) Glue(func_name, _end)
-#define REMOTE_FUNC_END(func_name) __attribute__((noinline)) void REMOTE_FUNC_END_PTR(func_name)(void) { __asm__ __volatile__("nop"); }
 
 REMOTE_FUNC_ATTRIBS
 void trampoline_trap(void);
@@ -11,8 +9,10 @@ extern void __trampoline_trap_return_ptr(void);
 extern void __trampoline_trap_end(void);
 
 REMOTE_FUNC_ATTRIBS
-void trampoline(void);
+void trampoline_counter(void);
 
-extern void __trampoline(void);
-extern void __trampoline_ret_val_addr(void);
-extern void __trampoline_end(void);
+extern void __trampoline_hit_count_addr(void);
+extern void __trampoline_counter_end(void);
+
+#define TrampolineHitCounterAddr() ((u64)&__trampoline_hit_count_addr - (u64)&trampoline_counter + 2) // extra bytes for movabs instruction
+#define TrampolineCounterSize() ((u64)&__trampoline_counter_end - (u64)&trampoline_counter)

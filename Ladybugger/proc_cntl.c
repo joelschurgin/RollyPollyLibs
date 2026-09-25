@@ -353,117 +353,148 @@ void lady_trampoline_push_instr(Lady_Ctx* ctx, void* func_local, void* func_remo
     remote_func_push_bytes(&ctx->remote_func_alloc, func_local, *write_pos, instr_bytes, instr->instr_len);
 }
 
-void lady_trampoline_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64 next_line_addr, u64** hit_count) {
+typedef struct {
+    u64 instr_addr;
+
+    Disasm_InstrArray post_tramp_instr;
+
+    void* func_local;
+    void* func_remote;
+
+    u64 write_pos;
+
+    u64 site_size;
+    u64 site_start_addr;
+    u64 site_end_addr;
+} Lady_TrampolineCtx;
+
+Lady_TrampolineCtx lady_trampoline_begin(Arena* arena, Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64 next_line_addr) {
+    Lady_TrampolineCtx tramp_ctx = {0};
+
+    // read instr bytes
+    u8Array instr_bytes = Array(arena, u8, next_line_addr - look_ahead_addr);
+    i32 ret = pread(ctx->mem_fd, instr_bytes.data, instr_bytes.count, look_ahead_addr);
+    if (ret < 0) {
+        perror("pread");
+    }
+
+    // disassemble
+    Disasm_InstrArray disasm_instr;
+    i64 target_addr_instr_idx = 0;
+    ArrayBuilderBlock(arena, disasm_instr, Disasm_Instr) {
+        u8* instr_ptr = instr_bytes.data;
+        while (instr_ptr < (instr_bytes.data + instr_bytes.count)) {
+            array_builder_push(arena, disasm_instr, disasm_decode(instr_ptr));
+            if ((u64)(instr_ptr - instr_bytes.data) == (target_addr - look_ahead_addr)) {
+                target_addr_instr_idx = (i64)disasm_instr.count-1;
+            }
+            instr_ptr += ArrayLast(disasm_instr).instr_len;
+        }
+    }
+
+    // find which instructions to replace
+    tramp_ctx.site_size = next_line_addr - target_addr;
+    u64 disasm_instr_start_idx = target_addr_instr_idx;
+    for (i64 instr_idx = target_addr_instr_idx - 1; instr_idx >= 0 && tramp_ctx.site_size < 5; instr_idx--) {
+        tramp_ctx.site_size += disasm_instr.data[instr_idx].instr_len;
+        disasm_instr_start_idx = instr_idx;
+    }
+
+    u64 instr_start_addr = next_line_addr - tramp_ctx.site_size;
+    u64 instr_addr = instr_start_addr;
+
+    u64 disasm_instr_end_idx = disasm_instr.count-1;
+    for (; disasm_instr_end_idx >= disasm_instr_start_idx; disasm_instr_end_idx--) {
+        u64 potential_tramp_site_size = tramp_ctx.site_size - disasm_instr.data[disasm_instr_end_idx].instr_len;
+        if (potential_tramp_site_size < 5) break;
+
+        tramp_ctx.site_size = potential_tramp_site_size;
+    }
+
+    RemoteFuncAllocator* alloc = &ctx->remote_func_alloc;
+
+    tramp_ctx.func_local = (u8*)alloc->base + alloc->pos;
+    tramp_ctx.func_remote = (u8*)alloc->remote_base + alloc->pos;
+
+    // write jump instruction into trampoline site
+    tramp_ctx.site_start_addr = instr_start_addr;
+    tramp_ctx.site_end_addr = instr_start_addr + tramp_ctx.site_size;
+    {
+        u8Array jmp_instr_bytes = Array(arena, u8, tramp_ctx.site_size);
+        MemorySet(jmp_instr_bytes.data, 0x90, tramp_ctx.site_size);
+
+        struct __attribute__((packed)) {
+            u8 opcode;
+            i32 addr;
+        } jmp_instr = {
+            .opcode = 0xe9,
+            .addr = (i32)((i64)tramp_ctx.func_remote - (i64)(tramp_ctx.site_end_addr)),
+        };
+        MemoryCopy(jmp_instr_bytes.data + (tramp_ctx.site_size - sizeof(jmp_instr)), &jmp_instr, sizeof(jmp_instr));
+
+        pwrite(ctx->mem_fd, jmp_instr_bytes.data, jmp_instr_bytes.count, tramp_ctx.site_start_addr);
+    }
+
+    // push any instructions before target_addr
+    {
+        Disasm_InstrArray instr_slice = Disasm_InstrArraySlice(disasm_instr, disasm_instr_start_idx, target_addr_instr_idx-1);
+        for EachElement(instr, Disasm_Instr, instr_slice) {
+            lady_trampoline_push_instr(ctx, tramp_ctx.func_local, tramp_ctx.func_remote, &tramp_ctx.write_pos, instr, instr_addr);
+            instr_addr += instr->instr_len;
+        }
+    }
+
+    tramp_ctx.instr_addr = target_addr;
+    tramp_ctx.post_tramp_instr = Disasm_InstrArraySlice(disasm_instr, target_addr_instr_idx, disasm_instr_end_idx);
+
+    return tramp_ctx;
+}
+
+void lady_trampoline_end(Lady_Ctx* ctx, Lady_TrampolineCtx* tramp_ctx) {
+    RemoteFuncAllocator* alloc = &ctx->remote_func_alloc;
+
+    // push any instructions after target_addr
+    {
+        u64 instr_addr = tramp_ctx->instr_addr;
+        for EachElement(instr, Disasm_Instr, tramp_ctx->post_tramp_instr) {
+            lady_trampoline_push_instr(ctx, tramp_ctx->func_local, tramp_ctx->func_remote, &tramp_ctx->write_pos, instr, instr_addr);
+            instr_addr += instr->instr_len;
+        }
+    }
+
+    // push returning jump
+    {
+        u8 jmp_instr[] = {0xff, 0x25, 0x00, 0x00, 0x00, 0x00};
+        remote_func_push_bytes(alloc, tramp_ctx->func_local, tramp_ctx->write_pos, jmp_instr, sizeof(jmp_instr));
+
+        u64 ret_addr = tramp_ctx->site_end_addr;
+        remote_func_push_bytes(alloc, tramp_ctx->func_local, tramp_ctx->write_pos, &ret_addr, sizeof(ret_addr));
+    }
+}
+
+void lady_trampoline_counter_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64 next_line_addr, u64** hit_count) {
     target_addr += ctx->base_addr;
     look_ahead_addr += ctx->base_addr;
     next_line_addr += ctx->base_addr;
 
-    TempArenaBlock(LaneArena()) {
-        // read instr bytes
-        u8Array instr_bytes = Array(LaneArena(), u8, next_line_addr - look_ahead_addr);
-        i32 ret = pread(ctx->mem_fd, instr_bytes.data, instr_bytes.count, look_ahead_addr);
-        if (ret < 0) {
-            perror("pread");
-        }
-
-        // disassemble
-        Disasm_InstrArray disasm_instr;
-        i64 target_addr_instr_idx = 0;
-        ArrayBuilderBlock(LaneArena(), disasm_instr, Disasm_Instr) {
-            u8* instr_ptr = instr_bytes.data;
-            while (instr_ptr < (instr_bytes.data + instr_bytes.count)) {
-                array_builder_push(LaneArena(), disasm_instr, disasm_decode(instr_ptr));
-                if ((u64)(instr_ptr - instr_bytes.data) == (target_addr - look_ahead_addr)) {
-                    target_addr_instr_idx = (i64)disasm_instr.count-1;
-                }
-                instr_ptr += ArrayLast(disasm_instr).instr_len;
-            }
-        }
-
-        // find which instructions to replace
-        u64 trampoline_site_size = next_line_addr - target_addr;
-        u64 disasm_instr_start_idx = target_addr_instr_idx;
-        for (i64 instr_idx = target_addr_instr_idx - 1; instr_idx >= 0 && trampoline_site_size < 5; instr_idx--) {
-            trampoline_site_size += disasm_instr.data[instr_idx].instr_len;
-            disasm_instr_start_idx = instr_idx;
-        }
-
-        u64 instr_start_addr = next_line_addr - trampoline_site_size;
-        u64 instr_addr = instr_start_addr;
-
-        u64 disasm_instr_end_idx = disasm_instr.count-1;
-        for (; disasm_instr_end_idx >= disasm_instr_start_idx; disasm_instr_end_idx--) {
-            u64 potential_trampoline_site_size = trampoline_site_size - disasm_instr.data[disasm_instr_end_idx].instr_len;
-            if (potential_trampoline_site_size < 5) break;
-
-            trampoline_site_size = potential_trampoline_site_size;
-        }
-
-        u64 func_size = (u64)&__trampoline_end - (u64)trampoline;
-        RemoteFuncAllocator* alloc = &ctx->remote_func_alloc;
-        Assert(alloc->pos + func_size <= alloc->size);
-
-        void* func_local = (u8*)alloc->base + alloc->pos;
-        void* func_remote = (u8*)alloc->remote_base + alloc->pos;
-
-        u64 write_pos = 0;
-
-        // write jump instruction into trampoline site
-        u64 trampoline_site_start_addr = instr_start_addr;
-        u64 trampoline_site_end_addr = instr_start_addr + trampoline_site_size;
-        {
-            u8Array jmp_instr_bytes = Array(LaneArena(), u8, trampoline_site_size);
-            MemorySet(jmp_instr_bytes.data, 0x90, trampoline_site_size);
-
-            struct __attribute__((packed)) {
-                u8 opcode;
-                i32 addr;
-            } jmp_instr = {
-                .opcode = 0xe9,
-                .addr = (i32)((i64)func_remote - (i64)(trampoline_site_end_addr)),
-            };
-            MemoryCopy(jmp_instr_bytes.data + (trampoline_site_size - sizeof(jmp_instr)), &jmp_instr, sizeof(jmp_instr));
-
-            pwrite(ctx->mem_fd, jmp_instr_bytes.data, jmp_instr_bytes.count, trampoline_site_start_addr);
-        }
-
-        // push any instructions before target_addr
-        for (u64 instr_idx = disasm_instr_start_idx; instr_idx < (u64)target_addr_instr_idx; instr_idx++) {
-            lady_trampoline_push_instr(ctx, func_local, func_remote, &write_pos, &disasm_instr.data[instr_idx], instr_addr);
-            instr_addr += disasm_instr.data[instr_idx].instr_len;
-        }
-
-        // push the trampoline
-        remote_func_push_bytes(alloc, func_local, write_pos, trampoline, func_size);
-
-        // push any instructions after target_addr
-        for (u64 instr_idx = (u64)target_addr_instr_idx; instr_idx <= disasm_instr_end_idx; instr_idx++) {
-            lady_trampoline_push_instr(ctx, func_local, func_remote, &write_pos, &disasm_instr.data[instr_idx], instr_addr);
-            instr_addr += disasm_instr.data[instr_idx].instr_len;
-        }
-
-        // push returning jump
-        {
-            u8 jmp_instr[] = {0xff, 0x25, 0x00, 0x00, 0x00, 0x00};
-            remote_func_push_bytes(alloc, func_local, write_pos, jmp_instr, sizeof(jmp_instr));
-
-            u64 ret_addr = trampoline_site_end_addr;
-            remote_func_push_bytes(alloc, func_local, write_pos, &ret_addr, sizeof(ret_addr));
-        }
+    Arena* arena = LaneArena();
+    TempArenaBlock(arena) {
+        Lady_TrampolineCtx tramp_ctx = lady_trampoline_begin(arena, ctx, look_ahead_addr, target_addr, next_line_addr);
+        remote_func_push_bytes(&ctx->remote_func_alloc, tramp_ctx.func_local, tramp_ctx.write_pos, trampoline_counter, TrampolineCounterSize());
+        lady_trampoline_end(ctx, &tramp_ctx);
 
         // set up hit count
         {
-            u64 rel_hit_count_addr = write_pos;
-            u64 hit_count_addr = rel_hit_count_addr + (u64)(uintptr_t)func_remote;
+            u64 rel_hit_count_addr = tramp_ctx.write_pos;
+            u64 hit_count_addr = rel_hit_count_addr + (u64)(uintptr_t)tramp_ctx.func_remote;
 
-            u64 trampoline_ret_val_addr = (u64)&__trampoline_ret_val_addr - (u64)&trampoline + 2; // extra bytes for movabs instruction
-            u64 pre_instr_offset = target_addr - instr_start_addr;
-            MemoryCopy(func_local + trampoline_ret_val_addr + pre_instr_offset, &hit_count_addr, sizeof(u64));
+            u64 pre_instr_offset = target_addr - tramp_ctx.site_start_addr;
+            MemoryCopy(tramp_ctx.func_local + TrampolineHitCounterAddr() + pre_instr_offset, &hit_count_addr, sizeof(u64));
 
-            *hit_count = (u64*)(rel_hit_count_addr + (u64)(uintptr_t)func_local);
+            *hit_count = (u64*)(rel_hit_count_addr + (u64)(uintptr_t)tramp_ctx.func_local);
 
             u64 hit_count_start_val = 0;
-            remote_func_push_bytes(alloc, func_local, write_pos, &hit_count_start_val, sizeof(hit_count_start_val));
+            remote_func_push_bytes(&ctx->remote_func_alloc, tramp_ctx.func_local, tramp_ctx.write_pos, &hit_count_start_val, sizeof(hit_count_start_val));
         }
     }
 }

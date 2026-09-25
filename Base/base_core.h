@@ -221,14 +221,26 @@ b32 memory_is_zero(void* ptr, u64 size);
 #define EachElementContinue(iter, type, array) EachElementContinueUntil(iter, type, array, false)
 
 #define IncElement(iter, array, num) if ((u64)(iter - (array).data) < (array).count) (iter) += (num);
+
 // arrays
+#define ArraySliceName(type) Glue(type, ArraySlice)
+
+#define DefineArraySlice(type) \
+    static inline ArrayName(type) ArraySliceName(type)(ArrayName(type) arr, u64 start_idx, u64 end_idx) { \
+        ArrayName(type) slice; \
+        slice.data = &arr.data[start_idx]; \
+        slice.count = end_idx + 1 - start_idx; \
+        return slice; \
+    }
+
 #define ArrayName(type) Glue(type, Array)
 
 #define Array(arena, type, num_elements) (ArrayName(type)){ .data = push_array((arena), type, (num_elements), true), .count = (num_elements), }
 #define DefineArray(type) typedef struct { \
         type * data;                       \
         u64 count;                         \
-    } ArrayName(type)
+    } ArrayName(type);                     \
+    DefineArraySlice(type)
 
 DefineArray(u64);
 DefineArray(u32);

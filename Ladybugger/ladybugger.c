@@ -130,10 +130,10 @@ void lady_test_trampoline(Lady_Ctx* ctx, u64 target_addr) {
     TempArenaBlock(arena) {
         lady_launch_process(arena, ctx);
 
-        u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAMPOLINE);
+        u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAMPOLINE_COUNTER);
         Lady_Bp* bp = lady_bp_hash_get(&ctx->bp_hash, bp_key);
 
-        ThreadLocalTimer("TRAMPOLINE was hit %lux", *bp->trampoline.hit_count) {
+        ThreadLocalTimer("TRAMPOLINE COUNTER was hit %lux", (bp->trampoline.hit_count) ? *bp->trampoline.hit_count : 0) {
             lady_debug_event_loop(ctx);
         }
     }
@@ -229,10 +229,11 @@ void* parallel_main(void* main_args) {
     LaneSync();
 
     AssignLane(0) {
+
         for (u64 i = 1; i < ctx->line_info.count; i++) {
             u64 target_addr = ctx->line_info.data[i].addr;
 
-            printf("DEBUGGING: 0x%lx | Line Info: %d\n", target_addr, i);
+            printf("DEBUGGING: 0x%lx | Line Info: %d / %d\n", target_addr, i, ctx->line_info.count - 1);
             lady_test_trampoline(ctx, target_addr);
             printf("\n");
         }

@@ -82,11 +82,11 @@ u64 lady_bp_set(Lady_Ctx* ctx, u64 addr, Lady_BpType type) {
             return bp_addr;
         }
         break;
-        case LADY_BP_TRAMPOLINE:
+        case LADY_BP_TRAMPOLINE_COUNTER:
         {
             u64* hit_count = 0;
             u64 line_info_idx = lady_addr_to_line_info_idx(ctx->line_info, addr);
-            lady_trampoline_set(ctx,
+            lady_trampoline_counter_set(ctx,
                                 _lady_look_ahead_addr(ctx, line_info_idx, addr),
                                 addr,
                                 _lady_next_line_addr(ctx, line_info_idx, addr),

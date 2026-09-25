@@ -20,10 +20,9 @@ void trampoline_trap(void) {
         ".att_syntax\n"
     );
 }
-REMOTE_FUNC_END(trampoline_trap);
 
 REMOTE_FUNC_ATTRIBS
-void trampoline(void) {
+void trampoline_counter(void) {
     __asm__ __volatile__ (
         ".intel_syntax noprefix\n"
 
@@ -46,7 +45,7 @@ void trampoline(void) {
         "mov [rsp + 104], r14 ;\n"
         "mov [rsp + 112], r15 ;\n"
 
-        "__trampoline_ret_val_addr: ;\n"
+        "__trampoline_hit_count_addr: ;\n"
         "movabs rax, 0x12345678abcdef12\n"
         "add qword ptr [rax], 1\n"
 
@@ -68,11 +67,10 @@ void trampoline(void) {
         "add rsp, 128\n"
         "popfq\n"
 
-        "__trampoline_end:\n"
+        "__trampoline_counter_end:\n"
 
         ".att_syntax\n"
     );
 }
-REMOTE_FUNC_END(trampoline);
 
 

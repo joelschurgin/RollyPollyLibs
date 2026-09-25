@@ -28,7 +28,7 @@ typedef struct {
 typedef enum {
     LADY_BP_TRAP,
     LADY_BP_TRAMPOLINE_TRAP,
-    LADY_BP_TRAMPOLINE,
+    LADY_BP_TRAMPOLINE_COUNTER,
 } Lady_BpType;
 
 typedef struct {

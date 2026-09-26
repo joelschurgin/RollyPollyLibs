@@ -23,19 +23,26 @@ typedef struct {
 
 typedef struct {
     u64* hit_count;
-} Lady_Trampoline;
+} Lady_TrampolineCounter;
+
+typedef struct {
+    u64* hit_count;
+    volatile b8* lock;
+} Lady_TrampolineLockingMechanism;
 
 typedef enum {
     LADY_BP_TRAP,
     LADY_BP_TRAMPOLINE_TRAP,
     LADY_BP_TRAMPOLINE_COUNTER,
+    LADY_BP_TRAMPOLINE_LOCKING_MECHANISM,
 } Lady_BpType;
 
 typedef struct {
     Lady_BpType type;
     union {
         Lady_Trap trap;
-        Lady_Trampoline trampoline;
+        Lady_TrampolineCounter trampoline_counter;
+        Lady_TrampolineLockingMechanism trampoline_locking_mechanism;
     };
     u64 line_info_idx;
     u64 hit_count;

@@ -182,6 +182,8 @@ void thread_local_timer_print(ThreadLocalTimer timer, u8* fmt, ...) {
             printf("Thread %d: %lf%s => %.*s\n", LaneIdx(), time_diff, units[unit_idx], msg.size, msg.str);
         else
             printf("Thread %d: %lf%s\n", LaneIdx(), time_diff, units[unit_idx]);
+
+        fflush(stdout);
     }
 
     va_end(args);

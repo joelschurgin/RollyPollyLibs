@@ -21,7 +21,9 @@ typedef struct {
     u8** argv;
 } MainArgs;
 
-b32 lady_event(Lady_Ctx* ctx, Lady_Event event) {
+volatile b8 target_process_running = false;
+
+b8 lady_event(Lady_Ctx* ctx, Lady_Event event) {
     switch (event) {
         case LADY_TRAP:
         {
@@ -90,61 +92,119 @@ b32 lady_event(Lady_Ctx* ctx, Lady_Event event) {
 
 void lady_debug_event_loop(Lady_Ctx* ctx) {
     Lady_Event event = LADY_NONE;
-    b32 run = true;
     do {
         event = lady_continue(ctx);
-        run = lady_event(ctx, event);
-    } while (run);
+        b8 running = lady_event(ctx, event);
+        atomic_store(&target_process_running, running);
+    } while (atomic_load(&target_process_running));
+}
+
+internal void _lady_lock_check_all_bps(Lady_Ctx* ctx) {
+    for (u64 bp_hash_idx = 0; bp_hash_idx < ctx->bp_hash.max_num_entries; bp_hash_idx++) {
+        Lady_Bp* bp = &ctx->bp_hash.entries[bp_hash_idx].value;
+        switch (bp->type) {
+            case LADY_BP_TRAMPOLINE_LOCKING_MECHANISM:
+                if (bp->trampoline_locking_mechanism.lock) {
+                    b8 lock = atomic_load(bp->trampoline_locking_mechanism.lock);
+                    if (lock == 1) {
+                        bp->hit_count = atomic_load(bp->trampoline_locking_mechanism.hit_count);
+                        *bp->trampoline_locking_mechanism.lock = 0;
+                        return;
+                    }
+                }
+            break;
+        }
+    }
+}
+
+void lady_lock_loop(Lady_Ctx* ctx) {
+    while (atomic_load(&target_process_running)) {
+        _lady_lock_check_all_bps(ctx);
+    }
 }
 
 void lady_test_trap(Lady_Ctx* ctx, u64 target_addr) {
-    Arena* arena = thread_ctx.shared_arena;
-    TempArenaBlock(arena) {
-        lady_launch_process(arena, ctx);
+    AssignLane(0) {
+        Arena* arena = thread_ctx.shared_arena;
+        TempArenaBlock(arena) {
+            lady_launch_process(arena, ctx);
 
-        u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAP);
-        Lady_Bp* bp = lady_bp_hash_get(&ctx->bp_hash, bp_key);
+            u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAP);
+            Lady_Bp* bp = lady_bp_hash_get(&ctx->bp_hash, bp_key);
 
-        ThreadLocalTimer("TRAP was hit %lux", bp->hit_count) {
-            lady_debug_event_loop(ctx);
+            ThreadLocalTimer("TRAP was hit %lux", bp->hit_count) {
+                lady_debug_event_loop(ctx);
+            }
         }
     }
 }
 
 void lady_test_trampoline_trap(Lady_Ctx* ctx, u64 target_addr) {
-    Arena* arena = thread_ctx.shared_arena;
-    TempArenaBlock(arena) {
-        lady_launch_process(arena, ctx);
+    AssignLane(0) {
+        Arena* arena = thread_ctx.shared_arena;
+        TempArenaBlock(arena) {
+            lady_launch_process(arena, ctx);
 
-        u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAMPOLINE_TRAP);
-        Lady_Bp* bp = lady_bp_hash_get(&ctx->bp_hash, bp_key);
+            u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAMPOLINE_TRAP);
+            Lady_Bp* bp = lady_bp_hash_get(&ctx->bp_hash, bp_key);
 
-        ThreadLocalTimer("TRAMPOLINE TRAP was hit %lux", bp->hit_count) {
-            lady_debug_event_loop(ctx);
+            ThreadLocalTimer("TRAMPOLINE TRAP was hit %lux", bp->hit_count) {
+                lady_debug_event_loop(ctx);
+            }
         }
     }
 }
 
 void lady_test_trampoline_counter(Lady_Ctx* ctx, u64 target_addr) {
-    Arena* arena = thread_ctx.shared_arena;
-    TempArenaBlock(arena) {
-        lady_launch_process(arena, ctx);
+    AssignLane(0) {
+        Arena* arena = thread_ctx.shared_arena;
+        TempArenaBlock(arena) {
+            lady_launch_process(arena, ctx);
 
-        u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAMPOLINE_COUNTER);
-        Lady_Bp* bp = lady_bp_hash_get(&ctx->bp_hash, bp_key);
+            u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAMPOLINE_COUNTER);
+            Lady_Bp* bp = lady_bp_hash_get(&ctx->bp_hash, bp_key);
 
-        ThreadLocalTimer("TRAMPOLINE COUNTER was hit %lux", (bp->trampoline.hit_count) ? *bp->trampoline.hit_count : 0) {
-            lady_debug_event_loop(ctx);
+            ThreadLocalTimer("TRAMPOLINE COUNTER was hit %lux", (bp->trampoline_locking_mechanism.hit_count) ? *bp->trampoline_locking_mechanism.hit_count : 0) {
+                lady_debug_event_loop(ctx);
+            }
         }
     }
 }
 
+void lady_test_trampoline_locking_mechanism(Lady_Ctx* ctx, u64 target_addr) {
+    TempArenaBlock(LaneArena()) {
+        Lady_Bp* bp = 0L;
+        AssignLane(0) {
+            lady_launch_process(LaneArena(), ctx);
+            atomic_store(&target_process_running, true);
+
+            u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAMPOLINE_LOCKING_MECHANISM);
+            bp = lady_bp_hash_get(&ctx->bp_hash, bp_key);
+        }
+        LaneSyncPtr(bp, 0);
+        LaneSync();
+
+        AssignLane(0) {
+            ThreadLocalTimer("TRAMPOLINE LOCKING MECHANISM was hit %lux", bp->hit_count) {
+                lady_debug_event_loop(ctx);
+            }
+        }
+
+        AssignLane(1) {
+            lady_lock_loop(ctx);
+        }
+        LaneSync();
+    }
+}
+
 void lady_sanity_check(Lady_Ctx* ctx) {
-    Arena* arena = thread_ctx.shared_arena;
-    TempArenaBlock(arena) {
-        lady_launch_process(arena, ctx);
-        ThreadLocalTimer("No Breakpoints Set") {
-            lady_debug_event_loop(ctx);
+    AssignLane(0) {
+        Arena* arena = thread_ctx.shared_arena;
+        TempArenaBlock(arena) {
+            lady_launch_process(arena, ctx);
+            ThreadLocalTimer("No Breakpoints Set") {
+                lady_debug_event_loop(ctx);
+            }
         }
     }
 }
@@ -228,23 +288,22 @@ void* parallel_main(void* main_args) {
     }
     LaneSync();
 
-    AssignLane(0) {
-        /*
-        for (u64 i = 1; i < ctx->line_info.count; i++) {
-            u64 target_addr = ctx->line_info.data[i].addr;
+    /*
+    for (u64 i = 1; i < ctx->line_info.count; i++) {
+        u64 target_addr = ctx->line_info.data[i].addr;
 
-            printf("DEBUGGING: 0x%lx | Line Info: %d / %d\n", target_addr, i, ctx->line_info.count - 1);
-            lady_test_trampoline_trap(ctx, target_addr);
-            printf("\n");
-        }
-        */
-
-        u64 target_addr = ctx->line_info.data[2].addr;
-        lady_test_trap(ctx, target_addr);
+        printf("DEBUGGING: 0x%lx | Line Info: %d / %d\n", target_addr, i, ctx->line_info.count - 1);
         lady_test_trampoline_trap(ctx, target_addr);
-        lady_test_trampoline_counter(ctx, target_addr);
-        lady_sanity_check(ctx);
+        printf("\n");
     }
+    */
+
+    u64 target_addr = ctx->line_info.data[2].addr;
+    lady_test_trap(ctx, target_addr);
+    lady_test_trampoline_trap(ctx, target_addr);
+    lady_test_trampoline_counter(ctx, target_addr);
+    lady_test_trampoline_locking_mechanism(ctx, target_addr);
+    lady_sanity_check(ctx);
     LaneSync();
 }
 
@@ -256,7 +315,7 @@ String curr_dir(String path) {
 }
 
 i32 main(i32 argc, u8** argv) {
-    u64 num_threads = 1;
+    u64 num_threads = 2;
  
     Arena* arena = arena_alloc(1024, 1024);
     String dir = curr_dir(String(argv[0]));

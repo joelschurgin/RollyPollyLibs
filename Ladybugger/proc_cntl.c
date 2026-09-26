@@ -294,40 +294,6 @@ RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size)
     return func_alloc;
 }
 
-/*
-void lady_trampoline_trap_set(Lady_Ctx* ctx, u64 addr, u64* bp_addr) {
-    addr += ctx->base_addr;
-
-    u64 func_size = (u64)&__trampoline_trap_end - (u64)trampoline_trap;
-
-    RemoteFuncAllocator* alloc = &ctx->remote_func_alloc;
-    Assert(alloc->pos + func_size <= alloc->size);
-
-    void* func_write_ptr = (u8*)alloc->base + alloc->pos;
-    void* remote_func_ptr = (u8*)alloc->remote_base + alloc->pos;
-    alloc->pos += func_size;
-
-    MemoryCopy(func_write_ptr, trampoline_trap, func_size);
-
-    {
-        u64 trampoline_trap_stolen_bytes_offset = (u64)&__trampoline_trap_stolen_bytes - (u64)&trampoline_trap;
-        u64 stolen_bytes = ptrace(PTRACE_PEEKDATA, ctx->pid, addr, 0L);
-        MemoryCopy(func_write_ptr + trampoline_trap_stolen_bytes_offset, &stolen_bytes, 5);
-    }
-
-    {
-        u64 trampoline_trap_return_ptr_offset = (u64)&__trampoline_trap_return_ptr - (u64)&trampoline_trap;
-        u64 ret_addr = (u64)addr + 5;
-        MemoryCopy(func_write_ptr + trampoline_trap_return_ptr_offset, &ret_addr, sizeof(u64));
-    }
-
-    proc_insert_jmp(ctx->pid, addr, (u64)remote_func_ptr, 5);
- 
-    u64 trap_offset = (u64)&__trampoline_trap - (u64)&trampoline_trap;
-    *bp_addr = (u64)remote_func_ptr + trap_offset - ctx->base_addr;
-}
-*/
-
 #define remote_func_push_bytes(alloc, func_ptr, write_pos, bytes, num_bytes) \
     do { \
         MemoryCopy((func_ptr) + (write_pos), (bytes), (num_bytes)); \
@@ -500,7 +466,7 @@ void lady_trampoline_counter_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_
     Arena* arena = LaneArena();
     TempArenaBlock(arena) {
         Lady_TrampolineCtx tramp_ctx = lady_trampoline_begin(arena, ctx, look_ahead_addr, target_addr, next_line_addr);
-        remote_func_push_bytes(&ctx->remote_func_alloc, tramp_ctx.func_local, tramp_ctx.write_pos, trampoline_counter, TrampolineCounterSize());
+        remote_func_push_bytes(&ctx->remote_func_alloc, tramp_ctx.func_local, tramp_ctx.write_pos, trampoline_counter, TrampolineCounter_Size());
         lady_trampoline_end(ctx, &tramp_ctx);
 
         // set up hit count
@@ -509,7 +475,7 @@ void lady_trampoline_counter_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_
             u64 hit_count_addr = rel_hit_count_addr + (u64)(uintptr_t)tramp_ctx.func_remote;
 
             u64 pre_instr_offset = target_addr - tramp_ctx.site_start_addr;
-            MemoryCopy(tramp_ctx.func_local + TrampolineHitCounterAddr() + pre_instr_offset, &hit_count_addr, sizeof(u64));
+            MemoryCopy(tramp_ctx.func_local + Trampoline_HitCounterAddr() + pre_instr_offset, &hit_count_addr, sizeof(u64));
 
             *hit_count = (u64*)(rel_hit_count_addr + (u64)(uintptr_t)tramp_ctx.func_local);
 
@@ -519,3 +485,38 @@ void lady_trampoline_counter_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_
     }
 }
 
+void lady_trampoline_locking_mechanism_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64 next_line_addr, u64** hit_count, b8** lock) {
+    target_addr += ctx->base_addr;
+    look_ahead_addr += ctx->base_addr;
+    next_line_addr += ctx->base_addr;
+
+    Arena* arena = LaneArena();
+    TempArenaBlock(arena) {
+        Lady_TrampolineCtx tramp_ctx = lady_trampoline_begin(arena, ctx, look_ahead_addr, target_addr, next_line_addr);
+        remote_func_push_bytes(&ctx->remote_func_alloc, tramp_ctx.func_local, tramp_ctx.write_pos, trampoline_locking_mechanism, TrampolineLockingMechanism_Size());
+        lady_trampoline_end(ctx, &tramp_ctx);
+
+        // set up hit count
+        {
+            u64 rel_hit_count_addr = tramp_ctx.write_pos;
+            u64 hit_count_addr = rel_hit_count_addr + (u64)(uintptr_t)tramp_ctx.func_remote;
+
+            u64 pre_instr_offset = target_addr - tramp_ctx.site_start_addr;
+            MemoryCopy(tramp_ctx.func_local + TrampolineLockingMechanism_HitCounterAddr() + pre_instr_offset, &hit_count_addr, sizeof(u64));
+
+            *hit_count = (u64*)(rel_hit_count_addr + (u64)(uintptr_t)tramp_ctx.func_local);
+
+            u64 hit_count_start_val = 0;
+            remote_func_push_bytes(&ctx->remote_func_alloc, tramp_ctx.func_local, tramp_ctx.write_pos, &hit_count_start_val, sizeof(hit_count_start_val));
+        }
+
+        // set up lock
+        {
+            u64 rel_lock_addr = tramp_ctx.write_pos;
+            u64 lock_addr = rel_lock_addr + (u64)(uintptr_t)tramp_ctx.func_remote;
+
+            *lock = (b8*)(rel_lock_addr + (u64)(uintptr_t)tramp_ctx.func_local);
+        }
+    }
+
+}

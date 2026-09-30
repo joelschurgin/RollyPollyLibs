@@ -73,37 +73,21 @@ u64 lady_bp_set(Lady_Ctx* ctx, u64 addr, Lady_BpType type) {
         break;
         case LADY_BP_TRAMPOLINE_TRAP:
         {
-            u64 bp_addr = 0;
+            u64 trap_addr = 0;
             u64 line_info_idx = lady_addr_to_line_info_idx(ctx->line_info, addr);
-            lady_trampoline_trap_set(ctx,
-                                     _lady_look_ahead_addr(ctx, line_info_idx, addr),
-                                     addr,
-                                     _lady_next_line_addr(ctx, line_info_idx, addr),
-                                     &bp_addr); // address that we'll get from the trampoline trap
-            lady_bp_hash_insert(&ctx->bp_hash, bp_addr, (Lady_Bp){
-                .type = LADY_BP_TRAMPOLINE_TRAP,
-                .line_info_idx = line_info_idx,
-            });
-            return bp_addr;
-        }
-        break;
-        case LADY_BP_TRAMPOLINE_COUNTER:
-        {
-            u64* hit_count = 0L;
-            u64 line_info_idx = lady_addr_to_line_info_idx(ctx->line_info, addr);
-            lady_trampoline_counter_set(ctx,
+            Lady_TrampolineFeatures features = (Lady_TrampolineFeatures) {
+                .trap_addr = &trap_addr,
+            };
+            lady_trampoline_set(ctx,
                                 _lady_look_ahead_addr(ctx, line_info_idx, addr),
                                 addr,
                                 _lady_next_line_addr(ctx, line_info_idx, addr),
-                                &hit_count);
-            lady_bp_hash_insert(&ctx->bp_hash, addr, (Lady_Bp){
+                                features);
+            lady_bp_hash_insert(&ctx->bp_hash, trap_addr, (Lady_Bp){
                 .type = LADY_BP_TRAMPOLINE_TRAP,
-                .trampoline_counter = (Lady_TrampolineCounter) {
-                    .hit_count = hit_count,
-                },
                 .line_info_idx = line_info_idx,
             });
-            return addr;
+            return trap_addr;
         }
         break;
         case LADY_BP_TRAMPOLINE_LOCKING_MECHANISM:
@@ -111,12 +95,15 @@ u64 lady_bp_set(Lady_Ctx* ctx, u64 addr, Lady_BpType type) {
             u64* hit_count = 0L;
             b8* lock = 0L;
             u64 line_info_idx = lady_addr_to_line_info_idx(ctx->line_info, addr);
-            lady_trampoline_locking_mechanism_set(ctx,
-                                                  _lady_look_ahead_addr(ctx, line_info_idx, addr),
-                                                  addr,
-                                                  _lady_next_line_addr(ctx, line_info_idx, addr),
-                                                  &hit_count,
-                                                  &lock);
+            Lady_TrampolineFeatures features = (Lady_TrampolineFeatures) {
+                .hit_count = &hit_count,
+                .lock = &lock,
+            };
+            lady_trampoline_set(ctx,
+                                _lady_look_ahead_addr(ctx, line_info_idx, addr),
+                                addr,
+                                _lady_next_line_addr(ctx, line_info_idx, addr),
+                                features);
             lady_bp_hash_insert(&ctx->bp_hash, addr, (Lady_Bp){
                 .type = LADY_BP_TRAMPOLINE_LOCKING_MECHANISM,
                 .trampoline_locking_mechanism = (Lady_TrampolineLockingMechanism) {

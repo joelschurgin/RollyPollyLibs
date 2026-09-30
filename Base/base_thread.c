@@ -171,10 +171,12 @@ void thread_local_timer_print(ThreadLocalTimer timer, u8* fmt, ...) {
     f64 time_diff = (f64)sec_diff * 1e9 + (f64)nsec_diff;
 
     i32 unit_idx = 0;
+    /*
     while (time_diff > 1000.0) {
         time_diff /= 1000.0;
         unit_idx += 1;
     }
+    */
 
     TempArenaBlock(LaneArena()) {
         String msg = string_formatv(LaneArena(), fmt, args);

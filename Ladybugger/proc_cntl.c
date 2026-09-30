@@ -238,28 +238,12 @@ void lady_trap_reset(Lady_Ctx* ctx, Lady_Trap* trap) {
     trap->data = trap_insert(ctx->pid, ctx->base_addr + trap->addr);
 }
 
-void proc_insert_jmp(pid_t pid, u64 addr, u64 func_ptr, u8 instr_len) {
-    struct __attribute__((packed)) {
-        u8 opcode;
-        i32 addr;
-    } jmp_instr = {
-        .opcode = 0xe9,
-        .addr = (i32)((i64)func_ptr - ((i64)addr + 5)),
-    };
-
-    u64 curr_instr = ptrace(PTRACE_PEEKDATA, pid, addr, 0L);
-
-    MemoryCopy(&curr_instr, &jmp_instr, sizeof(jmp_instr));
-    ptrace(PTRACE_POKEDATA, pid, addr, curr_instr);
-}
-
 RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size) {
     RemoteFuncAllocator func_alloc = {0};
 
     {
         mode_t old_mask = umask(0);
-        func_alloc.shm_fd = shm_open("/fast_dbg_shm",
-                                    O_CREAT | O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO );
+        func_alloc.shm_fd = shm_open("/fast_dbg_shm", O_CREAT | O_RDWR, S_IRWXU | S_IRWXG | S_IRWXO);
         umask(old_mask);
 
         Assert(func_alloc.shm_fd >= 0);
@@ -322,22 +306,16 @@ void lady_trampoline_push_instr(Lady_Ctx* ctx, void* func_local, void* func_remo
 }
 
 typedef struct {
-    u64 instr_addr;
-
+    Disasm_InstrArray pre_tramp_instr;
     Disasm_InstrArray post_tramp_instr;
 
-    void* func_local;
-    void* func_remote;
+    u64 size;
+    u64 start_addr;
+    u64 end_addr;
+} Lady_TrampolineSite;
 
-    u64 write_pos;
-
-    u64 site_size;
-    u64 site_start_addr;
-    u64 site_end_addr;
-} Lady_TrampolineCtx;
-
-Lady_TrampolineCtx lady_trampoline_begin(Arena* arena, Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64 next_line_addr) {
-    Lady_TrampolineCtx tramp_ctx = {0};
+internal Lady_TrampolineSite lady_trampoline_site_find(Arena* arena, Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64 next_line_addr) {
+    Lady_TrampolineSite tramp_site = {0};
 
     // read instr bytes
     u8Array instr_bytes = Array(arena, u8, next_line_addr - look_ahead_addr);
@@ -361,162 +339,145 @@ Lady_TrampolineCtx lady_trampoline_begin(Arena* arena, Lady_Ctx* ctx, u64 look_a
     }
 
     // find which instructions to replace
-    tramp_ctx.site_size = next_line_addr - target_addr;
+    tramp_site.size = next_line_addr - target_addr;
     u64 disasm_instr_start_idx = target_addr_instr_idx;
-    for (i64 instr_idx = target_addr_instr_idx - 1; instr_idx >= 0 && tramp_ctx.site_size < 5; instr_idx--) {
-        tramp_ctx.site_size += disasm_instr.data[instr_idx].instr_len;
+    for (i64 instr_idx = target_addr_instr_idx - 1; instr_idx >= 0 && tramp_site.size < 5; instr_idx--) {
+        tramp_site.size += disasm_instr.data[instr_idx].instr_len;
         disasm_instr_start_idx = instr_idx;
     }
 
-    u64 instr_start_addr = next_line_addr - tramp_ctx.site_size;
-    u64 instr_addr = instr_start_addr;
+    tramp_site.start_addr = next_line_addr - tramp_site.size;
 
     u64 disasm_instr_end_idx = disasm_instr.count-1;
     for (; disasm_instr_end_idx >= disasm_instr_start_idx; disasm_instr_end_idx--) {
-        u64 potential_tramp_site_size = tramp_ctx.site_size - disasm_instr.data[disasm_instr_end_idx].instr_len;
-        if (potential_tramp_site_size < 5) break;
+        u64 potential_tramp_size = tramp_site.size - disasm_instr.data[disasm_instr_end_idx].instr_len;
+        if (potential_tramp_size < 5) break;
 
-        tramp_ctx.site_size = potential_tramp_site_size;
+        tramp_site.size = potential_tramp_size;
     }
 
-    RemoteFuncAllocator* alloc = &ctx->remote_func_alloc;
+    tramp_site.end_addr = tramp_site.start_addr + tramp_site.size;
 
-    tramp_ctx.func_local = (u8*)alloc->base + alloc->pos;
-    tramp_ctx.func_remote = (u8*)alloc->remote_base + alloc->pos;
+    tramp_site.pre_tramp_instr = Disasm_InstrArraySlice(disasm_instr, disasm_instr_start_idx, target_addr_instr_idx-1);
+    tramp_site.post_tramp_instr = Disasm_InstrArraySlice(disasm_instr, target_addr_instr_idx, disasm_instr_end_idx);
 
-    // write jump instruction into trampoline site
-    tramp_ctx.site_start_addr = instr_start_addr;
-    tramp_ctx.site_end_addr = instr_start_addr + tramp_ctx.site_size;
-    {
-        u8Array jmp_instr_bytes = Array(arena, u8, tramp_ctx.site_size);
-        MemorySet(jmp_instr_bytes.data, 0x90, tramp_ctx.site_size);
-
-        struct __attribute__((packed)) {
-            u8 opcode;
-            i32 addr;
-        } jmp_instr = {
-            .opcode = 0xe9,
-            .addr = (i32)((i64)tramp_ctx.func_remote - (i64)(tramp_ctx.site_end_addr)),
-        };
-        MemoryCopy(jmp_instr_bytes.data + (tramp_ctx.site_size - sizeof(jmp_instr)), &jmp_instr, sizeof(jmp_instr));
-
-        pwrite(ctx->mem_fd, jmp_instr_bytes.data, jmp_instr_bytes.count, tramp_ctx.site_start_addr);
-    }
-
-    // push any instructions before target_addr
-    {
-        Disasm_InstrArray instr_slice = Disasm_InstrArraySlice(disasm_instr, disasm_instr_start_idx, target_addr_instr_idx-1);
-        for EachElement(instr, Disasm_Instr, instr_slice) {
-            lady_trampoline_push_instr(ctx, tramp_ctx.func_local, tramp_ctx.func_remote, &tramp_ctx.write_pos, instr, instr_addr);
-            instr_addr += instr->instr_len;
-        }
-    }
-
-    tramp_ctx.instr_addr = target_addr;
-    tramp_ctx.post_tramp_instr = Disasm_InstrArraySlice(disasm_instr, target_addr_instr_idx, disasm_instr_end_idx);
-
-    return tramp_ctx;
+    return tramp_site;
 }
 
-void lady_trampoline_end(Lady_Ctx* ctx, Lady_TrampolineCtx* tramp_ctx) {
-    RemoteFuncAllocator* alloc = &ctx->remote_func_alloc;
+// use rax for the address of any local vars
+// pushes:
+//      movabs rax, remote_addr
+internal inline void lady_trampoline_set_local_var_addr(RemoteFuncAllocator* alloc, u8* func_local, u64* write_pos, u64 remote_addr) {
+    u8 movabs[] = {0x48, 0xb8};
 
-    // push any instructions after target_addr
-    {
-        u64 instr_addr = tramp_ctx->instr_addr;
-        for EachElement(instr, Disasm_Instr, tramp_ctx->post_tramp_instr) {
-            lady_trampoline_push_instr(ctx, tramp_ctx->func_local, tramp_ctx->func_remote, &tramp_ctx->write_pos, instr, instr_addr);
-            instr_addr += instr->instr_len;
-        }
-    }
-
-    // push returning jump
-    {
-        u8 jmp_instr[] = {0xff, 0x25, 0x00, 0x00, 0x00, 0x00};
-        remote_func_push_bytes(alloc, tramp_ctx->func_local, tramp_ctx->write_pos, jmp_instr, sizeof(jmp_instr));
-
-        u64 ret_addr = tramp_ctx->site_end_addr;
-        remote_func_push_bytes(alloc, tramp_ctx->func_local, tramp_ctx->write_pos, &ret_addr, sizeof(ret_addr));
-    }
+    remote_func_push_bytes(alloc, func_local, *write_pos, &movabs, sizeof(movabs));
+    remote_func_push_bytes(alloc, func_local, *write_pos, &remote_addr, sizeof(remote_addr));
 }
 
-void lady_trampoline_trap_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64 next_line_addr, u64* bp_addr) {
+// defaults to trap if both trap and lock are set
+void lady_trampoline_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64 next_line_addr, Lady_TrampolineFeatures features) {
     target_addr += ctx->base_addr;
     look_ahead_addr += ctx->base_addr;
     next_line_addr += ctx->base_addr;
 
     Arena* arena = LaneArena();
     TempArenaBlock(arena) {
-        Lady_TrampolineCtx tramp_ctx = lady_trampoline_begin(arena, ctx, look_ahead_addr, target_addr, next_line_addr);
+        RemoteFuncAllocator* alloc = &ctx->remote_func_alloc;
 
-        *bp_addr = (u64)(uintptr_t)tramp_ctx.func_remote + tramp_ctx.write_pos - ctx->base_addr;
+        u8* func_local = (u8*)alloc->base + alloc->pos;
+        u8* func_remote = (u8*)alloc->remote_base + alloc->pos;
 
-        u8 int3 = 0xcc;
-        remote_func_push_bytes(&ctx->remote_func_alloc, tramp_ctx.func_local, tramp_ctx.write_pos, &int3, sizeof(int3));
+        u64 write_pos = 0;
 
-        lady_trampoline_end(ctx, &tramp_ctx);
-    }
-}
+        u8* var_base_local = func_local + write_pos;
+        u8* var_base_remote = func_remote + write_pos;
 
-void lady_trampoline_counter_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64 next_line_addr, u64** hit_count) {
-    target_addr += ctx->base_addr;
-    look_ahead_addr += ctx->base_addr;
-    next_line_addr += ctx->base_addr;
+        u64 var_section_size = write_pos;
 
-    Arena* arena = LaneArena();
-    TempArenaBlock(arena) {
-        Lady_TrampolineCtx tramp_ctx = lady_trampoline_begin(arena, ctx, look_ahead_addr, target_addr, next_line_addr);
-        remote_func_push_bytes(&ctx->remote_func_alloc, tramp_ctx.func_local, tramp_ctx.write_pos, trampoline_counter, TrampolineCounter_Size());
-        lady_trampoline_end(ctx, &tramp_ctx);
-
-        // set up hit count
-        {
-            u64 rel_hit_count_addr = tramp_ctx.write_pos;
-            u64 hit_count_addr = rel_hit_count_addr + (u64)(uintptr_t)tramp_ctx.func_remote;
-
-            u64 pre_instr_offset = target_addr - tramp_ctx.site_start_addr;
-            MemoryCopy(tramp_ctx.func_local + Trampoline_HitCounterAddr() + pre_instr_offset, &hit_count_addr, sizeof(u64));
-
-            *hit_count = (u64*)(rel_hit_count_addr + (u64)(uintptr_t)tramp_ctx.func_local);
-
-            u64 hit_count_start_val = 0;
-            remote_func_push_bytes(&ctx->remote_func_alloc, tramp_ctx.func_local, tramp_ctx.write_pos, &hit_count_start_val, sizeof(hit_count_start_val));
-        }
-    }
-}
-
-void lady_trampoline_locking_mechanism_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u64 next_line_addr, u64** hit_count, b8** lock) {
-    target_addr += ctx->base_addr;
-    look_ahead_addr += ctx->base_addr;
-    next_line_addr += ctx->base_addr;
-
-    Arena* arena = LaneArena();
-    TempArenaBlock(arena) {
-        Lady_TrampolineCtx tramp_ctx = lady_trampoline_begin(arena, ctx, look_ahead_addr, target_addr, next_line_addr);
-        remote_func_push_bytes(&ctx->remote_func_alloc, tramp_ctx.func_local, tramp_ctx.write_pos, trampoline_locking_mechanism, TrampolineLockingMechanism_Size());
-        lady_trampoline_end(ctx, &tramp_ctx);
-
-        // set up hit count
-        {
-            u64 rel_hit_count_addr = tramp_ctx.write_pos;
-            u64 hit_count_addr = rel_hit_count_addr + (u64)(uintptr_t)tramp_ctx.func_remote;
-
-            u64 pre_instr_offset = target_addr - tramp_ctx.site_start_addr;
-            MemoryCopy(tramp_ctx.func_local + TrampolineLockingMechanism_HitCounterAddr() + pre_instr_offset, &hit_count_addr, sizeof(u64));
-
-            *hit_count = (u64*)(rel_hit_count_addr + (u64)(uintptr_t)tramp_ctx.func_local);
-
-            u64 hit_count_start_val = 0;
-            remote_func_push_bytes(&ctx->remote_func_alloc, tramp_ctx.func_local, tramp_ctx.write_pos, &hit_count_start_val, sizeof(hit_count_start_val));
+        // local variables
+        u8* hit_count_remote = 0L;
+        if (features.hit_count) {
+            *features.hit_count = (u64*)(var_base_local + write_pos);
+            **features.hit_count = 0;
+            hit_count_remote = var_base_remote + write_pos;
+            write_pos += 8;
         }
 
-        // set up lock
-        {
-            u64 rel_lock_addr = tramp_ctx.write_pos;
-            u64 lock_addr = rel_lock_addr + (u64)(uintptr_t)tramp_ctx.func_remote;
+        u8* lock_remote = 0L;
+        if (features.lock && !features.trap_addr) {
+            *features.lock = var_base_local + write_pos;
+            **features.lock = 0;
+            lock_remote = var_base_remote + write_pos;
+            write_pos += 1;
+        }
 
-            *lock = (b8*)(rel_lock_addr + (u64)(uintptr_t)tramp_ctx.func_local);
+        write_pos = AlignPow2(write_pos, 8); // turns out alignment matters
+
+        var_section_size = write_pos - var_section_size;
+
+        Lady_TrampolineSite tramp_site = lady_trampoline_site_find(arena, ctx, look_ahead_addr, target_addr, next_line_addr);
+
+        // insert trampoline in target
+        {
+            u8Array jmp_instr_bytes = Array(arena, u8, tramp_site.size);
+            MemorySet(jmp_instr_bytes.data, 0x90, tramp_site.size);
+
+            struct __attribute__((packed)) {
+                u8 opcode;
+                i32 addr;
+            } jmp_instr = {
+                .opcode = 0xe9,
+                .addr = (i32)((i64)func_remote + (i64)var_section_size - (i64)(tramp_site.end_addr)),
+            };
+            MemoryCopy(jmp_instr_bytes.data + (tramp_site.size - sizeof(jmp_instr)), &jmp_instr, sizeof(jmp_instr));
+
+            pwrite(ctx->mem_fd, jmp_instr_bytes.data, jmp_instr_bytes.count, tramp_site.start_addr);
+        }
+
+        // push any instructions before target_addr
+        {
+            u64 instr_addr = tramp_site.start_addr;
+            for EachElement(instr, Disasm_Instr, tramp_site.pre_tramp_instr) {
+                lady_trampoline_push_instr(ctx, func_local, func_remote, &write_pos, instr, instr_addr);
+                instr_addr += instr->instr_len;
+            }
+        }
+
+        remote_func_push_bytes(alloc, func_local, write_pos, trampoline_save_state, (u64)&__trampoline_save_state_end - (u64)&trampoline_save_state);
+
+        if (features.hit_count) {
+            lady_trampoline_set_local_var_addr(alloc, func_local, &write_pos, (u64)hit_count_remote);
+            remote_func_push_bytes(alloc, func_local, write_pos, trampoline_hit_count, (u64)&__trampoline_hit_count_end - (u64)&trampoline_hit_count);
+        }
+
+        if (features.trap_addr) {
+            *features.trap_addr = (u64)(func_remote + write_pos - ctx->base_addr);
+
+            u8 trap = 0xcc;
+            remote_func_push_bytes(alloc, func_local, write_pos, &trap, 1);
+        } else if (features.lock) {
+            lady_trampoline_set_local_var_addr(alloc, func_local, &write_pos, (u64)lock_remote);
+            remote_func_push_bytes(alloc, func_local, write_pos, trampoline_spin_lock, (u64)&__trampoline_spin_lock_end - (u64)&trampoline_spin_lock);
+        }
+
+        remote_func_push_bytes(alloc, func_local, write_pos, trampoline_restore_state, (u64)&__trampoline_restore_state_end - (u64)&trampoline_restore_state);
+
+        // push any instructions after target_addr
+        {
+            u64 instr_addr = target_addr;
+            for EachElement(instr, Disasm_Instr, tramp_site.post_tramp_instr) {
+                lady_trampoline_push_instr(ctx, func_local, func_remote, &write_pos, instr, instr_addr);
+                instr_addr += instr->instr_len;
+            }
+        }
+
+        // push returning jump
+        {
+            u8 jmp_instr[] = {0xff, 0x25, 0x00, 0x00, 0x00, 0x00};
+            remote_func_push_bytes(alloc, func_local, write_pos, jmp_instr, sizeof(jmp_instr));
+
+            u64 ret_addr = tramp_site.end_addr;
+            remote_func_push_bytes(alloc, func_local, write_pos, &ret_addr, sizeof(ret_addr));
         }
     }
-
 }

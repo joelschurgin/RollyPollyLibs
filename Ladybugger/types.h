@@ -33,7 +33,6 @@ typedef struct {
 typedef enum {
     LADY_BP_TRAP,
     LADY_BP_TRAMPOLINE_TRAP,
-    LADY_BP_TRAMPOLINE_COUNTER,
     LADY_BP_TRAMPOLINE_LOCKING_MECHANISM,
 } Lady_BpType;
 
@@ -73,6 +72,12 @@ typedef struct {
     u64 num_entries;
     u64 max_num_entries;
 } Lady_JmpHash;
+
+typedef struct {
+    u64** hit_count;
+    b8** lock;
+    u64* trap_addr;
+} Lady_TrampolineFeatures;
 
 typedef struct {
     pid_t pid;

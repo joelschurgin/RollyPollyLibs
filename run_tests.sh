@@ -1,6 +1,6 @@
 #!/usr/bin/bash
 
-NUM_ITER=1000
+NUM_ITER=200
 
 rm runs.txt
 

@@ -1,6 +1,6 @@
 typedef struct {
     void* remote_base;
-    void* base;
+    void* local_base;
     u64 pos;
     u64 size;
     i32 remote_shm_fd;

@@ -263,14 +263,14 @@ RemoteFuncAllocator remote_func_alloc_init(pid_t pid, u64 target_addr, u64 size)
 
     Assert((i64)func_alloc.remote_base >= 0);
 
-    func_alloc.base = mmap(0L,
+    func_alloc.local_base = mmap(0L,
                         size,
                         PROT_READ | PROT_WRITE,
                         MAP_SHARED,
                         func_alloc.shm_fd,
                         0);
 
-    Assert((i64)func_alloc.base >= 0);
+    Assert((i64)func_alloc.local_base >= 0);
 
     func_alloc.pos = 0;
     func_alloc.size = size;
@@ -384,7 +384,7 @@ void lady_trampoline_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u6
     TempArenaBlock(arena) {
         RemoteFuncAllocator* alloc = &ctx->remote_func_alloc;
 
-        u8* func_local = (u8*)alloc->base + alloc->pos;
+        u8* func_local = (u8*)alloc->local_base + alloc->pos;
         u8* func_remote = (u8*)alloc->remote_base + alloc->pos;
 
         u64 write_pos = 0;
@@ -479,5 +479,7 @@ void lady_trampoline_set(Lady_Ctx* ctx, u64 look_ahead_addr, u64 target_addr, u6
             u64 ret_addr = tramp_site.end_addr;
             remote_func_push_bytes(alloc, func_local, write_pos, &ret_addr, sizeof(ret_addr));
         }
+
+        alloc->pos = AlignPow2(alloc->pos, 8);
     }
 }

@@ -84,13 +84,13 @@ u64 lady_bp_set(Lady_Ctx* ctx, u64 addr, Lady_BpType type) {
                                 _lady_next_line_addr(ctx, line_info_idx, addr),
                                 features);
             lady_bp_hash_insert(&ctx->bp_hash, trap_addr, (Lady_Bp){
-                .type = LADY_BP_TRAMPOLINE_TRAP,
+                .type = type,
                 .line_info_idx = line_info_idx,
             });
             return trap_addr;
         }
         break;
-        case LADY_BP_TRAMPOLINE_LOCKING_MECHANISM:
+        case LADY_BP_TRAMPOLINE_SPIN_LOCK:
         {
             u64* hit_count = 0L;
             b8* lock = 0L;
@@ -105,8 +105,8 @@ u64 lady_bp_set(Lady_Ctx* ctx, u64 addr, Lady_BpType type) {
                                 _lady_next_line_addr(ctx, line_info_idx, addr),
                                 features);
             lady_bp_hash_insert(&ctx->bp_hash, addr, (Lady_Bp){
-                .type = LADY_BP_TRAMPOLINE_LOCKING_MECHANISM,
-                .trampoline_locking_mechanism = (Lady_TrampolineLockingMechanism) {
+                .type = type,
+                .trampoline = (Lady_Trampoline) {
                     .hit_count = hit_count,
                     .lock = lock,
                 },

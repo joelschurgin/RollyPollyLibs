@@ -107,13 +107,13 @@ internal inline void _lady_lock_check_all_bps(Lady_Ctx* ctx) {
 
         Lady_Bp* bp = &ctx->bp_hash.entries[curr_idx].value;
         switch (bp->type) {
-            case LADY_BP_TRAMPOLINE_LOCKING_MECHANISM:
-                if (bp->trampoline_locking_mechanism.lock) {
-                    b8 lock = atomic_load(bp->trampoline_locking_mechanism.lock);
+            case LADY_BP_TRAMPOLINE_SPIN_LOCK:
+                if (bp->trampoline.lock) {
+                    b8 lock = atomic_load(bp->trampoline.lock);
                     if (lock == 1) {
-                        bp->hit_count = atomic_load(bp->trampoline_locking_mechanism.hit_count);
+                        bp->hit_count = atomic_load(bp->trampoline.hit_count);
                         last_bp_hash_idx = curr_idx;
-                        atomic_store(bp->trampoline_locking_mechanism.lock, 0);
+                        atomic_store(bp->trampoline.lock, 0);
                         return;
                     }
                 }
@@ -160,14 +160,14 @@ void lady_test_trampoline_trap(Lady_Ctx* ctx, u64 target_addr) {
     }
 }
 
-void lady_test_trampoline_locking_mechanism(Lady_Ctx* ctx, u64 target_addr) {
+void lady_test_trampoline_spin_lock(Lady_Ctx* ctx, u64 target_addr) {
     TempArenaBlock(LaneArena()) {
         Lady_Bp* bp = 0L;
         AssignLane(0) {
             lady_launch_process(LaneArena(), ctx);
             atomic_store(&target_process_running, true);
 
-            u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAMPOLINE_LOCKING_MECHANISM);
+            u64 bp_key = lady_bp_set(ctx, target_addr, LADY_BP_TRAMPOLINE_SPIN_LOCK);
             bp = lady_bp_hash_get(&ctx->bp_hash, bp_key);
         }
         LaneSyncPtr(bp, 0);
@@ -281,7 +281,7 @@ void* parallel_main(void* main_args) {
     u64 target_addr = ctx->line_info.data[2].addr;
     lady_test_trap(ctx, target_addr);
     lady_test_trampoline_trap(ctx, target_addr);
-    lady_test_trampoline_locking_mechanism(ctx, target_addr);
+    lady_test_trampoline_spin_lock(ctx, target_addr);
     lady_sanity_check(ctx);
     LaneSync();
 }

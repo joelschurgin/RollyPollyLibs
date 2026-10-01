@@ -58,6 +58,19 @@ void trampoline_restore_state(void) {
 }
 
 REMOTE_FUNC_ATTRIBS
+void trampoline_hit_count(void) {
+    __asm__ __volatile__ (
+        ".intel_syntax noprefix\n"
+
+        "add qword ptr [rax], 1\n"
+
+        "__trampoline_hit_count_end:\n"
+
+        ".att_syntax\n"
+    );
+}
+
+REMOTE_FUNC_ATTRIBS
 void trampoline_spin_lock(void) {
     __asm__ __volatile__ (
         ".intel_syntax noprefix\n"
@@ -77,17 +90,3 @@ void trampoline_spin_lock(void) {
         ".att_syntax\n"
     );
 }
-
-REMOTE_FUNC_ATTRIBS
-void trampoline_hit_count(void) {
-    __asm__ __volatile__ (
-        ".intel_syntax noprefix\n"
-
-        "add qword ptr [rax], 1\n"
-
-        "__trampoline_hit_count_end:\n"
-
-        ".att_syntax\n"
-    );
-}
-

@@ -34,9 +34,15 @@ void* parallel_main(void* main_args) {
     misty_read_elf_section_headers(mountain, f, section_header_table_info);
 
     LaneSync();
-    if (LaneIdx() == 0) {
+    AssignLane(0) {
         Misty_LineInfoArray line_info = misty_read_line_info(mountain, f);
     }
+    LaneSync(); // remove when done debugging
+
+    AssignLane(1) {
+        misty_read_debug_info(mountain, f);
+    }
+    LaneSync();
 }
 
 String curr_dir(String path) {
@@ -47,7 +53,7 @@ String curr_dir(String path) {
 }
 
 i32 main(i32 argc, u8** argv) {
-    u64 num_threads = 1;
+    u64 num_threads = 2;
  
     Arena* arena = arena_alloc(1024, 1024);
     String dir = curr_dir(String(argv[0]));

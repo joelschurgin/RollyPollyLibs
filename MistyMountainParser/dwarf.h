@@ -31,7 +31,7 @@
 #define	_DWARF_H 1
 
 /* DWARF Unit Header Types.  */
-enum
+typedef enum
 {
     DW_UT_compile = 0x01,
     DW_UT_type = 0x02,
@@ -42,7 +42,7 @@ enum
 
     DW_UT_lo_user = 0x80,
     DW_UT_hi_user = 0xff
-};
+} DwarfUnitType;
 
 /* DWARF tags.  */
 typedef enum {
@@ -143,15 +143,15 @@ typedef enum {
 
 
 /* Children determination encodings.  */
-enum
+typedef enum
 {
     DW_CHILDREN_no = 0,
     DW_CHILDREN_yes = 1
-};
+} DwarfHasChild;
 
 
 /* DWARF attributes encodings.  */
-enum
+typedef enum
 {
     DW_AT_sibling = 0x01,
     DW_AT_location = 0x02,
@@ -362,7 +362,7 @@ enum
     DW_AT_GNU_bias = 0x2305,
 
     DW_AT_hi_user = 0x3fff
-};
+} DwarfAttributeType;
 
 /* Old unofficially attribute names.  Should not be used.
    Will not appear in known-dwarf.h  */
@@ -430,8 +430,7 @@ typedef enum {
 
 
 /* DWARF location operation encodings.  */
-enum
-{
+typedef enum {
     DW_OP_addr = 0x03,		/* Constant address.  */
     DW_OP_deref = 0x06,
     DW_OP_const1u = 0x08,	/* Unsigned 1-byte constant.  */
@@ -619,7 +618,7 @@ enum
 
     DW_OP_lo_user = 0xe0,	/* Implementation-defined range start.  */
     DW_OP_hi_user = 0xff	/* Implementation-defined range end.  */
-};
+} DwarfOpType;
 
 
 /* DWARF base type encodings.  */

@@ -65,7 +65,10 @@ typedef enum {
     MISTY_NONE,
     MISTY_STRING,
     MISTY_UINT,
+    MISTY_SINT,
     MISTY_ADDR,
+    MISTY_REF,
+    MISTY_FLAG,
 } Misty_ValueType;
 
 typedef struct {
@@ -74,7 +77,10 @@ typedef struct {
         String str;
         u64 addr;
         u64 uint;
-    } val;
+        i64 sint;
+        u64 offset;
+        b8 flag;
+    };
 } Misty_Value;
 
 typedef struct {
@@ -87,7 +93,7 @@ DefineArray(Misty_FilePath);
 typedef struct {
     u64 unit_length;
     u16 version;
-    u8 address_size_bytes;
+    u8 addr_size_bytes;
     u8 segment_selector_size_bytes;
 
     u64 header_length;
@@ -114,6 +120,23 @@ typedef struct {
 DefineArray(Misty_LineInfo);
 
 typedef struct {
+    u64 unit_length;
+    u16 version;
+    DwarfUnitType unit_type;
+    u8  addr_size_bytes;
+    u64 debug_abbrev_offset;
+
+    u64 header_length;
+
+    DwarfType type;
+} Misty_DieHeader;
+
+typedef struct {
+    Misty_DieHeader header;
+    u64Array abbrev_offsets;
+} Misty_Die;
+
+typedef struct {
     Arena* arena;
     ElfType type;
     ElfEndian endian;
@@ -122,6 +145,8 @@ typedef struct {
     u64 debug_str_offsets;
     u64 debug_line;
     u64 debug_line_str;
+    u64 debug_abbrev;
+    u64 debug_info;
 
     Misty_SectionArray sections;
 
@@ -145,10 +170,13 @@ u8*                              misty_read_shstrtab(Misty* mountain, File* f, u
 
 void                             misty_read_elf_section_headers(Misty* mountain, File* f, Misty_SectionHeaderTableInfo section_header_table_info);
 
-Misty_Value                      misty_read_form_val(Misty* mountain, File* f, Misty_Section* section, DwarfFormType form);
+Misty_Value                      misty_read_form_val(Misty* mountain, File* f, Misty_Section* section, DwarfFormType form, u8 addr_size_bytes);
 u64                              misty_read_initial_length_value(File* f, Misty_Section* section, DwarfType* type);
 
 Misty_LineInfoHeader             misty_read_line_info_header(Misty* mountain, File* f, Misty_Section* section);
 Misty_LineInfoArray              misty_read_line_info(Misty* mountain, File* f);
+
+void                             misty_die_read_abbrev_offsets(Misty* mountain, File* f, Misty_Die* die);
+void                             misty_read_debug_info(Misty* mountain, File* f);
 
 #endif

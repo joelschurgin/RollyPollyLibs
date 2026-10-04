@@ -79,6 +79,8 @@ void misty_read_elf_section_headers(Misty* mountain, File* f, Misty_SectionHeade
             else if (string_equal(debug_name, String("str_offsets")))   mountain->debug_str_offsets = section_idx;
             else if (string_equal(debug_name, String("line")))          mountain->debug_line        = section_idx;
             else if (string_equal(debug_name, String("line_str")))      mountain->debug_line_str    = section_idx;
+            else if (string_equal(debug_name, String("abbrev")))        mountain->debug_abbrev      = section_idx;
+            else if (string_equal(debug_name, String("info")))          mountain->debug_info        = section_idx;
         }
     }
 }
@@ -128,6 +130,26 @@ internal u64 read_uleb128(u8* data, u64* num_bytes_read) {
     return result;
 }
 
+internal i64 read_sleb128(u8* data, u64* num_bytes_read) {
+    u64 result = 0;
+    u64 shift = 0;
+    u64 count = 0;
+    u8 byte;
+    for (;;) {
+        byte = data[count++];
+        result |= (u64)(byte & 0x7f) << shift;
+        shift += 7;
+        if ((byte & 0x80) == 0) break;
+    }
+
+    if (shift < 64 && (byte & 0x40)) {
+        result |= (~0ULL << shift);
+    }
+ 
+    *num_bytes_read = count;
+    return (i64)result;
+}
+
 internal u64 DwarfSectionRead_uleb128(File* f, Misty_Section* section) {
     u64 num_bytes_read = 0;
     u64 result = read_uleb128(f->data + section->offset + section->pos, &num_bytes_read);
@@ -135,28 +157,154 @@ internal u64 DwarfSectionRead_uleb128(File* f, Misty_Section* section) {
     return result;
 }
 
-Misty_Value misty_read_form_val(Misty* mountain, File* f, Misty_Section* section, DwarfFormType form) {
-    Assert(section->addr_type != DWARF_NONE);
+internal i64 DwarfSectionRead_sleb128(File* f, Misty_Section* section) {
+    u64 num_bytes_read = 0;
+    i64 result = read_sleb128(f->data + section->offset + section->pos, &num_bytes_read);
+    section->pos += num_bytes_read;
+    return result;
+}
 
+Misty_Value misty_read_form_val(Misty* mountain, File* f, Misty_Section* section, DwarfFormType form, u8 addr_size_bytes) {
     Misty_Value val = {0};
 
     switch (form) {
+        case DW_FORM_string:
+        {
+            val.type = MISTY_STRING;
+            val.str =  DwarfSectionRead_String(mountain->arena, f, section);
+        }
+        break;
+        case DW_FORM_strp:
+        {
+            val.type = MISTY_STRING;
+            u64 offset = 0;
+            DwarfSectionRead_Addr(f, section, offset, section->addr_type);
+            val.str = DwarfSectionRead_StringAt(mountain->arena, f, &misty_section(mountain, debug_str), offset);
+        }
+        break;
         case DW_FORM_line_strp:
         {
             val.type = MISTY_STRING;
             u64 offset = 0;
             DwarfSectionRead_Addr(f, section, offset, section->addr_type);
-            val.val.str = DwarfSectionRead_StringAt(mountain->arena, f, &misty_section(mountain, debug_line_str), offset);
+            val.str = DwarfSectionRead_StringAt(mountain->arena, f, &misty_section(mountain, debug_line_str), offset);
+        }
+        break;
+        case DW_FORM_ref1:
+        {
+            val.type = MISTY_REF;
+            DwarfSectionRead_Data(f, section, &val.offset, 1);
+        }
+        break;
+        case DW_FORM_ref2:
+        {
+            val.type = MISTY_REF;
+            DwarfSectionRead_Data(f, section, &val.offset, 2);
+        }
+        break;
+        case DW_FORM_ref4:
+        {
+            val.type = MISTY_REF;
+            DwarfSectionRead_Data(f, section, &val.offset, 4);
+        }
+        break;
+        case DW_FORM_ref8:
+        {
+            val.type = MISTY_REF;
+            DwarfSectionRead_Data(f, section, &val.offset, 8);
+        }
+        break;
+        case DW_FORM_ref_udata:
+        {
+            val.type = MISTY_REF;
+            val.offset = DwarfSectionRead_uleb128(f, section);
+        }
+        break;
+        case DW_FORM_data1:
+        {
+            val.type = MISTY_UINT;
+            DwarfSectionRead_Data(f, section, &val.offset, 1);
+        }
+        break;
+        case DW_FORM_data2:
+        {
+            val.type = MISTY_UINT;
+            DwarfSectionRead_Data(f, section, &val.uint, 2);
+        }
+        break;
+        case DW_FORM_data4:
+        {
+            val.type = MISTY_UINT;
+            DwarfSectionRead_Data(f, section, &val.uint, 4);
+        }
+        break;
+        case DW_FORM_data8:
+        {
+            val.type = MISTY_UINT;
+            DwarfSectionRead_Data(f, section, &val.uint, 8);
+        }
+        break;
+        case DW_FORM_data16:
+        {
+            val.type = MISTY_UINT;
+            DwarfSectionRead_Data(f, section, &val.uint, 16);
         }
         break;
         case DW_FORM_udata:
         {
             val.type = MISTY_UINT;
-            val.val.uint = DwarfSectionRead_uleb128(f, section);
+            val.uint = DwarfSectionRead_uleb128(f, section);
+        }
+        break;
+        case DW_FORM_addr:
+        {
+            val.type = MISTY_ADDR;
+            DwarfSectionRead_Data(f, section, &val.addr, addr_size_bytes);
+        }
+        break;
+        case DW_FORM_sec_offset:
+        {
+            val.type = MISTY_ADDR;
+            DwarfSectionRead_Data(f, section, &val.addr, (section->addr_type == DWARF_32) ? 4 : 8);
+        }
+        break;
+        case DW_FORM_flag_present:
+        {
+            val.type = MISTY_FLAG;
+            val.flag = 1;
+        }
+        break;
+        case DW_FORM_exprloc:
+        {
+            // DWARF5 pg 26 for expressions
+            u64 length = DwarfSectionRead_uleb128(f, section);
+            TempArenaBlock(mountain->arena) {
+                u8Array expr_bytes = Array(mountain->arena, u8, length);
+                DwarfSectionRead_Data(f, section, expr_bytes.data, expr_bytes.count);
+
+                for (u64 idx = 0; idx < expr_bytes.count; idx++) {
+                    DwarfOpType op = expr_bytes.data[idx];
+                    switch (op) {
+                        case DW_OP_call_frame_cfa:
+                            // not sure what needs to happen here yet
+                        break;
+                        case DW_OP_fbreg:
+                        {
+                            val.type = MISTY_SINT;
+                            u64 num_bytes_read = 0;
+                            val.sint = read_sleb128(&expr_bytes.data[idx+1], &num_bytes_read);
+                            idx += num_bytes_read;
+                        }
+                        break;
+                        default:
+                            TODO("DW_OP not handled");
+                    }
+                }
+            }
         }
         break;
         default:
-            Assert(!"Form Type Not Handled");
+            TODO("Form Type Not Handled");
     }
 
     return val;
@@ -179,13 +327,14 @@ u64 misty_read_initial_length_value(File* f, Misty_Section* section, DwarfType* 
 
 Misty_Value misty_read_line_content_description(Misty* mountain, File* f, Misty_Section* section, Misty_LineHeaderEntryFormat* entry_format) {
     Misty_Value val = {0};
+    u8 addr_size_bytes = (section->addr_type == DWARF_32) ? 4 : 8;
     switch (entry_format->type) {
         case DW_LNCT_path:
-            val = misty_read_form_val(mountain, f, section, entry_format->form);
+            val = misty_read_form_val(mountain, f, section, entry_format->form, addr_size_bytes);
             Assert(val.type == MISTY_STRING);
         break;
         case DW_LNCT_directory_index:
-            val = misty_read_form_val(mountain, f, section, entry_format->form);
+            val = misty_read_form_val(mountain, f, section, entry_format->form, addr_size_bytes);
             Assert(val.type == MISTY_UINT);
         break;
         default:
@@ -212,7 +361,7 @@ internal void _misty_read_line_info_header_dirs_and_files_dwarf5(Misty* mountain
         for (u64 dir_idx = 0; dir_idx < mountain->dirs.count; dir_idx++) {
             for EachElement(entry_format, Misty_LineHeaderEntryFormat, dir_entry_format) {
                 Misty_Value val = misty_read_line_content_description(mountain, f, section, entry_format);
-                mountain->dirs.data[dir_idx] = val.val.str;
+                mountain->dirs.data[dir_idx] = val.str;
             }
         }
     }
@@ -235,9 +384,9 @@ internal void _misty_read_line_info_header_dirs_and_files_dwarf5(Misty* mountain
             for EachElement(entry_format, Misty_LineHeaderEntryFormat, file_entry_format) {
                 Misty_Value val = misty_read_line_content_description(mountain, f, section, entry_format);
                 if (val.type == MISTY_STRING) {
-                    mountain->file_paths.data[file_idx].file_name = val.val.str;
+                    mountain->file_paths.data[file_idx].file_name = val.str;
                 } else if (val.type == MISTY_UINT) {
-                    mountain->file_paths.data[file_idx].dir_idx = val.val.uint;
+                    mountain->file_paths.data[file_idx].dir_idx = val.uint;
                 } else {
                     Assert(!"Unhandled type for mountain->file_paths");
                 }
@@ -315,10 +464,10 @@ Misty_LineInfoHeader misty_read_line_info_header(Misty* mountain, File* f, Misty
     Assert(header.version >= 2 && header.version <= 5);
 
     if (header.version == 5) {
-        DwarfSectionRead_Struct(f, section, header.address_size_bytes);
+        DwarfSectionRead_Struct(f, section, header.addr_size_bytes);
         DwarfSectionRead_Struct(f, section, header.segment_selector_size_bytes);
     } else {
-        header.address_size_bytes = (header.type == DWARF_32) ? 4 : 8;
+        header.addr_size_bytes = (header.type == DWARF_32) ? 4 : 8;
     }
 
     DwarfSectionRead_Addr(f, section, header.header_length, header.type);
@@ -399,7 +548,7 @@ Misty_LineInfoArray misty_read_line_info(Misty* mountain, File* f) {
                     break;
                     case DW_LNE_set_address:
                         Assert(sizeof(state.addr) >= (u64)(ext_opcode_length-1));
-                        MemoryCopy(&state.addr, ext_opcode + 1, header.address_size_bytes);
+                        MemoryCopy(&state.addr, ext_opcode + 1, header.addr_size_bytes);
                         state.op_idx = 0;
                     break;
                     case DW_LNE_set_discriminator:
@@ -508,6 +657,117 @@ Misty_LineInfoArray misty_read_line_info(Misty* mountain, File* f) {
     return line_info;
 }
 
+void misty_die_read_abbrev_offsets(Misty* mountain, File* f, Misty_Die* die) {
+    Misty_Section* section = &misty_section(mountain, debug_abbrev);
+    section->pos = die->header.debug_abbrev_offset;
+    section->addr_type = die->header.type;
+
+    ArrayBuilderBlock(mountain->arena, die->abbrev_offsets, u64) {
+        array_builder_push(mountain->arena, die->abbrev_offsets, section->pos);
+        while (1) {
+            u64 abbrev_idx = DwarfSectionRead_uleb128(f, section);
+            if (abbrev_idx == 0) break;
+            array_builder_push(mountain->arena, die->abbrev_offsets, section->pos);
+
+            DwarfTagType tag = DwarfSectionRead_uleb128(f, section);
+            DwarfHasChild has_child = DwarfSectionRead_uleb128(f, section);
+
+            DwarfAttributeType attribute;
+            DwarfFormType form;
+            u64 implicit_const = 0;
+            while (1) {
+                attribute = DwarfSectionRead_uleb128(f, section);
+                form = DwarfSectionRead_uleb128(f, section);
+ 
+                if (attribute == 0 || form == 0) break;
+
+                switch (form) {
+                    case DW_FORM_implicit_const:
+                        implicit_const = DwarfSectionRead_uleb128(f, section);
+                    break;
+                }
+            }
+        }
+    }
+}
+
+
+void misty_read_debug_info(Misty* mountain, File* f) {
+    // read CU header DWARF5.pdf page 200
+    Misty_Section* section = &misty_section(mountain, debug_info);
+
+    Misty_Die die = {0};
+
+    // header
+    {
+        {
+            u32 unit_length_32 = 0;
+            DwarfSectionRead_Struct(f, section, unit_length_32);
+            if (unit_length_32 < 0xfffffff0) {
+                die.header.unit_length = (u64)unit_length_32;
+                die.header.type = DWARF_32;
+            } else { 
+                DwarfSectionRead_Struct(f, section, die.header.unit_length);
+                die.header.type = DWARF_64;
+            }
+            section->addr_type = die.header.type;
+        }
+
+        DwarfSectionRead_Struct(f, section, die.header.version);
+
+        {
+            u8 unit_type = 0;
+            DwarfSectionRead_Struct(f, section, unit_type);
+            die.header.unit_type = (DwarfUnitType)unit_type;
+        }
+
+        DwarfSectionRead_Struct(f, section, die.header.addr_size_bytes);
+        DwarfSectionRead_Data(f, section, &die.header.debug_abbrev_offset, (die.header.type == DWARF_32) ? 4 : 8);
+
+        switch (die.header.unit_type) {
+            case DW_UT_compile:
+                // no more bytes to read for the die.header
+            break;
+            default:
+                TODO("Handle Other DWARF_UT types");
+        }
+    }
+
+    misty_die_read_abbrev_offsets(mountain, f, &die);
+
+    // read the data
+    while (1) {
+        u64 debug_info_code = DwarfSectionRead_uleb128(f, section);
+        if (debug_info_code == 0) {
+            break;
+        }
+
+        u64 abbrev_offset = die.abbrev_offsets.data[debug_info_code];
+
+        Misty_Section* abbrev_section = &misty_section(mountain, debug_abbrev);
+        abbrev_section->pos = abbrev_offset;
+
+        DwarfTagType tag = DwarfSectionRead_uleb128(f, abbrev_section);
+        DwarfHasChild has_child = DwarfSectionRead_uleb128(f, abbrev_section);
+
+        DwarfAttributeType attribute;
+        DwarfFormType form;
+        Misty_Value value;
+        while(1) {
+            attribute = DwarfSectionRead_uleb128(f, abbrev_section);
+            form = DwarfSectionRead_uleb128(f, abbrev_section);
+
+            if (attribute == 0 || form == 0) break;
+
+            if (form == DW_FORM_implicit_const) {
+                value.type = MISTY_UINT;
+                value.uint = DwarfSectionRead_sleb128(f, abbrev_section);
+            } else {
+                value = misty_read_form_val(mountain, f, section, form, die.header.addr_size_bytes);
+            }
+        }
+    }
+}
 
 #undef DwarfSectionRead_Data
 #undef DwarfSectionRead_Struct

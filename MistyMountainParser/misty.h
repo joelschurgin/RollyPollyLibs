@@ -42,7 +42,7 @@ typedef struct {
     String name;
     u64 size;
     u64 offset;
-    u64 pos;
+    u64Array pos;
     DwarfType addr_type;
 } Misty_Section;
 
@@ -80,8 +80,101 @@ typedef struct {
         i64 sint;
         u64 offset;
         b8 flag;
-    };
+    } val;
 } Misty_Value;
+
+typedef enum {
+    MISTY_TYPE_INFO_MODIFIER_NONE,
+    MISTY_CONST,
+    MISTY_POINTER,
+} Misty_TypeInfoModifier;
+
+typedef struct Misty_TypeInfo Misty_TypeInfo;
+struct Misty_TypeInfo {
+    Misty_TypeInfo* next;
+    Misty_TypeInfo* related_type_info;
+    String name;
+    u64 byte_size;
+    DwarfAttributeEncodingType encoding;
+    Misty_TypeInfoModifier modifier;
+    u64 entry_addr;
+    u64 type_ref;
+};
+
+typedef struct {
+    Misty_TypeInfo* first;
+    Misty_TypeInfo* last;
+} Misty_TypeInfoList;
+
+typedef struct Misty_Variable Misty_Variable;
+struct Misty_Variable {
+    Misty_Variable* next;
+
+    Misty_TypeInfo* type;
+    String name;
+
+    u64 file_idx;
+    u64 line;
+    u64 column;
+ 
+    u64 entry_addr;
+
+    u64 type_ref;
+
+    // something for location
+};
+
+typedef struct {
+    Misty_Variable* first;
+    Misty_Variable* last;
+} Misty_VariableList;
+
+DefineArray(Misty_Variable);
+
+typedef struct Misty_Subprogram Misty_Subprogram;
+struct Misty_Subprogram {
+    Misty_Subprogram* next;
+
+    String name;
+
+    u64 file_idx;
+    u64 line;
+    u64 column;
+
+    //Misty_TypeInfo* ret_type;
+    //Misty_VariableArray parameters;
+
+    b8 prototyped;
+    b8 external;
+
+    u64 entry_addr;
+
+    u64 ret_type_ref;
+
+    b8 unspecified_params;
+};
+
+typedef struct {
+    Misty_Subprogram* first;
+    Misty_Subprogram* last;
+} Misty_SubprogramList;
+
+typedef struct {
+    String name;
+    String producer;
+    String language_name;
+    String comp_dir;
+
+    u64 language_version;
+
+    u64 low_pc;
+    u64 high_pc;
+
+    u64 stmt_list;
+    u64 macros;
+
+    DwarfLang language;
+} Misty_CompileUnit;
 
 typedef struct {
     String file_name;
@@ -134,7 +227,17 @@ typedef struct {
 typedef struct {
     Misty_DieHeader header;
     u64Array abbrev_offsets;
+
+    Misty_CompileUnit comp_unit;
+ 
+    Misty_TypeInfoList type_info;
+    Misty_VariableList variable;
+    Misty_SubprogramList subprogram;
+
+    u64 start_addr;
 } Misty_Die;
+
+DefineArray(Misty_Die);
 
 typedef struct {
     Arena* arena;
@@ -152,6 +255,10 @@ typedef struct {
 
     StringArray dirs;
     Misty_FilePathArray file_paths;
+
+    Misty_DieArray die_arr; 
+
+    Mutex* mutex;
 } Misty;
 
 Misty* misty_mountain_create(Arena* arena);
@@ -177,6 +284,8 @@ Misty_LineInfoHeader             misty_read_line_info_header(Misty* mountain, Fi
 Misty_LineInfoArray              misty_read_line_info(Misty* mountain, File* f);
 
 void                             misty_die_read_abbrev_offsets(Misty* mountain, File* f, Misty_Die* die);
+
+void                             misty_parse_die(Misty* mountain, File* f, Misty_Die* die);
 void                             misty_read_debug_info(Misty* mountain, File* f);
 
 #endif

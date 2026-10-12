@@ -25,6 +25,7 @@ void* parallel_main(void* main_args) {
         f = FilePtr(arena, path);
 
         mountain = Misty(arena);
+        mutex_assign(&mountain->mutex);
         section_header_table_info = misty_read_elf_header(mountain, f);
     }
     LaneSyncPtr(f, 0);
@@ -34,14 +35,14 @@ void* parallel_main(void* main_args) {
     misty_read_elf_section_headers(mountain, f, section_header_table_info);
 
     LaneSync();
+    /*
     AssignLane(0) {
         Misty_LineInfoArray line_info = misty_read_line_info(mountain, f);
     }
-    LaneSync(); // remove when done debugging
+    LaneSync();
+    */
 
-    AssignLane(1) {
-        misty_read_debug_info(mountain, f);
-    }
+    misty_read_debug_info(mountain, f);
     LaneSync();
 }
 
@@ -83,7 +84,7 @@ i32 main(i32 argc, u8** argv) {
             .argv = argv_test,
         };
 
-        create_parallel_entry_point(num_threads, 0, parallel_main, &main_args);
+        create_parallel_entry_point(num_threads, 1, parallel_main, &main_args);
         temp_arena_end(temp_arena);
     }
 

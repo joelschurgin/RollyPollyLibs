@@ -1,19 +1,19 @@
-
-
-
 #include <stdio.h>
-#include <unistd.h>
 
-float func(float a) {
-    return a * 0.3f;
+unsigned long calculate_factorial(unsigned long n) {
+    unsigned long result = 1;
+ 
+    for (unsigned long i = n; i >= 1; i--) {
+        result = result * i; 
+    }
+
+    return result;
 }
 
 int main() {
-    pid_t pid = getpid();
-    for (int i = 0; i < 100000; i++) {
-        float a = 0.1f;
-        float b = func(a + pid);
-    }
-
+    unsigned long number = 5;
+    unsigned long fact = calculate_factorial(number);
+ 
+    printf("The factorial of %d is: %d\n", number, fact);
     return 0;
 }

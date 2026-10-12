@@ -622,7 +622,7 @@ typedef enum {
 
 
 /* DWARF base type encodings.  */
-enum
+typedef enum
 {
     DW_ATE_void = 0x0,
     DW_ATE_address = 0x1,
@@ -646,7 +646,7 @@ enum
 
     DW_ATE_lo_user = 0x80,
     DW_ATE_hi_user = 0xff
-};
+} DwarfAttributeEncodingType;
 
 
 /* DWARF decimal sign encodings.  */
@@ -704,8 +704,7 @@ enum
    See https://dwarfstd.org/languages.html for language code published
    after DWARF5 was published (but before DWARF6 has been released,
    which will introduce a new DW_AT_language_name/version scheme).  */
-enum
-{
+typedef enum {
     DW_LANG_C89 = 0x0001,	     /* ISO C:1989 */
     DW_LANG_C = 0x0002,		     /* C */
     DW_LANG_Ada83 = 0x0003,	     /* ISO Ada:1983 */
@@ -779,7 +778,7 @@ enum
     DW_LANG_lo_user = 0x8000,
     DW_LANG_Mips_Assembler = 0x8001, /* Assembler */
     DW_LANG_hi_user = 0xffff
-};
+} DwarfLang;
 
 /* Old (typo) '1' != 'I'.  */
 #define DW_LANG_PL1 DW_LANG_PLI

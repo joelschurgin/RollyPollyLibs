@@ -224,6 +224,20 @@ typedef struct {
     DwarfType type;
 } Misty_DieHeader;
 
+typedef enum {
+    MISTY_DIE_ENTRY_NONE,
+    MISTY_DIE_ENTRY_COMPUNIT,
+    MISTY_DIE_ENTRY_TYPE,
+    MISTY_DIE_ENTRY_SUBPROGRAM,
+    MISTY_DIE_ENTRY_VARIABLE,
+} Misty_DieEntryType;
+
+typedef struct {
+    void* value;
+    Misty_DieEntryType type;
+    DwarfHasChild has_child;
+} Misty_DieEntry;
+
 typedef struct {
     Misty_DieHeader header;
     u64Array abbrev_offsets;
@@ -285,7 +299,7 @@ Misty_LineInfoArray              misty_read_line_info(Misty* mountain, File* f);
 
 void                             misty_die_read_abbrev_offsets(Misty* mountain, File* f, Misty_Die* die);
 
-void                             misty_parse_die(Misty* mountain, File* f, Misty_Die* die);
+void                             misty_parse_die(Misty* mountain, File* f, Misty_Die* die, Misty_DieEntry* parent);
 void                             misty_read_debug_info(Misty* mountain, File* f);
 
 #endif

@@ -299,9 +299,10 @@ Misty_Value misty_read_form_val(Misty* mountain, File* f, Misty_Section* section
                         break;
                         case DW_OP_fbreg:
                         {
-                            val.type = MISTY_SINT;
+                            val.type = MISTY_LOCATION;
                             u64 num_bytes_read = 0;
-                            val.val.sint = read_sleb128(&expr_bytes.data[idx+1], &num_bytes_read);
+                            val.val.location.type = MISTY_LOCATION_FBREG;
+                            val.val.location.val.sint = read_sleb128(&expr_bytes.data[idx+1], &num_bytes_read);
                             idx += num_bytes_read;
                         }
                         break;
@@ -724,6 +725,8 @@ typedef struct {
     u64 type_ref;
     u64 sibling_ref;
 
+    Misty_Location location;
+
     DwarfLang language;
     DwarfAttributeEncodingType encoding;
 
@@ -732,6 +735,7 @@ typedef struct {
     b8 declaration;
     b8 frame_base;
     b8 call_all_tail_calls;
+    b8 call_all_calls;
 } Misty_AttribValues;
 
 void misty_parse_attrib(DwarfAttributeType attrib, Misty_Value value, Misty_AttribValues* attrib_values) {
@@ -758,6 +762,8 @@ void misty_parse_attrib(DwarfAttributeType attrib, Misty_Value value, Misty_Attr
         case DW_AT_sibling:             attrib_values->sibling_ref          =   value.val.addr;                             break;
         case DW_AT_frame_base:          attrib_values->frame_base           =   1;                                          break;
         case DW_AT_call_all_tail_calls: attrib_values->call_all_tail_calls  =   value.val.flag;                             break;
+        case DW_AT_call_all_calls:      attrib_values->call_all_calls       =   value.val.flag;                             break;
+        case DW_AT_location:            attrib_values->location             =   value.val.location;                         break;
         default:
             TODO("Unhandled attrib");
     }
@@ -776,6 +782,7 @@ Misty_DieEntry misty_push_type(Misty* mountain, Misty_Die* die, u64 entry_addr) 
     }
 
     die->type_info.last->entry_addr = entry_addr;
+    die->type_info.size += 1;
 
     Misty_DieEntry entry = {0};
     entry.value = (void*)new_type;
@@ -796,10 +803,32 @@ Misty_DieEntry misty_push_subprogram(Misty* mountain, Misty_Die* die, u64 entry_
     }
 
     die->subprogram.last->entry_addr = entry_addr;
+    die->subprogram.size += 1;
  
     Misty_DieEntry entry = {0};
     entry.value = (void*)new_subprogram;
     entry.type = MISTY_DIE_ENTRY_SUBPROGRAM;
+    return entry;
+}
+
+Misty_DieEntry misty_push_lexical_block(Misty* mountain, Misty_Die* die, u64 entry_addr) {
+    Misty_LexicalBlock* new_lexical_block = 0L;
+    MutexBlock(mountain->mutex) {
+        new_lexical_block = push_struct(mountain->arena, Misty_LexicalBlock);
+    }
+    if (!die->lexical_block.first) {
+        die->lexical_block.first = new_lexical_block;
+        die->lexical_block.last = new_lexical_block;
+    } else {
+        SLLQueuePush(die->lexical_block.first, die->lexical_block.last, new_lexical_block);
+    }
+
+    die->lexical_block.last->entry_addr = entry_addr;
+    die->lexical_block.size += 1;
+
+    Misty_DieEntry entry = {0};
+    entry.value = (void*)new_lexical_block;
+    entry.type = MISTY_DIE_ENTRY_LEXICAL_BLOCK;
     return entry;
 }
 
@@ -816,11 +845,26 @@ Misty_DieEntry misty_push_variable(Misty* mountain, Misty_Die* die, u64 entry_ad
     }
 
     die->variable.last->entry_addr = entry_addr;
+    die->variable.size += 1;
 
     Misty_DieEntry entry = {0};
     entry.value = (void*)new_variable;
     entry.type = MISTY_DIE_ENTRY_VARIABLE;
     return entry;
+}
+
+void misty_push_variable_ref(Misty* mountain, Misty_VariableRefList* ref_list, Misty_Variable* var) {
+    Misty_VariableRef* new_ref = 0L;
+    MutexBlock(mountain->mutex) {
+        new_ref = push_struct(mountain->arena, Misty_VariableRef);
+    }
+    new_ref->ref = var;
+    if (!ref_list->first) {
+        ref_list->first = new_ref;
+        ref_list->last = new_ref;
+    } else {
+        SLLQueuePush(ref_list->first, ref_list->last, new_ref);
+    }
 }
 
 Misty_DieEntry misty_parse_die_entry(Misty* mountain, File* f, Misty_Die* die) {
@@ -931,6 +975,23 @@ Misty_DieEntry misty_parse_die_entry(Misty* mountain, File* f, Misty_Die* die) {
             die->subprogram.last->unspecified_params = 1;
         }
         break;
+        case DW_TAG_variable:
+        {
+            entry = misty_push_variable(mountain, die, entry_addr);
+            die->variable.last->name     = attrib_values.name;
+            die->variable.last->file_idx = attrib_values.file_idx;
+            die->variable.last->line     = attrib_values.line;
+            die->variable.last->column   = attrib_values.column;
+            die->variable.last->type_ref = attrib_values.type_ref;
+        }
+        break;
+        case DW_TAG_lexical_block:
+        {
+            entry = misty_push_lexical_block(mountain, die, entry_addr);
+            die->lexical_block.last->low_pc  = attrib_values.low_pc;
+            die->lexical_block.last->high_pc = attrib_values.high_pc;
+        }
+        break;
         default:
             TODO("Unhandled DW_TAG");
     }
@@ -948,26 +1009,25 @@ void misty_parse_die(Misty* mountain, File* f, Misty_Die* die, Misty_DieEntry* p
     do {
         entry = misty_parse_die_entry(mountain, f, die);
 
-        if (parent)
-        switch (parent->type) {
-            case MISTY_DIE_ENTRY_COMPUNIT:
-            break;
-            case MISTY_DIE_ENTRY_TYPE:
-            break;
-            case MISTY_DIE_ENTRY_SUBPROGRAM:
-                switch (entry.type) {
-                    case MISTY_DIE_ENTRY_COMPUNIT:
-                    break;
-                    case MISTY_DIE_ENTRY_TYPE:
-                    break;
-                    case MISTY_DIE_ENTRY_SUBPROGRAM:
-                    break;
-                    case MISTY_DIE_ENTRY_VARIABLE:
-                    break;
+        if (parent) {
+            switch (parent->type) {
+                case MISTY_DIE_ENTRY_COMPUNIT:
+                break;
+                case MISTY_DIE_ENTRY_TYPE:
+                break;
+                case MISTY_DIE_ENTRY_SUBPROGRAM:
+                {
+                    Misty_Subprogram* subprog = (Misty_Subprogram*)parent->value;
+                    switch (entry.type) {
+                        case MISTY_DIE_ENTRY_VARIABLE:
+                            misty_push_variable_ref(mountain, &subprog->parameters, ((Misty_Variable*)entry.value));
+                        break;
+                    }
                 }
-            break;
-            case MISTY_DIE_ENTRY_VARIABLE:
-            break;
+                break;
+                case MISTY_DIE_ENTRY_VARIABLE:
+                break;
+            }
         }
 
         if (entry.has_child) {

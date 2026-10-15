@@ -62,6 +62,18 @@ typedef struct {
 DefineArray(Misty_LineHeaderEntryFormat);
 
 typedef enum {
+    MISTY_LOCATION_NONE,
+    MISTY_LOCATION_FBREG,
+} Misty_LocationType;
+
+typedef struct {
+    union {
+        u64 sint;
+    } val;
+    Misty_LocationType type;
+} Misty_Location;
+
+typedef enum {
     MISTY_NONE,
     MISTY_STRING,
     MISTY_UINT,
@@ -69,6 +81,7 @@ typedef enum {
     MISTY_ADDR,
     MISTY_REF,
     MISTY_FLAG,
+    MISTY_LOCATION,
 } Misty_ValueType;
 
 typedef struct {
@@ -80,6 +93,7 @@ typedef struct {
         i64 sint;
         u64 offset;
         b8 flag;
+        Misty_Location location;
     } val;
 } Misty_Value;
 
@@ -104,6 +118,7 @@ struct Misty_TypeInfo {
 typedef struct {
     Misty_TypeInfo* first;
     Misty_TypeInfo* last;
+    u64 size;
 } Misty_TypeInfoList;
 
 typedef struct Misty_Variable Misty_Variable;
@@ -127,9 +142,21 @@ struct Misty_Variable {
 typedef struct {
     Misty_Variable* first;
     Misty_Variable* last;
+    u64 size;
 } Misty_VariableList;
 
 DefineArray(Misty_Variable);
+
+typedef struct Misty_VariableRef Misty_VariableRef;
+struct Misty_VariableRef {
+    Misty_VariableRef* next;
+    Misty_Variable* ref;
+};
+
+typedef struct {
+    Misty_VariableRef* first;
+    Misty_VariableRef* last;
+} Misty_VariableRefList;
 
 typedef struct Misty_Subprogram Misty_Subprogram;
 struct Misty_Subprogram {
@@ -141,9 +168,6 @@ struct Misty_Subprogram {
     u64 line;
     u64 column;
 
-    //Misty_TypeInfo* ret_type;
-    //Misty_VariableArray parameters;
-
     b8 prototyped;
     b8 external;
 
@@ -151,13 +175,30 @@ struct Misty_Subprogram {
 
     u64 ret_type_ref;
 
+    Misty_VariableRefList parameters;
+
     b8 unspecified_params;
 };
 
 typedef struct {
     Misty_Subprogram* first;
     Misty_Subprogram* last;
+    u64 size;
 } Misty_SubprogramList;
+
+typedef struct Misty_LexicalBlock Misty_LexicalBlock;
+struct Misty_LexicalBlock {
+    Misty_LexicalBlock* next;
+    u64 low_pc;
+    u64 high_pc;
+    u64 entry_addr;
+};
+
+typedef struct {
+    Misty_LexicalBlock* first;
+    Misty_LexicalBlock* last;
+    u64 size;
+} Misty_LexicalBlockList;
 
 typedef struct {
     String name;
@@ -230,6 +271,7 @@ typedef enum {
     MISTY_DIE_ENTRY_TYPE,
     MISTY_DIE_ENTRY_SUBPROGRAM,
     MISTY_DIE_ENTRY_VARIABLE,
+    MISTY_DIE_ENTRY_LEXICAL_BLOCK,
 } Misty_DieEntryType;
 
 typedef struct {
@@ -247,6 +289,7 @@ typedef struct {
     Misty_TypeInfoList type_info;
     Misty_VariableList variable;
     Misty_SubprogramList subprogram;
+    Misty_LexicalBlockList lexical_block;
 
     u64 start_addr;
 } Misty_Die;

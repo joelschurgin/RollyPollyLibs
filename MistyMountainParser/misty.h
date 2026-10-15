@@ -68,7 +68,7 @@ typedef enum {
 
 typedef struct {
     union {
-        u64 sint;
+        i64 sint;
     } val;
     Misty_LocationType type;
 } Misty_Location;
@@ -136,7 +136,7 @@ struct Misty_Variable {
 
     u64 type_ref;
 
-    // something for location
+    Misty_Location location;
 };
 
 typedef struct {
@@ -297,7 +297,8 @@ typedef struct {
 DefineArray(Misty_Die);
 
 typedef struct {
-    Arena* arena;
+    Arena* temp_arena;
+    Arena* dest_arena;
     ElfType type;
     ElfEndian endian;
 
@@ -313,13 +314,10 @@ typedef struct {
     StringArray dirs;
     Misty_FilePathArray file_paths;
 
-    Misty_DieArray die_arr; 
-
     Mutex* mutex;
-} Misty;
+} Misty_DwarfReader;
 
-Misty* misty_mountain_create(Arena* arena);
-#define Misty(arena) misty_mountain_create((arena))
+Misty_DwarfReader* misty_mountain_create(Arena* dest_arena, Arena* temp_arena);
 
 #define misty_section(misty_mountain, section_name) ((misty_mountain)->sections.data[(misty_mountain)->section_name])
 
@@ -329,20 +327,31 @@ typedef struct {
     u8* section_names;
 } Misty_SectionHeaderTableInfo;
 
-Misty_SectionHeaderTableInfo     misty_read_elf_header(Misty* mountain, File* f);
-u8*                              misty_read_shstrtab(Misty* mountain, File* f, u64 offset);
+typedef struct {
+    Arena* arena;
 
-void                             misty_read_elf_section_headers(Misty* mountain, File* f, Misty_SectionHeaderTableInfo section_header_table_info);
+    StringArray dirs;
+    Misty_FilePathArray file_paths;
 
-Misty_Value                      misty_read_form_val(Misty* mountain, File* f, Misty_Section* section, DwarfFormType form, u8 addr_size_bytes);
+    Misty_LineInfoArray line_info;
+} Misty_DebugInfo;
+
+Misty_SectionHeaderTableInfo     misty_read_elf_header(Misty_DwarfReader* mountain, File* f);
+u8*                              misty_read_shstrtab(Misty_DwarfReader* mountain, File* f, u64 offset);
+
+void                             misty_read_elf_section_headers(Misty_DwarfReader* mountain, File* f, Misty_SectionHeaderTableInfo section_header_table_info);
+
+Misty_Value                      misty_read_form_val(Misty_DwarfReader* mountain, File* f, Misty_Section* section, DwarfFormType form, u8 addr_size_bytes);
 u64                              misty_read_initial_length_value(File* f, Misty_Section* section, DwarfType* type);
 
-Misty_LineInfoHeader             misty_read_line_info_header(Misty* mountain, File* f, Misty_Section* section);
-Misty_LineInfoArray              misty_read_line_info(Misty* mountain, File* f);
+Misty_LineInfoHeader             misty_read_line_info_header(Misty_DwarfReader* mountain, File* f, Misty_Section* section);
+Misty_LineInfoArray              misty_read_line_info(Misty_DwarfReader* mountain, File* f);
 
-void                             misty_die_read_abbrev_offsets(Misty* mountain, File* f, Misty_Die* die);
+void                             misty_die_read_abbrev_offsets(Misty_DwarfReader* mountain, File* f, Misty_Die* die);
 
-void                             misty_parse_die(Misty* mountain, File* f, Misty_Die* die, Misty_DieEntry* parent);
-void                             misty_read_debug_info(Misty* mountain, File* f);
+void                             misty_parse_die(Misty_DwarfReader* mountain, File* f, Misty_Die* die, Misty_DieEntry* parent);
+void                             misty_read_debug_info(Misty_DwarfReader* mountain, File* f);
+
+Misty_DebugInfo*                 misty_parse(Arena* arena, String path);
 
 #endif

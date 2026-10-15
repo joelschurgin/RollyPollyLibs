@@ -16,34 +16,16 @@ void* parallel_main(void* main_args) {
         ThreadExit(NULL);
     }
 
-    File* f;
-    Misty* mountain = 0L;
-    Misty_SectionHeaderTableInfo section_header_table_info;
-    if (LaneIdx() == 0) {
-        Arena* arena = default_arena();
-        String path = String(argv[1]);
-        f = FilePtr(arena, path);
-
-        mountain = Misty(arena);
-        mutex_assign(&mountain->mutex);
-        section_header_table_info = misty_read_elf_header(mountain, f);
-    }
-    LaneSyncPtr(f, 0);
-    LaneSyncPtr(mountain, 0);
-    LaneSyncStruct(section_header_table_info, 0);
-
-    misty_read_elf_section_headers(mountain, f, section_header_table_info);
-
-    LaneSync();
-    /*
+    String path = {0};
+    Arena* arena = 0L;
     AssignLane(0) {
-        Misty_LineInfoArray line_info = misty_read_line_info(mountain, f);
+        path = String(argv[1]);
+        arena = default_arena();
     }
-    LaneSync();
-    */
+    LaneSyncStruct(path, 0);
+    LaneSyncPtr(arena, 0);
 
-    misty_read_debug_info(mountain, f);
-    LaneSync();
+    Misty_DebugInfo* debug_info = misty_parse(arena, path);
 }
 
 String curr_dir(String path) {

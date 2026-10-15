@@ -48,18 +48,19 @@ Arena* arena_alloc_(u64 reserve_size, u64 commit_size) {
 
 void arena_release_(Arena **arena) {
     if (!(arena && *arena)) return;
-    memory_release(*arena, (*arena)->reserved);
 
     Arena** begin = all_arenas;
     Arena** end = all_arenas + all_arenas_size;
     for (Arena** a = begin; a != end; a++) {
-        if (*arena == *a) {
+        if (a && *a && arena && *arena && *arena == *a) {
             *a = NULL;
             break;
         }
     }
 
+    Arena* arena_to_free = *arena;
     (*arena) = NULL;
+    memory_release(arena_to_free, (arena_to_free)->reserved);
 }
 
 internal void arena_release_all() {

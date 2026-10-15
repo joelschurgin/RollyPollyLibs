@@ -1,13 +1,14 @@
 #include "misty.h"
 
-Misty* misty_mountain_create(Arena* arena) {
-    Misty* mountain = push_struct(arena, Misty);
-    mountain->arena = arena;
+Misty_DwarfReader* misty_mountain_create(Arena* dest_arena, Arena* temp_arena) {
+    Misty_DwarfReader* mountain = push_struct(temp_arena, Misty_DwarfReader);
+    mountain->temp_arena = temp_arena;
+    mountain->dest_arena = dest_arena;
     return mountain;
 }
 
 #define ElfHeaderGet(header, field) (((header).type == ELF_32) ? (header).h.h32.field : (header).h.h64.field)
-Misty_SectionHeaderTableInfo misty_read_elf_header(Misty* mountain, File* f) {
+Misty_SectionHeaderTableInfo misty_read_elf_header(Misty_DwarfReader* mountain, File* f) {
     ElfHeader header;
     file_read_bytes(f, 0, &header.h, sizeof(header.h));
 
@@ -28,10 +29,10 @@ Misty_SectionHeaderTableInfo misty_read_elf_header(Misty* mountain, File* f) {
 
     mountain->type     = type;
     mountain->endian   = endian;
-    mountain->sections = Array(mountain->arena, Misty_Section, 1 + ElfHeaderGet(header, e_shnum));
+    mountain->sections = Array(mountain->temp_arena, Misty_Section, 1 + ElfHeaderGet(header, e_shnum));
 
     for EachElement(sec, Misty_Section, mountain->sections) {
-        sec->pos = Array(mountain->arena, u64, LaneCount());
+        sec->pos = Array(mountain->temp_arena, u64, LaneCount());
     }
 
     Misty_SectionHeaderTableInfo section_header_table_info = (Misty_SectionHeaderTableInfo) {
@@ -45,7 +46,7 @@ Misty_SectionHeaderTableInfo misty_read_elf_header(Misty* mountain, File* f) {
     return section_header_table_info;
 }
 
-u8* misty_read_shstrtab(Misty* mountain, File* f, u64 offset) {
+u8* misty_read_shstrtab(Misty_DwarfReader* mountain, File* f, u64 offset) {
     ElfSectionHeader section_header = (ElfSectionHeader){
         .type = mountain->type,
     };
@@ -54,12 +55,12 @@ u8* misty_read_shstrtab(Misty* mountain, File* f, u64 offset) {
     u64 section_size = ElfHeaderGet(section_header, sh_size);
     u64 section_offset = ElfHeaderGet(section_header, sh_offset);
 
-    u8* names = push_array(mountain->arena, u8, section_size, false);
+    u8* names = push_array(mountain->temp_arena, u8, section_size, false);
     file_read_bytes(f, section_offset, names, section_size);
     return names;
 }
 
-void misty_read_elf_section_headers(Misty* mountain, File* f, Misty_SectionHeaderTableInfo section_header_table_info) {
+void misty_read_elf_section_headers(Misty_DwarfReader* mountain, File* f, Misty_SectionHeaderTableInfo section_header_table_info) {
     ThreadArraySplit split = ThreadArraySplit(mountain->sections.count-1);
 
     for (u64 curr_section = split.start_idx; curr_section < split.end_idx; curr_section++) {
@@ -170,7 +171,7 @@ internal i64 DwarfSectionRead_sleb128(File* f, Misty_Section* section) {
     return result;
 }
 
-Misty_Value misty_read_form_val(Misty* mountain, File* f, Misty_Section* section, DwarfFormType form, u8 addr_size_bytes) {
+Misty_Value misty_read_form_val(Misty_DwarfReader* mountain, File* f, Misty_Section* section, DwarfFormType form, u8 addr_size_bytes) {
 #ifdef BUILD_DEBUG
     LaneCtx* lane_ctx = LaneCtx();
 #endif
@@ -180,7 +181,7 @@ Misty_Value misty_read_form_val(Misty* mountain, File* f, Misty_Section* section
         case DW_FORM_string:
         {
             val.type = MISTY_STRING;
-            val.val.str =  DwarfSectionRead_String(mountain->arena, f, section);
+            val.val.str =  DwarfSectionRead_String(mountain->temp_arena, f, section);
         }
         break;
         case DW_FORM_strp:
@@ -188,7 +189,7 @@ Misty_Value misty_read_form_val(Misty* mountain, File* f, Misty_Section* section
             val.type = MISTY_STRING;
             u64 offset = 0;
             DwarfSectionRead_Addr(f, section, offset, section->addr_type);
-            val.val.str = DwarfSectionRead_StringAt(mountain->arena, f, &misty_section(mountain, debug_str), offset);
+            val.val.str = DwarfSectionRead_StringAt(mountain->temp_arena, f, &misty_section(mountain, debug_str), offset);
         }
         break;
         case DW_FORM_line_strp:
@@ -196,7 +197,7 @@ Misty_Value misty_read_form_val(Misty* mountain, File* f, Misty_Section* section
             val.type = MISTY_STRING;
             u64 offset = 0;
             DwarfSectionRead_Addr(f, section, offset, section->addr_type);
-            val.val.str = DwarfSectionRead_StringAt(mountain->arena, f, &misty_section(mountain, debug_line_str), offset);
+            val.val.str = DwarfSectionRead_StringAt(mountain->temp_arena, f, &misty_section(mountain, debug_line_str), offset);
         }
         break;
         case DW_FORM_ref1:
@@ -287,8 +288,8 @@ Misty_Value misty_read_form_val(Misty* mountain, File* f, Misty_Section* section
         {
             // DWARF5 pg 26 for expressions
             u64 length = DwarfSectionRead_uleb128(f, section);
-            TempArenaBlock(mountain->arena) {
-                u8Array expr_bytes = Array(mountain->arena, u8, length);
+            TempArenaBlock(mountain->temp_arena) {
+                u8Array expr_bytes = Array(mountain->temp_arena, u8, length);
                 DwarfSectionRead_Data(f, section, expr_bytes.data, expr_bytes.count);
 
                 for (u64 idx = 0; idx < expr_bytes.count; idx++) {
@@ -335,7 +336,7 @@ u64 misty_read_initial_length_value(File* f, Misty_Section* section, DwarfType* 
     return length_64;
 }
 
-Misty_Value misty_read_line_content_description(Misty* mountain, File* f, Misty_Section* section, Misty_LineHeaderEntryFormat* entry_format) {
+Misty_Value misty_read_line_content_description(Misty_DwarfReader* mountain, File* f, Misty_Section* section, Misty_LineHeaderEntryFormat* entry_format) {
     Misty_Value val = {0};
     u8 addr_size_bytes = (section->addr_type == DWARF_32) ? 4 : 8;
     switch (entry_format->type) {
@@ -353,12 +354,12 @@ Misty_Value misty_read_line_content_description(Misty* mountain, File* f, Misty_
     return val;
 }
 
-internal void _misty_read_line_info_header_dirs_and_files_dwarf5(Misty* mountain, File* f, Misty_Section* section) {
+internal void _misty_read_line_info_header_dirs_and_files_dwarf5(Misty_DwarfReader* mountain, File* f, Misty_Section* section) {
     // dirs
     {
         Misty_LineHeaderEntryFormatArray dir_entry_format = {0};
         DwarfSectionRead_Data(f, section, &dir_entry_format.count, 1);
-        dir_entry_format = Array(mountain->arena, Misty_LineHeaderEntryFormat, dir_entry_format.count);
+        dir_entry_format = Array(mountain->temp_arena, Misty_LineHeaderEntryFormat, dir_entry_format.count);
 
         for EachElement(entry_format, Misty_LineHeaderEntryFormat, dir_entry_format) {
             entry_format->type = DwarfSectionRead_uleb128(f, section);
@@ -366,7 +367,7 @@ internal void _misty_read_line_info_header_dirs_and_files_dwarf5(Misty* mountain
         }
 
         mountain->dirs.count = DwarfSectionRead_uleb128(f, section);
-        mountain->dirs = Array(mountain->arena, String, mountain->dirs.count);
+        mountain->dirs = Array(mountain->temp_arena, String, mountain->dirs.count);
 
         for (u64 dir_idx = 0; dir_idx < mountain->dirs.count; dir_idx++) {
             for EachElement(entry_format, Misty_LineHeaderEntryFormat, dir_entry_format) {
@@ -380,7 +381,7 @@ internal void _misty_read_line_info_header_dirs_and_files_dwarf5(Misty* mountain
     {
         Misty_LineHeaderEntryFormatArray file_entry_format = {0};
         DwarfSectionRead_Data(f, section, &file_entry_format.count, 1);
-        file_entry_format = Array(mountain->arena, Misty_LineHeaderEntryFormat, file_entry_format.count);
+        file_entry_format = Array(mountain->temp_arena, Misty_LineHeaderEntryFormat, file_entry_format.count);
 
         for EachElement(entry_format, Misty_LineHeaderEntryFormat, file_entry_format) {
             entry_format->type = DwarfSectionRead_uleb128(f, section);
@@ -388,7 +389,7 @@ internal void _misty_read_line_info_header_dirs_and_files_dwarf5(Misty* mountain
         }
 
         mountain->file_paths.count = DwarfSectionRead_uleb128(f, section);
-        mountain->file_paths = Array(mountain->arena, Misty_FilePath, mountain->file_paths.count);
+        mountain->file_paths = Array(mountain->temp_arena, Misty_FilePath, mountain->file_paths.count);
 
         for (u64 file_idx = 0; file_idx < mountain->file_paths.count; file_idx++) {
             for EachElement(entry_format, Misty_LineHeaderEntryFormat, file_entry_format) {
@@ -405,7 +406,7 @@ internal void _misty_read_line_info_header_dirs_and_files_dwarf5(Misty* mountain
     }
 }
 
-internal void _misty_read_line_info_header_dirs_and_files_dwarf234(Misty* mountain, File* f, Misty_Section* section) {
+internal void _misty_read_line_info_header_dirs_and_files_dwarf234(Misty_DwarfReader* mountain, File* f, Misty_Section* section) {
     // dirs
     {
         // count
@@ -421,9 +422,9 @@ internal void _misty_read_line_info_header_dirs_and_files_dwarf234(Misty* mounta
         Misty_SectionPos(section) = section_pos;
 
         // read
-        mountain->dirs = Array(mountain->arena, String, num_dirs+1);
+        mountain->dirs = Array(mountain->temp_arena, String, num_dirs+1);
         for (u64 dir_idx = 1; dir_idx < num_dirs; dir_idx++) {
-            mountain->dirs.data[dir_idx] = DwarfSectionRead_String(mountain->arena, f, section);
+            mountain->dirs.data[dir_idx] = DwarfSectionRead_String(mountain->temp_arena, f, section);
             String dir = mountain->dirs.data[dir_idx];
             printf("%d: %.*s\n", dir_idx, dir.size, dir.str);
         }
@@ -449,9 +450,9 @@ internal void _misty_read_line_info_header_dirs_and_files_dwarf234(Misty* mounta
         Misty_SectionPos(section) = section_pos;
 
         // read
-        mountain->file_paths = Array(mountain->arena, Misty_FilePath, num_file_paths+1);
+        mountain->file_paths = Array(mountain->temp_arena, Misty_FilePath, num_file_paths+1);
         for (u64 file_path_idx = 1; file_path_idx < num_file_paths; file_path_idx++) {
-            mountain->file_paths.data[file_path_idx].file_name = DwarfSectionRead_String(mountain->arena, f, section);
+            mountain->file_paths.data[file_path_idx].file_name = DwarfSectionRead_String(mountain->temp_arena, f, section);
             mountain->file_paths.data[file_path_idx].dir_idx   = DwarfSectionRead_uleb128(f, section);
             (void)DwarfSectionRead_uleb128(f, section);
             (void)DwarfSectionRead_uleb128(f, section);
@@ -464,7 +465,7 @@ internal void _misty_read_line_info_header_dirs_and_files_dwarf234(Misty* mounta
 }
 
 
-Misty_LineInfoHeader misty_read_line_info_header(Misty* mountain, File* f, Misty_Section* section) {
+Misty_LineInfoHeader misty_read_line_info_header(Misty_DwarfReader* mountain, File* f, Misty_Section* section) {
     Misty_LineInfoHeader header = {0};
     header.unit_length = misty_read_initial_length_value(f, section, &header.type);
 
@@ -494,7 +495,7 @@ Misty_LineInfoHeader misty_read_line_info_header(Misty* mountain, File* f, Misty
 
     DwarfSectionRead_Struct(f, section, header.opcode_base);
 
-    header.standard_opcode_lengths = Array(mountain->arena, u8, header.opcode_base-1);
+    header.standard_opcode_lengths = Array(mountain->temp_arena, u8, header.opcode_base-1);
     DwarfSectionRead_Array(f, section, header.standard_opcode_lengths);
 
     if (header.version == 5) {
@@ -521,7 +522,7 @@ typedef struct {
     b8 epilogue_begin;
 } Misty_LineInfoState;
 
-Misty_LineInfoArray misty_read_line_info(Misty* mountain, File* f) {
+Misty_LineInfoArray misty_read_line_info(Misty_DwarfReader* mountain, File* f) {
     Misty_Section* section = &misty_section(mountain, debug_line);
     Misty_LineInfoHeader header = misty_read_line_info_header(mountain, f, section);
     Misty_LineInfoState state = {
@@ -540,9 +541,9 @@ Misty_LineInfoArray misty_read_line_info(Misty* mountain, File* f) {
     };
 
     Misty_LineInfoArray line_info = {0};
-    ArrayBuilderBlock(mountain->arena, line_info, Misty_LineInfo) {
+    ArrayBuilderBlock(mountain->dest_arena, line_info, Misty_LineInfo) {
 
-        array_builder_push(mountain->arena, line_info, (Misty_LineInfo){0});
+        array_builder_push(mountain->dest_arena, line_info, (Misty_LineInfo){0});
 
         for (; !state.end_sequence ;) {
             u8 opcode = 0;
@@ -648,7 +649,7 @@ Misty_LineInfoArray misty_read_line_info(Misty* mountain, File* f) {
                 state.prologue_end = 0;
                 state.epilogue_begin = 0;
 
-                array_builder_push(mountain->arena, line_info, ((Misty_LineInfo){
+                array_builder_push(mountain->dest_arena, line_info, ((Misty_LineInfo){
                     .addr = state.addr,
                     .line = state.line,
                     .column = state.column,
@@ -656,7 +657,7 @@ Misty_LineInfoArray misty_read_line_info(Misty* mountain, File* f) {
                 }));
             }
         }
-        array_builder_push(mountain->arena, line_info, ((Misty_LineInfo){
+        array_builder_push(mountain->dest_arena, line_info, ((Misty_LineInfo){
             .addr = state.addr,
             .line = state.line,
             .column = state.column,
@@ -667,17 +668,17 @@ Misty_LineInfoArray misty_read_line_info(Misty* mountain, File* f) {
     return line_info;
 }
 
-void misty_die_read_abbrev_offsets(Misty* mountain, File* f, Misty_Die* die) {
+void misty_die_read_abbrev_offsets(Misty_DwarfReader* mountain, File* f, Misty_Die* die) {
     Misty_Section* section = &misty_section(mountain, debug_abbrev);
     Misty_SectionPos(section) = die->header.debug_abbrev_offset;
     section->addr_type = die->header.type;
 
-    ArrayBuilderBlock(mountain->arena, die->abbrev_offsets, u64) {
-        array_builder_push(mountain->arena, die->abbrev_offsets, Misty_SectionPos(section));
+    ArrayBuilderBlock(mountain->temp_arena, die->abbrev_offsets, u64) {
+        array_builder_push(mountain->temp_arena, die->abbrev_offsets, Misty_SectionPos(section));
         while (1) {
             u64 abbrev_idx = DwarfSectionRead_uleb128(f, section);
             if (abbrev_idx == 0) break;
-            array_builder_push(mountain->arena, die->abbrev_offsets, Misty_SectionPos(section));
+            array_builder_push(mountain->temp_arena, die->abbrev_offsets, Misty_SectionPos(section));
 
             DwarfTagType tag = DwarfSectionRead_uleb128(f, section);
 
@@ -769,10 +770,10 @@ void misty_parse_attrib(DwarfAttributeType attrib, Misty_Value value, Misty_Attr
     }
 }
 
-Misty_DieEntry misty_push_type(Misty* mountain, Misty_Die* die, u64 entry_addr) {
+Misty_DieEntry misty_push_type(Misty_DwarfReader* mountain, Misty_Die* die, u64 entry_addr, Misty_AttribValues* attrib_values) {
     Misty_TypeInfo* new_type = 0L;
     MutexBlock(mountain->mutex) {
-        new_type = push_struct(mountain->arena, Misty_TypeInfo);
+        new_type = push_struct(mountain->temp_arena, Misty_TypeInfo);
     }
     if (!die->type_info.first) {
         die->type_info.first = new_type;
@@ -781,8 +782,13 @@ Misty_DieEntry misty_push_type(Misty* mountain, Misty_Die* die, u64 entry_addr) 
         SLLQueuePush(die->type_info.first, die->type_info.last, new_type);
     }
 
-    die->type_info.last->entry_addr = entry_addr;
     die->type_info.size += 1;
+
+    new_type->name       = attrib_values->name;
+    new_type->byte_size  = attrib_values->byte_size;
+    new_type->encoding   = attrib_values->encoding;
+    new_type->type_ref   = attrib_values->type_ref;
+    new_type->entry_addr = entry_addr;
 
     Misty_DieEntry entry = {0};
     entry.value = (void*)new_type;
@@ -790,10 +796,10 @@ Misty_DieEntry misty_push_type(Misty* mountain, Misty_Die* die, u64 entry_addr) 
     return entry;
 }
 
-Misty_DieEntry misty_push_subprogram(Misty* mountain, Misty_Die* die, u64 entry_addr) {
+Misty_DieEntry misty_push_subprogram(Misty_DwarfReader* mountain, Misty_Die* die, u64 entry_addr, Misty_AttribValues* attrib_values) {
     Misty_Subprogram* new_subprogram = 0L;
     MutexBlock(mountain->mutex) {
-        new_subprogram = push_struct(mountain->arena, Misty_Subprogram);
+        new_subprogram = push_struct(mountain->temp_arena, Misty_Subprogram);
     }
     if (!die->subprogram.first) {
         die->subprogram.first = new_subprogram;
@@ -802,19 +808,26 @@ Misty_DieEntry misty_push_subprogram(Misty* mountain, Misty_Die* die, u64 entry_
         SLLQueuePush(die->subprogram.first, die->subprogram.last, new_subprogram);
     }
 
-    die->subprogram.last->entry_addr = entry_addr;
     die->subprogram.size += 1;
  
+    new_subprogram->name       = attrib_values->name;
+    new_subprogram->file_idx   = attrib_values->file_idx;
+    new_subprogram->line       = attrib_values->line;
+    new_subprogram->column     = attrib_values->column;
+    new_subprogram->prototyped = attrib_values->prototyped;
+    new_subprogram->external   = attrib_values->external;
+    new_subprogram->entry_addr = entry_addr;
+
     Misty_DieEntry entry = {0};
     entry.value = (void*)new_subprogram;
     entry.type = MISTY_DIE_ENTRY_SUBPROGRAM;
     return entry;
 }
 
-Misty_DieEntry misty_push_lexical_block(Misty* mountain, Misty_Die* die, u64 entry_addr) {
+Misty_DieEntry misty_push_lexical_block(Misty_DwarfReader* mountain, Misty_Die* die, u64 entry_addr, Misty_AttribValues* attrib_values) {
     Misty_LexicalBlock* new_lexical_block = 0L;
     MutexBlock(mountain->mutex) {
-        new_lexical_block = push_struct(mountain->arena, Misty_LexicalBlock);
+        new_lexical_block = push_struct(mountain->temp_arena, Misty_LexicalBlock);
     }
     if (!die->lexical_block.first) {
         die->lexical_block.first = new_lexical_block;
@@ -823,8 +836,11 @@ Misty_DieEntry misty_push_lexical_block(Misty* mountain, Misty_Die* die, u64 ent
         SLLQueuePush(die->lexical_block.first, die->lexical_block.last, new_lexical_block);
     }
 
-    die->lexical_block.last->entry_addr = entry_addr;
     die->lexical_block.size += 1;
+
+    new_lexical_block->low_pc     = attrib_values->low_pc;
+    new_lexical_block->high_pc    = attrib_values->high_pc;
+    new_lexical_block->entry_addr = entry_addr;
 
     Misty_DieEntry entry = {0};
     entry.value = (void*)new_lexical_block;
@@ -832,10 +848,10 @@ Misty_DieEntry misty_push_lexical_block(Misty* mountain, Misty_Die* die, u64 ent
     return entry;
 }
 
-Misty_DieEntry misty_push_variable(Misty* mountain, Misty_Die* die, u64 entry_addr) {
+Misty_DieEntry misty_push_variable(Misty_DwarfReader* mountain, Misty_Die* die, u64 entry_addr, Misty_AttribValues* attrib_values) {
     Misty_Variable* new_variable = 0L;
     MutexBlock(mountain->mutex) {
-        new_variable = push_struct(mountain->arena, Misty_Variable);
+        new_variable = push_struct(mountain->temp_arena, Misty_Variable);
     }
     if (!die->variable.first) {
         die->variable.first = new_variable;
@@ -844,8 +860,15 @@ Misty_DieEntry misty_push_variable(Misty* mountain, Misty_Die* die, u64 entry_ad
         SLLQueuePush(die->variable.first, die->variable.last, new_variable);
     }
 
-    die->variable.last->entry_addr = entry_addr;
     die->variable.size += 1;
+
+    new_variable->name       = attrib_values->name;
+    new_variable->file_idx   = attrib_values->file_idx;
+    new_variable->line       = attrib_values->line;
+    new_variable->column     = attrib_values->column;
+    new_variable->type_ref   = attrib_values->type_ref;
+    new_variable->location   = attrib_values->location;
+    new_variable->entry_addr = entry_addr;
 
     Misty_DieEntry entry = {0};
     entry.value = (void*)new_variable;
@@ -853,10 +876,10 @@ Misty_DieEntry misty_push_variable(Misty* mountain, Misty_Die* die, u64 entry_ad
     return entry;
 }
 
-void misty_push_variable_ref(Misty* mountain, Misty_VariableRefList* ref_list, Misty_Variable* var) {
+void misty_push_variable_ref(Misty_DwarfReader* mountain, Misty_VariableRefList* ref_list, Misty_Variable* var) {
     Misty_VariableRef* new_ref = 0L;
     MutexBlock(mountain->mutex) {
-        new_ref = push_struct(mountain->arena, Misty_VariableRef);
+        new_ref = push_struct(mountain->temp_arena, Misty_VariableRef);
     }
     new_ref->ref = var;
     if (!ref_list->first) {
@@ -867,7 +890,7 @@ void misty_push_variable_ref(Misty* mountain, Misty_VariableRefList* ref_list, M
     }
 }
 
-Misty_DieEntry misty_parse_die_entry(Misty* mountain, File* f, Misty_Die* die) {
+Misty_DieEntry misty_parse_die_entry(Misty_DwarfReader* mountain, File* f, Misty_Die* die) {
     Misty_DieEntry entry = {0};
 
     Misty_Section* section = &misty_section(mountain, debug_info);
@@ -912,7 +935,6 @@ Misty_DieEntry misty_parse_die_entry(Misty* mountain, File* f, Misty_Die* die) {
 
     switch (tag) {
         case DW_TAG_compile_unit:
-        {
             die->comp_unit.name             = attrib_values.name;
             die->comp_unit.producer         = attrib_values.producer;
             die->comp_unit.language_name    = attrib_values.language_name;
@@ -925,72 +947,32 @@ Misty_DieEntry misty_parse_die_entry(Misty* mountain, File* f, Misty_Die* die) {
             die->comp_unit.language         = attrib_values.language;
 
             entry.type = MISTY_DIE_ENTRY_COMPUNIT;
-        }
         break;
         case DW_TAG_base_type:
-        {
-            entry = misty_push_type(mountain, die, entry_addr);
-            die->type_info.last->name      = attrib_values.name;
-            die->type_info.last->encoding  = attrib_values.encoding;
-            die->type_info.last->byte_size = attrib_values.byte_size;
-        }
+            entry = misty_push_type(mountain, die, entry_addr, &attrib_values);
         break;
         case DW_TAG_const_type:
-        {
-            entry = misty_push_type(mountain, die, entry_addr);
-            die->type_info.last->modifier = MISTY_CONST;
-            die->type_info.last->type_ref = attrib_values.type_ref;
-        }
+            entry = misty_push_type(mountain, die, entry_addr, &attrib_values);
+            ((Misty_TypeInfo*)entry.value)->modifier = MISTY_CONST;
         break;
         case DW_TAG_pointer_type:
-        {
-            entry = misty_push_type(mountain, die, entry_addr);
-            die->type_info.last->modifier = MISTY_POINTER;
-            die->type_info.last->type_ref = attrib_values.type_ref;
-        }
+            entry = misty_push_type(mountain, die, entry_addr, &attrib_values);
+            ((Misty_TypeInfo*)entry.value)->modifier = MISTY_POINTER;
         break;
         case DW_TAG_subprogram:
-        {
-            entry = misty_push_subprogram(mountain, die, entry_addr);
-            die->subprogram.last->name       = attrib_values.name;
-            die->subprogram.last->file_idx   = attrib_values.file_idx;
-            die->subprogram.last->line       = attrib_values.line;
-            die->subprogram.last->column     = attrib_values.column;
-            die->subprogram.last->prototyped = attrib_values.prototyped;
-            die->subprogram.last->external   = attrib_values.external;
-        }
+            entry = misty_push_subprogram(mountain, die, entry_addr, &attrib_values);
         break;
         case DW_TAG_formal_parameter:
-        {
-            entry = misty_push_variable(mountain, die, entry_addr);
-            die->variable.last->name     = attrib_values.name;
-            die->variable.last->file_idx = attrib_values.file_idx;
-            die->variable.last->line     = attrib_values.line;
-            die->variable.last->column   = attrib_values.column;
-            die->variable.last->type_ref = attrib_values.type_ref;
-        }
+            entry = misty_push_variable(mountain, die, entry_addr, &attrib_values);
         break;
         case DW_TAG_unspecified_parameters:
-        {
             die->subprogram.last->unspecified_params = 1;
-        }
         break;
         case DW_TAG_variable:
-        {
-            entry = misty_push_variable(mountain, die, entry_addr);
-            die->variable.last->name     = attrib_values.name;
-            die->variable.last->file_idx = attrib_values.file_idx;
-            die->variable.last->line     = attrib_values.line;
-            die->variable.last->column   = attrib_values.column;
-            die->variable.last->type_ref = attrib_values.type_ref;
-        }
+            entry = misty_push_variable(mountain, die, entry_addr, &attrib_values);
         break;
         case DW_TAG_lexical_block:
-        {
-            entry = misty_push_lexical_block(mountain, die, entry_addr);
-            die->lexical_block.last->low_pc  = attrib_values.low_pc;
-            die->lexical_block.last->high_pc = attrib_values.high_pc;
-        }
+            entry = misty_push_lexical_block(mountain, die, entry_addr, &attrib_values);
         break;
         default:
             TODO("Unhandled DW_TAG");
@@ -1000,7 +982,7 @@ Misty_DieEntry misty_parse_die_entry(Misty* mountain, File* f, Misty_Die* die) {
     return entry;
 }
 
-void misty_parse_die(Misty* mountain, File* f, Misty_Die* die, Misty_DieEntry* parent) {
+void misty_parse_die(Misty_DwarfReader* mountain, File* f, Misty_Die* die, Misty_DieEntry* parent) {
 #ifdef BUILD_DEBUG
     LaneCtx* lane_ctx = LaneCtx();
 #endif
@@ -1036,13 +1018,14 @@ void misty_parse_die(Misty* mountain, File* f, Misty_Die* die, Misty_DieEntry* p
     } while (entry.type != MISTY_DIE_ENTRY_NONE);
 }
 
-void misty_read_debug_info(Misty* mountain, File* f) {
+void misty_read_debug_info(Misty_DwarfReader* mountain, File* f) {
     // read CU header DWARF5.pdf page 200
     Misty_Section* section = &misty_section(mountain, debug_info);
 
+    Misty_DieArray die_arr;
     AssignLane(0) {
         // header
-        ArrayBuilderBlock(mountain->arena, mountain->die_arr, Misty_Die) 
+        ArrayBuilderBlock(mountain->temp_arena, die_arr, Misty_Die) 
         for (Misty_SectionPos(section) = 0; Misty_SectionPos(section) < section->size; ){
             Misty_Die die = {0};
 
@@ -1075,23 +1058,23 @@ void misty_read_debug_info(Misty* mountain, File* f) {
             switch (die.header.unit_type) {
                 case DW_UT_compile:
                     // no more bytes to read for the die.header
-                    die.start_addr = Misty_SectionPos(section);;
+                    die.start_addr = Misty_SectionPos(section);
                 break;
                 default:
                     TODO("Handle Other DWARF_UT types");
             }
 
-            array_builder_push(mountain->arena, mountain->die_arr, die);
+            array_builder_push(mountain->temp_arena, die_arr, die);
 
             Misty_SectionPos(section) = section_pos + die.header.unit_length;
         }
     }
-    LaneSync();
+    LaneSyncStruct(die_arr, 0);
 
     {
-        ThreadArraySplit split = ThreadArraySplit(mountain->die_arr.count);
+        ThreadArraySplit split = ThreadArraySplit(die_arr.count);
         for (u64 i = split.start_idx; i < split.end_idx; i++) {
-            Misty_Die* die = mountain->die_arr.data + i;
+            Misty_Die* die = die_arr.data + i;
 
             misty_die_read_abbrev_offsets(mountain, f, die);
 
@@ -1106,3 +1089,55 @@ void misty_read_debug_info(Misty* mountain, File* f) {
 
 #undef DwarfSectionRead_Data
 #undef DwarfSectionRead_Struct
+
+Misty_DebugInfo* misty_parse(Arena* arena, String path) {
+    Misty_DebugInfo* debug_info = push_struct(arena, Misty_DebugInfo);
+    debug_info->arena = arena;
+ 
+    File* f;
+    Misty_DwarfReader* mountain = 0L;
+    Misty_SectionHeaderTableInfo section_header_table_info;
+    AssignLane(0) {
+        Arena* mountain_temp_arena = default_arena();
+        f = FilePtr(mountain_temp_arena, path);
+
+        mountain = misty_mountain_create(arena, mountain_temp_arena);
+        mutex_assign(&mountain->mutex);
+        section_header_table_info = misty_read_elf_header(mountain, f);
+    }
+    LaneSyncPtr(f, 0);
+    LaneSyncPtr(mountain, 0);
+    LaneSyncStruct(section_header_table_info, 0);
+
+    misty_read_elf_section_headers(mountain, f, section_header_table_info);
+
+    LaneSync();
+    AssignLane(0) {
+        debug_info->line_info = misty_read_line_info(mountain, f);
+
+        debug_info->dirs= Array(arena, String, mountain->dirs.count);
+        for (u64 dir_idx = 0; dir_idx < mountain->dirs.count; dir_idx++) {
+            debug_info->dirs.data[dir_idx] = string_copy(arena, mountain->dirs.data[dir_idx]);
+        }
+
+        debug_info->file_paths = Array(arena, Misty_FilePath, mountain->file_paths.count);
+        for (u64 file_idx = 0; file_idx < mountain->file_paths.count; file_idx++) {
+            debug_info->file_paths.data[file_idx] = (Misty_FilePath) {
+                .file_name = string_copy(arena, mountain->file_paths.data[file_idx].file_name),
+                .dir_idx = mountain->file_paths.data[file_idx].dir_idx,
+            };
+        }
+    }
+    LaneSync();
+
+    misty_read_debug_info(mountain, f);
+
+    LaneSync();
+    AssignLane(0) {
+        arena_release(mountain->temp_arena);
+    }
+    LaneSync();
+
+    return debug_info;
+}
+

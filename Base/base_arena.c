@@ -52,7 +52,7 @@ void arena_release_(Arena **arena) {
     Arena** begin = all_arenas;
     Arena** end = all_arenas + all_arenas_size;
     for (Arena** a = begin; a != end; a++) {
-        if (a && *a && arena && *arena && *arena == *a) {
+        if (*arena == *a) {
             *a = NULL;
             break;
         }
@@ -67,8 +67,10 @@ internal void arena_release_all() {
     Arena** begin = all_arenas;
     Arena** end = all_arenas + all_arenas_size;
     for (Arena** a = begin; a != end; a++) {
-        memory_release(*a, (*a)->reserved);
-        *a = NULL;
+        if (a && *a) {
+            memory_release(*a, (*a)->reserved);
+            *a = NULL;
+        }
     }
 }
 
